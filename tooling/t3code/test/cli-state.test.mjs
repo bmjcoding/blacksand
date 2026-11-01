@@ -36,7 +36,7 @@ function cli() {
     BLACKSAND_T3_HEADLESS: "1",
   };
   const slots = isMac
-    ? { installed: path.join(apps, "Blacksand T3.app"), previous: path.join(apps, ".Blacksand T3.previous.app"), outgoing: path.join(apps, ".Blacksand T3.outgoing.app"), staged: path.join(apps, ".Blacksand T3.new.app") }
+    ? { installed: path.join(apps, "T3 Code (blacksand).app"), previous: path.join(apps, ".T3 Code (blacksand).previous.app"), outgoing: path.join(apps, ".T3 Code (blacksand).outgoing.app"), staged: path.join(apps, ".T3 Code (blacksand).new.app") }
     : { installed: path.join(data, "blacksand", "t3", "app"), previous: path.join(data, "blacksand", "t3", "app.previous"), outgoing: path.join(data, "blacksand", "t3", "app.outgoing"), staged: path.join(data, "blacksand", "t3", "app.new") };
   fs.mkdirSync(path.dirname(slots.installed), { recursive: true });
   const state = path.join(repo, "state");

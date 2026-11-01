@@ -97,8 +97,8 @@ say() { printf '%s phone-server: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
 
 # Only the app the admin installed; BLACKSAND_T3_APP is for the tests (launchd's
 # job sets no such variable, and this account can't edit the job).
-T3B_APP="${BLACKSAND_T3_APP:-/Applications/Blacksand T3.app}"
-T3B_ELECTRON="$T3B_APP/Contents/MacOS/Blacksand T3"
+T3B_APP="${BLACKSAND_T3_APP:-/Applications/T3 Code (blacksand).app}"
+T3B_ELECTRON="$T3B_APP/Contents/MacOS/T3 Code (blacksand)"
 T3B_ASAR="$T3B_APP/Contents/Resources/app.asar"
 T3B_SERVER="$T3B_ASAR/apps/server/dist/bin.mjs"
 T3B_ENV_FILE="$T3B_HOME/server.env"

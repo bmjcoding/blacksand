@@ -5,9 +5,9 @@
 T3B_ELECTRON=""
 T3B_SERVER=""
 T3B_ASAR=""
-for T3B_APP in "\${BLACKSAND_T3_APP:-}" "/Applications/Blacksand T3.app" "$HOME/Applications/Blacksand T3.app"; do
-  if [ -n "$T3B_APP" ] && [ -x "$T3B_APP/Contents/MacOS/Blacksand T3" ]; then
-    T3B_ELECTRON="$T3B_APP/Contents/MacOS/Blacksand T3"
+for T3B_APP in "\${BLACKSAND_T3_APP:-}" "/Applications/T3 Code (blacksand).app" "$HOME/Applications/T3 Code (blacksand).app"; do
+  if [ -n "$T3B_APP" ] && [ -x "$T3B_APP/Contents/MacOS/T3 Code (blacksand)" ]; then
+    T3B_ELECTRON="$T3B_APP/Contents/MacOS/T3 Code (blacksand)"
     T3B_ASAR="$T3B_APP/Contents/Resources/app.asar"
     break
   fi

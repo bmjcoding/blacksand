@@ -14,7 +14,7 @@ import linux from "../lib/platform/linux.mjs";
 
 test("the collected app is scanned, staged dependencies and sidecars included, for both artifact shapes", () => {
   const out = fs.mkdtempSync(path.join(os.tmpdir(), "t3b-build-artifact-"));
-  const app = path.join(out, "Blacksand T3.app");
+  const app = path.join(out, "T3 Code (blacksand).app");
   const sidecar = path.join(app, "Contents", "Resources", "app.asar.unpacked", "node_modules", "helper");
   fs.mkdirSync(sidecar, { recursive: true });
   fs.writeFileSync(path.join(sidecar, "index.js"), "module.exports = 1;\n");

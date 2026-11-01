@@ -110,3 +110,52 @@ test("the preview start waits for its window", () => {
   assert.match(file("blacksandDriftReport.ts"), /event\.type === "preview-open"/);
   assert.match(fs.readFileSync(new URL("../lib/preview.mjs", import.meta.url), "utf8"), /emit\(\{ type: "preview-open", version \}\)/);
 });
+
+test("the app is called T3 Code (blacksand) everywhere it shows its name, with no stage label", () => {
+  const replaces = (id) => byId.get(id).edits.map((edit) => edit.replace).join("\n");
+  assert.match(replaces("desktop/identity-app-id"), /if \(version\) return "T3 Code \(blacksand\)";/, "the .app, Dock and Finder name");
+  assert.match(replaces("desktop/identity-app-id"), /"dev\.blacksand\.t3"/, "the bundle ID stays");
+  assert.match(replaces("desktop/identity-runtime-name"), /const APP_BASE_NAME = "T3 Code \(blacksand\)";/);
+  assert.match(replaces("desktop/identity-runtime-name"), /displayName: APP_BASE_NAME,/, "menu bar, About, window title, Linux launcher");
+  assert.match(replaces("desktop/identity-package-name"), /name: "blacksand-t3",/, "the Electron name and Keychain item stay");
+  assert.match(replaces("web/branding-name"), /\?\? "T3 Code \(blacksand\)";/);
+  assert.match(replaces("web/branding-title"), /^<title>T3 Code \(blacksand\)<\/title>$/);
+  assert.equal(replaces("web/branding-display-name"), "  return input.baseName;\n");
+});
+
+test("the sidebar logo is upstream's T3 Code with a muted, smaller blacksand after it", () => {
+  for (const id of ["web/blacksand-wordmark", "web/blacksand-stage-art"]) assert.ok(!byId.has(id), `${id} is gone`);
+  const [edit] = byId.get("web/blacksand-sidebar-name").edits;
+  assert.equal(edit.find, "        Code\n      </span>\n    </span>\n", "after upstream's muted Code, inside its mark");
+  assert.match(edit.replace, /^ {8}Code\n {6}<\/span>\n {6}<span className=\{cn\("shrink-0 text-xs font-normal", onBackdrop \? "text-white\/50" : "text-muted-foreground\/70"\)\}>\n {8}blacksand\n {6}<\/span>\n {4}<\/span>\n$/);
+  assert.equal(index.get("web/blacksand-sidebar-name"), "wordmark");
+  assert.doesNotMatch(file("BlacksandBrand.tsx"), /Wordmark|Redacted|BLACKOUT/);
+  assert.doesNotMatch(file("blacksand.css"), /t3b-wordmark|t3b-redacted/);
+  assert.doesNotMatch(file("blacksandInterface.ts"), /wordmark|redact/i);
+});
+
+test("the app icon is upstream's with the blacksand badge in front", () => {
+  assert.equal(file("blacksand.svg"), fs.readFileSync(new URL("../../../docs/assets/blacksand.svg", import.meta.url), "utf8"), "the badge's logo is docs/assets/blacksand.svg");
+  const badge = byId.get("desktop/app-icon-badge");
+  assert.equal(badge.file, "assets/prod/app-icon.icon/Assets/blacksand-badge.svg");
+  assert.ok(badge.content.includes(file("blacksand.svg").trim()), "the logo as it is, coloured by its group");
+  assert.match(badge.content, /<g color="#ffffff" fill="#ffffff"/);
+  // Upstream's icon.json at v0.1.7-nightly.20261031.3991, abridged.
+  const upstream = { fill: { solid: "display-p3:0.00000,0.00000,0.00000,1.00000" }, groups: [{ layers: [{ "image-name": "text.svg", name: "Text" }] }], "supported-platforms": { squares: "shared" } };
+  const icon = JSON.parse(byId.get("desktop/app-icon-badge-layer").transform(JSON.stringify(upstream, null, 2)));
+  assert.deepEqual(icon.groups.slice(1), upstream.groups, "upstream's layers stay, behind the badge");
+  assert.deepEqual(icon.groups[0].layers.map((layer) => layer["image-name"]), ["blacksand-badge.svg"]);
+  assert.equal(icon.groups[0].layers[0].position.scale, 0.42, "42% of the icon's width");
+  assert.deepEqual({ ...icon, groups: upstream.groups }, upstream);
+  assert.throws(() => byId.get("desktop/app-icon-badge-layer").transform("{}"), /no groups/);
+  const writes = rules.filter((rule) => rule.id.startsWith("desktop/app-icon-") && rule.kind === "write" && rule.overwrite).map((rule) => rule.file).sort();
+  assert.deepEqual(writes, [
+    "assets/nightly/nightly-macos-1024.png",
+    "assets/nightly/nightly-universal-1024.png",
+    "assets/nightly/nightly-web-apple-touch-180.png",
+    "assets/prod/black-macos-1024.png",
+    "assets/prod/black-universal-1024.png",
+    "assets/prod/t3-black-web-apple-touch-180.png",
+  ]);
+  assert.ok(rules.filter((rule) => rule.id.startsWith("desktop/app-icon-")).every((rule) => index.get(rule.id) === "app-icon"), "looks only: one feature");
+});

@@ -3,7 +3,7 @@
 // supervisor runs a fake installed app's server as you, unprivileged, in a
 // scratch home; the rendered runner's __blacksand-stop-stale-server runs against
 // the same home. Opt-in, a real packed build:
-//   BLACKSAND_T3_TEST_PACKED_APP="/path/to/Blacksand T3.app" node --test test/phone-server.deep.test.mjs
+//   BLACKSAND_T3_TEST_PACKED_APP="/path/to/T3 Code (blacksand).app" node --test test/phone-server.deep.test.mjs
 import { spawn, spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -40,7 +40,7 @@ function host(extraEnv = {}) {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "t3b-phone-")));
   const home = path.join(dir, "home");
   fs.mkdirSync(home, { mode: 0o700 });
-  const app = path.join(dir, "Blacksand T3.app");
+  const app = path.join(dir, "T3 Code (blacksand).app");
   const asar = path.join(app, "Contents", "Resources", "app.asar");
   const build = (where) => {
     fs.mkdirSync(path.join(where, "apps", "server", "dist"), { recursive: true });
@@ -48,7 +48,7 @@ function host(extraEnv = {}) {
   };
   build(asar);
   fs.mkdirSync(path.join(app, "Contents", "MacOS"), { recursive: true });
-  fs.symlinkSync(process.execPath, path.join(app, "Contents", "MacOS", "Blacksand T3"));
+  fs.symlinkSync(process.execPath, path.join(app, "Contents", "MacOS", "T3 Code (blacksand)"));
   const runner = path.join(dir, "run-t3.sh");
   fs.writeFileSync(runner, `#!/bin/sh\nset -eu\n${RUNNER}`, { mode: 0o700 });
   const env = { PATH: process.env.PATH, HOME: home, BLACKSAND_T3_APP: app, BLACKSAND_T3_UPDATE_REQUESTS: path.join(dir, "Shared", "update-requests"), ...extraEnv };
@@ -203,10 +203,10 @@ test("a dead supervisor's state file never holds a desktop connection up", () =>
   fs.writeFileSync(path.join(servers, "daemon"), `${process.pid}\nMon Jan  1 00:00:00 2001\n/bin/sh /usr/local/libexec/blacksand/phone-server 4773\nstarting\n\n\n`);
   const runner = path.join(dir, "run-t3.sh");
   fs.writeFileSync(runner, `#!/bin/sh\nset -eu\n${RUNNER}`, { mode: 0o700 });
-  const app = path.join(dir, "Blacksand T3.app");
+  const app = path.join(dir, "T3 Code (blacksand).app");
   fs.mkdirSync(path.join(app, "Contents", "MacOS"), { recursive: true });
   fs.mkdirSync(path.join(app, "Contents", "Resources", "app.asar"), { recursive: true });
-  fs.symlinkSync(process.execPath, path.join(app, "Contents", "MacOS", "Blacksand T3"));
+  fs.symlinkSync(process.execPath, path.join(app, "Contents", "MacOS", "T3 Code (blacksand)"));
   const started = Date.now();
   const stop = spawnSync(runner, ["__blacksand-stop-stale-server"], { encoding: "utf8", env: { PATH: process.env.PATH, HOME: home, BLACKSAND_T3_APP: app }, timeout: 90_000 });
   assert.equal(stop.status, 0, stop.stderr);
@@ -285,24 +285,24 @@ test("a packed app.asar (a regular file) counts as installed: the supervisor sta
 /** A fake app whose app.asar is a packed archive, a regular file, as in a real build. */
 function packedApp() {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "t3b-phone-packed-")));
-  const app = path.join(dir, "Blacksand T3.app");
+  const app = path.join(dir, "T3 Code (blacksand).app");
   fs.mkdirSync(path.join(app, "Contents", "Resources"), { recursive: true });
   fs.mkdirSync(path.join(app, "Contents", "MacOS"), { recursive: true });
   fs.writeFileSync(path.join(app, "Contents", "Resources", "app.asar"), Buffer.alloc(4096, 1));
-  fs.symlinkSync(process.execPath, path.join(app, "Contents", "MacOS", "Blacksand T3"));
+  fs.symlinkSync(process.execPath, path.join(app, "Contents", "MacOS", "T3 Code (blacksand)"));
   return { dir, app };
 }
 
 // Opt-in (see the top): a real packed build, e.g. one from `blacksand t3 check --build`.
 const PACKED = process.env.BLACKSAND_T3_TEST_PACKED_APP;
 const sourced = (body) => spawnSync("bash", ["-c", `source ${JSON.stringify(ADD_PHONE)}\n${body}`], { encoding: "utf8" });
-test("with a real packed build: the installer's check, the supervisor, the runner sharing its server, an update, and shutdown", { skip: !(isMac && PACKED) && "set BLACKSAND_T3_TEST_PACKED_APP to a built Blacksand T3.app" }, async () => {
+test("with a real packed build: the installer's check, the supervisor, the runner sharing its server, an update, and shutdown", { skip: !(isMac && PACKED) && "set BLACKSAND_T3_TEST_PACKED_APP to a built T3 Code (blacksand).app" }, async () => {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "t3b-phone-real-")));
-  const app = path.join(dir, "Blacksand T3.app");
+  const app = path.join(dir, "T3 Code (blacksand).app");
   assert.equal(spawnSync("cp", ["-cR", PACKED, app]).status, 0, "an APFS clone of the build");
   const asar = path.join(app, "Contents", "Resources", "app.asar");
   assert.ok(fs.statSync(asar).isFile(), "a packed archive");
-  const check = sourced(`APP=${JSON.stringify(app)} ELECTRON="$APP/Contents/MacOS/Blacksand T3" ASAR="$APP/Contents/Resources/app.asar" SERVER="$ASAR/apps/server/dist/bin.mjs" NAME=agent-a HOME_DIR=/tmp
+  const check = sourced(`APP=${JSON.stringify(app)} ELECTRON="$APP/Contents/MacOS/T3 Code (blacksand)" ASAR="$APP/Contents/Resources/app.asar" SERVER="$ASAR/apps/server/dist/bin.mjs" NAME=agent-a HOME_DIR=/tmp
 as_user() { shift; "$@"; }
 if why="$(app_problem)"; then echo "PROBLEM $why"; else echo OK; fi`);
   assert.equal(check.stdout.trim(), "OK", check.stdout + check.stderr);

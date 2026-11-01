@@ -36,4 +36,4 @@ chmod 600 "$TMP"
 if [[ "$(uname -s)" == Darwin ]]; then chmod -N "$TMP"; fi
 mv "$TMP" "$ENV_FILE"
 trap - EXIT
-printf 'Saved to %s (owner only). To use it, switch this account'\''s SSH environment off and on in Blacksand T3\n(Settings > Connections > Environments).\n' "$ENV_FILE"
+printf 'Saved to %s (owner only). To use it, switch this account'\''s SSH environment off and on in T3 Code (blacksand)\n(Settings > Connections > Environments).\n' "$ENV_FILE"

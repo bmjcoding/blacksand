@@ -264,7 +264,7 @@ test("--allow-from pins logins to the desktop Mac's exact tailnet addresses (and
 function extractOptionParser() {
   const source = fs.readFileSync(ADD_ACCOUNT, "utf8");
   const start = source.indexOf('  NAME="${1:-}"');
-  const end = source.indexOf("  [[ -x \"$APP/Contents/MacOS/Blacksand T3\" ]]");
+  const end = source.indexOf("  [[ -x \"$APP/Contents/MacOS/T3 Code (blacksand)\" ]]");
   assert.ok(start > 0 && end > start, "main's option parsing is where this test expects it");
   return `parse_options() {\n${source.slice(start, end)}\n  echo "ALLOW_LAN=$ALLOW_LAN LOOPBACK=$LOOPBACK ALLOW_FROM=$ALLOW_FROM"\n}\nSUDO_USER=admin-test`;
 }

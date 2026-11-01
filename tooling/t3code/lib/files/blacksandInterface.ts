@@ -9,16 +9,6 @@
 import { useSyncExternalStore } from "react";
 
 export const BLACKSAND_INTERFACE = {
-  wordmark: {
-    title: "T3 BLACKOUT logo",
-    description: "The sidebar logo. Off shows upstream's.",
-    searchTerms: "wordmark brand sidebar logo name",
-  },
-  art: {
-    title: "Redaction art",
-    description: "Redaction bars instead of the nightly starfield at the top of the sidebar.",
-    searchTerms: "redacted bars starfield nightly sidebar background stage",
-  },
   send: {
     title: "Send button ring",
     description: "A ringed send button in the theme's accent, and a glow around the chat box while you type.",

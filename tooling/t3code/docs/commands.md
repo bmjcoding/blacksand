@@ -68,7 +68,7 @@ yourself.
 | `state/` in the clone | mode 700: the log (`blacksand-t3.log`), install records, the update lock, `install.json`, and on macOS the signing keychain |
 | `~/.blacksand/t3` | the app's and each server's data. blacksand-t3 never uses upstream's `~/.t3` |
 | `~/.blacksand/t3/bin/t3` | every command writes it, so agents and the app can run this clone's CLI by a fixed path. A command writes it with a rename, so it replaces a link already there instead of writing through it |
-| `/Applications/Blacksand T3.app` (macOS) | the app, when you're an admin. Otherwise it's in `~/Applications` |
+| `/Applications/T3 Code (blacksand).app` (macOS) | the app, when you're an admin. Otherwise it's in `~/Applications` |
 | `~/.local/share/blacksand/t3/app` (Linux) | the app |
 | `/private/var/blacksand-build`, `/var/lib/blacksand-build` | the build account's home ([build account](building/build-account.md)) |
 | `/Users/Shared/blacksand` (macOS) | the update-request folder and the published pricing table, shared with agent accounts |

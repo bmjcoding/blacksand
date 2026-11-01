@@ -20,10 +20,10 @@ import { assertConsistent, world } from "./app-activation-fixtures.mjs";
 function apps() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "t3b-app-"));
   const paths = {
-    installed: path.join(dir, "Blacksand T3.app"),
-    staged: path.join(dir, ".Blacksand T3.new.app"),
-    previous: path.join(dir, ".Blacksand T3.previous.app"),
-    outgoing: path.join(dir, ".Blacksand T3.outgoing.app"),
+    installed: path.join(dir, "T3 Code (blacksand).app"),
+    staged: path.join(dir, ".T3 Code (blacksand).new.app"),
+    previous: path.join(dir, ".T3 Code (blacksand).previous.app"),
+    outgoing: path.join(dir, ".T3 Code (blacksand).outgoing.app"),
   };
   const make = (where, version) => {
     fs.mkdirSync(where, { recursive: true });
@@ -100,13 +100,13 @@ test("rollback without a previous build changes nothing", () => {
 });
 
 test("only the desktop holds an update back, not servers run from the app", () => {
-  const exe = "/Applications/Blacksand T3.app/Contents/MacOS/";
-  assert.equal(isDesktopCommand("/Applications/Blacksand T3.app/Contents/MacOS/Blacksand T3", exe), true);
-  assert.equal(isDesktopCommand("/Applications/Blacksand T3.app/Contents/MacOS/Blacksand T3 -psn_0_12345", exe), true);
-  const server = "/Applications/Blacksand T3.app/Contents/MacOS/Blacksand T3 /Applications/Blacksand T3.app/Contents/Resources/app.asar/apps/server/dist/bin.mjs";
+  const exe = "/Applications/T3 Code (blacksand).app/Contents/MacOS/";
+  assert.equal(isDesktopCommand("/Applications/T3 Code (blacksand).app/Contents/MacOS/T3 Code (blacksand)", exe), true);
+  assert.equal(isDesktopCommand("/Applications/T3 Code (blacksand).app/Contents/MacOS/T3 Code (blacksand) -psn_0_12345", exe), true);
+  const server = "/Applications/T3 Code (blacksand).app/Contents/MacOS/T3 Code (blacksand) /Applications/T3 Code (blacksand).app/Contents/Resources/app.asar/apps/server/dist/bin.mjs";
   assert.equal(isDesktopCommand(`${server} serve --host 127.0.0.1 --port 3773 --base-dir /Users/agent-claude/.blacksand/t3`, exe), false);
   assert.equal(isDesktopCommand(`${server} auth pairing create --json`, exe), false);
-  assert.equal(isDesktopCommand("/Applications/Blacksand T3.app/Contents/Frameworks/Blacksand T3 Helper.app/Contents/MacOS/Blacksand T3 Helper", exe), false);
+  assert.equal(isDesktopCommand("/Applications/T3 Code (blacksand).app/Contents/Frameworks/T3 Code (blacksand) Helper.app/Contents/MacOS/T3 Code (blacksand) Helper", exe), false);
   assert.equal(isDesktopCommand("/opt/t3/app/t3code --type=renderer", "/opt/t3/app/"), true);
   assert.equal(isDesktopCommand("/opt/t3/app/t3code /opt/t3/app/resources/app.asar/apps/server/dist/bin.mjs serve", "/opt/t3/app/"), false);
 });
@@ -180,12 +180,12 @@ function journalWorld() {
   const apps = path.join(dir, "Applications");
   fs.mkdirSync(apps);
   const slots = {
-    installed: path.join(apps, "Blacksand T3.app"),
-    previous: path.join(apps, ".Blacksand T3.previous.app"),
-    outgoing: path.join(apps, ".Blacksand T3.outgoing.app"),
+    installed: path.join(apps, "T3 Code (blacksand).app"),
+    previous: path.join(apps, ".T3 Code (blacksand).previous.app"),
+    outgoing: path.join(apps, ".T3 Code (blacksand).outgoing.app"),
   };
-  const staged = path.join(apps, ".Blacksand T3.new.app");
-  const pending = path.join(apps, ".Blacksand T3.pending.app");
+  const staged = path.join(apps, ".T3 Code (blacksand).new.app");
+  const pending = path.join(apps, ".T3 Code (blacksand).pending.app");
   const make = (where, v) => {
     fs.mkdirSync(where);
     fs.writeFileSync(path.join(where, "version"), v);
@@ -273,7 +273,7 @@ test("journals this install wrote still recover, from either staging folder", ()
   assert.equal(fs.readFileSync(path.join(w.slots.previous, "version"), "utf8"), "2");
   // A pending build whose install was cut off before anything moved: undone, still staged.
   const p = journalWorld();
-  const pending = path.join(p.apps, ".Blacksand T3.pending.app");
+  const pending = path.join(p.apps, ".T3 Code (blacksand).pending.app");
   fs.renameSync(p.staged, pending);
   p.write({ ...p.install, staged: pending });
   assert.deepEqual(p.recover(), { op: "install", committed: false, staged: pending, records: p.install.records });

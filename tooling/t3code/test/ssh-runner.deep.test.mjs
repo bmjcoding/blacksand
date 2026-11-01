@@ -36,13 +36,13 @@ const rendered = () => `#!/bin/sh\nset -eu\nT3_ARCHIVE_VERSION='9.9.9'\n${new Fu
 function host() {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "t3b-runner-")));
   const home = path.join(dir, "home");
-  const app = path.join(dir, "Blacksand T3.app");
+  const app = path.join(dir, "T3 Code (blacksand).app");
   fs.mkdirSync(path.join(app, "Contents", "MacOS"), { recursive: true });
   fs.mkdirSync(path.join(app, "Contents", "Resources"), { recursive: true });
   fs.writeFileSync(path.join(app, "Contents", "Resources", "app.asar"), "build 1");
   // A server loops until killed, so it shows in ps with its arguments; anything else echoes.
   fs.writeFileSync(
-    path.join(app, "Contents", "MacOS", "Blacksand T3"),
+    path.join(app, "Contents", "MacOS", "T3 Code (blacksand)"),
     '#!/bin/sh\nif [ "$2" = serve ] && [ -z "${T3B_FAKE_ONESHOT:-}" ]; then while :; do sleep 1; done; fi\nprintf "%s|%s\\n" "$*" "${T3B_TEST_TOKEN:-}"\n',
     { mode: 0o755 },
   );
@@ -139,7 +139,7 @@ if (process.argv[2] === "serve") {
 function recordsHost() {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "t3b-runner-")));
   const home = path.join(dir, "home");
-  const app = path.join(dir, "Blacksand T3.app");
+  const app = path.join(dir, "T3 Code (blacksand).app");
   const asar = path.join(app, "Contents", "Resources", "app.asar");
   const build = (where) => {
     fs.mkdirSync(path.join(where, "apps", "server", "dist"), { recursive: true });
@@ -147,7 +147,7 @@ function recordsHost() {
   };
   build(asar);
   fs.mkdirSync(path.join(app, "Contents", "MacOS"), { recursive: true });
-  fs.symlinkSync(process.execPath, path.join(app, "Contents", "MacOS", "Blacksand T3"));
+  fs.symlinkSync(process.execPath, path.join(app, "Contents", "MacOS", "T3 Code (blacksand)"));
   fs.mkdirSync(home, { mode: 0o700 });
   const runner = path.join(dir, "run-t3.sh");
   fs.writeFileSync(runner, rendered(), { mode: 0o700 });
@@ -198,7 +198,7 @@ test("each server keeps its own record: its start time, build and command line",
     assert.match(build, /^\d+:\d+:\d+:\d+$/);
     assert.ok(await waitFor(() => ps("args", server.pid).includes(" serve ")), "running as the server");
     assert.equal(args, ps("args", server.pid).trim());
-    assert.ok(args.startsWith(`${h.app}/Contents/MacOS/Blacksand T3 ${h.app}/Contents/Resources/app.asar/apps/server/dist/bin.mjs serve `));
+    assert.ok(args.startsWith(`${h.app}/Contents/MacOS/T3 Code (blacksand) ${h.app}/Contents/Resources/app.asar/apps/server/dist/bin.mjs serve `));
     assert.equal(fs.statSync(h.records).mode & 0o077, 0, "records are private");
   } finally {
     h.cleanup();
@@ -294,7 +294,7 @@ function startingHost() {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "t3b-runner-")));
   const home = path.join(dir, "home");
   fs.mkdirSync(home, { mode: 0o700 });
-  const app = path.join(dir, "Blacksand T3.app");
+  const app = path.join(dir, "T3 Code (blacksand).app");
   const asar = path.join(app, "Contents", "Resources", "app.asar");
   const build = (where) => {
     fs.mkdirSync(path.join(where, "apps", "server", "dist"), { recursive: true });
@@ -302,7 +302,7 @@ function startingHost() {
   };
   build(asar);
   fs.mkdirSync(path.join(app, "Contents", "MacOS"), { recursive: true });
-  fs.symlinkSync(process.execPath, path.join(app, "Contents", "MacOS", "Blacksand T3"));
+  fs.symlinkSync(process.execPath, path.join(app, "Contents", "MacOS", "T3 Code (blacksand)"));
   const runner = path.join(dir, "run-t3.sh");
   fs.writeFileSync(runner, `#!/bin/sh\nset -eu\n${decodeTemplate(SOURCE)}`, { mode: 0o700 });
   const bin = path.join(dir, "bin");

@@ -47,8 +47,8 @@ Your SSH agent may ask you to approve Blacksand T3's use of the key the first ti
 
 - **Only the installed build runs.** Rule `ssh/runner-installed-blacksand-only`
   enforces this. The remote never downloads a server. It looks for
-  `BLACKSAND_T3_APP`, then `/Applications/Blacksand T3.app`, then
-  `~/Applications/Blacksand T3.app`.
+  `BLACKSAND_T3_APP`, then `/Applications/T3 Code (blacksand).app`, then
+  `~/Applications/T3 Code (blacksand).app`.
 - **Data stays separate.** Each account's server keeps its data in its own
   `~/.blacksand/t3`, never `~/.t3` (rule `ssh/blacksand-home`). The launch folder is
   `0700`, because its log holds a one-time pairing link.

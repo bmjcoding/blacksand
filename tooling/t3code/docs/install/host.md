@@ -78,7 +78,7 @@ agent accounts find it. It also needs the default locations, and it stops if
 `BLACKSAND_T3_APPS` or `BLACKSAND_T3_UPDATE_REQUESTS` points anywhere else. Beyond
 what [the desktop install](desktop.md#what-it-does) does, it:
 
-- Installs the app to `/Applications/Blacksand T3.app`, without opening it.
+- Installs the app to `/Applications/T3 Code (blacksand).app`, without opening it.
 - Installs the updater as the LaunchDaemon `dev.blacksand.update`. The updater runs
   as you, even with nobody logged in. It runs hourly, and whenever a server on this
   host asks for an update through `/Users/Shared/blacksand/update-requests`
@@ -96,7 +96,7 @@ git --version
 - `role: host`
 - `schedule: hourly, and on update requests (LaunchDaemon: runs with nobody logged in)`
 - `builds: as _blacksand-build`
-- `app: /Applications/Blacksand T3.app`
+- `app: /Applications/T3 Code (blacksand).app`
 - `signing: Apple Development: …`
 
 Run `git --version` in a new Terminal window. It shows 2.55.0 or later.

@@ -87,7 +87,7 @@ describe("blacksand CLI routes", () => {
       NodeFS.rmSync(baseDir, { recursive: true, force: true });
     }
     expect(new BootServiceInstallError({ cause: "blacksand" }).message).toMatch(/^Blacksand T3 sets up no background service\./);
-    expect(new BootServiceInstallError({ cause: new Error("disk full") }).message).toBe("Could not set up the Blacksand T3 background service.");
+    expect(new BootServiceInstallError({ cause: new Error("disk full") }).message).toBe("Could not set up the T3 Code (blacksand) background service.");
   });
 
   it("never runs or installs a T3 runtime, a cached stock one included (`t3 update`, a server's self-update)", async () => {

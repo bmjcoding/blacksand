@@ -18,12 +18,12 @@ export const features = [
   {
     name: "names",
     label: "Blacksand names",
-    description: "Blacksand T3 as the app name in a plain browser and the page title; the Ink and Orchid theme names",
-    rules: ["web/branding-name", "web/branding-title", "web/theme-name-ink", "web/theme-name-orchid"],
+    description: "T3 Code (blacksand) as the app name in a plain browser and the page title, without a stage label; the Ink and Orchid theme names",
+    rules: ["web/branding-name", "web/branding-display-name", "web/branding-title", "web/theme-name-ink", "web/theme-name-orchid"],
   },
   {
     name: "product-name",
-    label: "Blacksand T3 in dialogs and menus",
+    label: "T3 Code (blacksand) in dialogs and menus",
     description: "Upstream's ~400 hardcoded mentions of T3 Code",
     rules: ["brand/name"],
   },
@@ -36,24 +36,16 @@ export const features = [
   {
     name: "brand-file",
     label: "Blacksand brand components",
-    description: "The wordmark, redaction art and version stamp components, and this build's version info and drift report",
+    description: "The version stamp component, and this build's version info and drift report",
     rules: ["web/blacksand-brand-file", "web/blacksand-build-info", "web/blacksand-drift-report"],
     // Its components read the interface switches, which load with the styles.
     requires: ["styles"],
   },
   {
     name: "wordmark",
-    label: "T3 BLACKOUT wordmark",
-    description: "The sidebar logo",
-    rules: ["web/blacksand-wordmark"],
-    requires: ["brand-file", "styles"],
-  },
-  {
-    name: "stage-art",
-    label: "Redaction art",
-    description: "Replaces the nightly starfield behind the sidebar and send button",
-    rules: ["web/blacksand-stage-art"],
-    requires: ["brand-file", "styles"],
+    label: "blacksand in the sidebar logo",
+    description: "A muted blacksand after upstream's T3 Code at the top of the sidebar",
+    rules: ["web/blacksand-sidebar-name"],
   },
   {
     name: "version-stamp",
@@ -107,8 +99,8 @@ export const features = [
   },
   {
     name: "app-icon",
-    label: "Redacted app icon",
-    description: "The redaction-bar app icon in the Dock and Finder, layered for Liquid Glass",
+    label: "blacksand badge on the app icon",
+    description: "Upstream's T3 Code icon with the blacksand badge in the Dock, Finder, launcher and splash, layered for Liquid Glass",
     rules: ["desktop/app-icon-*"],
   },
   {

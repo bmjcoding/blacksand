@@ -38,12 +38,19 @@ machine stays on the installed build and says why.
 ## What the rules change
 
 The rules remove what [privacy](../security/privacy.md) lists. They also give the app
-its own name, bundle ID, data directory and look. The look is the Redacted app icon
-plus touches that follow whichever theme you pick. Those touches are the T3 BLACKOUT
-wordmark, redaction bars in place of the nightly starfield, a ringed send button,
-button glow, a version stamp and accent text selection. Each has its own switch in
-**Settings → Appearance → Interface**. Blacksand adds no themes of its own. Use
-upstream's themes, or add a custom theme to change the accent.
+its own name, bundle ID and data directory. The name is T3 Code (blacksand). The icon
+is upstream's, with a small blacksand badge in the corner. The sidebar logo is
+upstream's too, with a muted "blacksand" after it. A few touches follow whichever
+theme you pick: a ringed send button, button glow, a version stamp and accent text
+selection. Each has its own switch in **Settings → Appearance → Interface**. Blacksand
+adds no themes of its own. Use upstream's themes, or add a custom theme to change the
+accent.
+
+The badge's logo is [`docs/assets/blacksand.svg`](../../../../docs/assets/blacksand.svg).
+`tooling/t3code/lib/files/blacksand.svg` is a copy, so the T3 component builds on its
+own. A test keeps the two the same. The badge PNGs in `tooling/t3code/lib/files/` are
+upstream's icons with the badge drawn on. When upstream changes its icons, remake them
+with `tooling/t3code/scripts/badge-icons.swift`; its first lines say how.
 
 ## The build report
 

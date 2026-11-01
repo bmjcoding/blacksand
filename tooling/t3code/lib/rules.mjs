@@ -53,17 +53,36 @@ export function desktopBuildsOnly(yaml) {
   return lines.join("\n");
 }
 
-/** One write rule per file of the Icon Composer bundle in lib/files/app-icon.icon. */
-const iconBundleRules = () => {
-  const root = path.join(here, "files", "app-icon.icon");
-  const files = fs.readdirSync(root, { recursive: true }).filter((rel) => fs.statSync(path.join(root, rel)).isFile());
-  return files.sort().map((rel) => ({
-    id: `desktop/app-icon-bundle:${rel}`,
-    why: "The Redacted app icon, layered for Liquid Glass (compiled by lib/build.mjs when Xcode 26+ is present)",
-    kind: "write",
-    file: path.join("assets", "blacksand", "app-icon.icon", rel),
-    content: readBinary(path.join("app-icon.icon", rel)),
-  }));
+/**
+ * The app icon's blacksand badge: the logo, as it is, in white, in a dark circle
+ * with a thin light ring. lib/files/blacksand.svg is docs/assets/blacksand.svg,
+ * copied so this folder builds on its own (test/app-rules.test.mjs keeps them the
+ * same). lib/files/badge-*.png are upstream's PNG icons with this drawn on
+ * (scripts/badge-icons.swift).
+ */
+export const BLACKSAND_BADGE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<circle cx="512" cy="512" r="496" fill="#0b0b0c" stroke="#d9d9d9" stroke-width="16"/>
+<g color="#ffffff" fill="#ffffff" transform="translate(512 512) scale(0.74) translate(-512 -620)">
+${readFile("blacksand.svg").trim()}
+</g>
+</svg>
+`;
+
+/**
+ * The badge as a layer of its own in front of upstream's Icon Composer icon: 42%
+ * of the icon's width, in its bottom-right corner. Icon Composer measures from
+ * the centre of a 1024-point canvas, y down.
+ */
+const BADGE_LAYER = {
+  layers: [
+    {
+      glass: false,
+      "image-name": "blacksand-badge.svg",
+      name: "Blacksand badge",
+      position: { scale: 0.42, "translation-in-points": [250, 250] },
+    },
+  ],
+  shadow: { kind: "neutral", opacity: 0.5 },
 };
 
 
@@ -1509,7 +1528,18 @@ export const makeRules = ({ updater, build }) => [
     edits: [
       {
         find: 'export const APP_BASE_NAME = injectedDesktopAppBranding?.baseName ?? "T3 Code";',
-        replace: 'export const APP_BASE_NAME = injectedDesktopAppBranding?.baseName ?? "Blacksand T3";',
+        replace: 'export const APP_BASE_NAME = injectedDesktopAppBranding?.baseName ?? "T3 Code (blacksand)";',
+      },
+    ],
+  },
+  {
+    id: "web/branding-display-name",
+    why: "The name is T3 Code (blacksand) on every track: no (Beta) or (Nightly) after it",
+    file: "apps/web/src/branding.logic.ts",
+    edits: [
+      {
+        find: '  if (input.stageLabel.trim().toLowerCase() === "latest") {\n    return input.baseName;\n  }\n\n  return `${input.baseName} (${input.stageLabel})`;\n',
+        replace: "  return input.baseName;\n",
       },
     ],
   },
@@ -1518,7 +1548,7 @@ export const makeRules = ({ updater, build }) => [
     why: "Page title before the app mounts",
     file: "apps/web/index.html",
     // Any stage label: builds trail upstream by the soak window, across renames like Alpha → Beta.
-    edits: [{ find: /<title>T3 Code(?: \([A-Za-z]+\))?<\/title>/, replace: "<title>Blacksand T3</title>" }],
+    edits: [{ find: /<title>T3 Code(?: \([A-Za-z]+\))?<\/title>/, replace: "<title>T3 Code (blacksand)</title>" }],
   },
   {
     // Labels only; the ids ("default", "t3-chat") stay so saved choices and
@@ -1687,7 +1717,7 @@ export const makeRules = ({ updater, build }) => [
   // -------------------------------------------------------------- blacksand --
   {
     id: "web/blacksand-css",
-    why: "Wordmark size, nightly redaction art, ringed send button, composer glow",
+    why: "Ringed send button, composer glow, button glow, version stamp, accent text selection",
     kind: "write",
     file: "apps/web/src/blacksand.css",
     content: readFile("blacksand.css"),
@@ -1706,42 +1736,22 @@ export const makeRules = ({ updater, build }) => [
   },
   {
     id: "web/blacksand-brand-file",
-    why: "The T3 BLACKOUT wordmark and the redaction art that replaces the nightly starfield",
+    why: "The version stamp and its card of what this build changes",
     kind: "write",
     file: "apps/web/src/components/BlacksandBrand.tsx",
     content: readFile("BlacksandBrand.tsx"),
   },
   {
-    id: "web/blacksand-wordmark",
-    why: "Sidebar logo reads T3 BLACKOUT instead of T3 Code, while its switch is on (upstream's mark otherwise)",
+    id: "web/blacksand-sidebar-name",
+    why: "Upstream's sidebar logo, T3 Code, with a muted, smaller blacksand after it",
     file: "apps/web/src/components/sidebar/SidebarChrome.tsx",
     edits: [
       {
-        find: 'import { T3Wordmark } from "../T3Wordmark";',
+        find: "        Code\n      </span>\n    </span>\n",
         replace:
-          'import { T3Wordmark } from "../T3Wordmark";\nimport { BlacksandWordmark } from "../BlacksandBrand";\nimport { useBlacksandInterface } from "../../blacksandInterface";',
-      },
-      {
-        find: "function SidebarBrandMark({ onBackdrop }: { onBackdrop: boolean }) {\n",
-        replace:
-          "function SidebarBrandMark(props: { onBackdrop: boolean }) {\n  return useBlacksandInterface(\"wordmark\") ? <BlacksandWordmark /> : <UpstreamSidebarBrandMark {...props} />;\n}\n\nfunction UpstreamSidebarBrandMark({ onBackdrop }: { onBackdrop: boolean }) {\n",
-      },
-    ],
-  },
-  {
-    id: "web/blacksand-stage-art",
-    why: "The nightly starfield becomes Blacksand's redaction bars, and the send button drops its starfield fill for a ring, each while its switch is on",
-    file: "apps/web/src/components/SidebarStageBackdrop.tsx",
-    edits: [
-      { find: 'import { useId } from "react";', replace: 'import { useId } from "react";\n\nimport { BlacksandRedactedArt } from "./BlacksandBrand";' },
-      {
-        find: 'return variant === "nightly" ? <NightlySkyArt /> : <DevBlueprintArt />;',
-        replace: 'return variant === "nightly" ? <BlacksandRedactedArt fallback={<NightlySkyArt />} /> : <DevBlueprintArt />;',
-      },
-      {
-        find: 'return variant === "nightly" ? <NightlySkyArt compact /> : <DevBlueprintArt compact />;',
-        replace:
-          'return variant === "nightly" ? <BlacksandRedactedArt compact fallback={<NightlySkyArt compact />} /> : <DevBlueprintArt compact />;',
+          "        Code\n      </span>\n" +
+          '      <span className={cn("shrink-0 text-xs font-normal", onBackdrop ? "text-white/50" : "text-muted-foreground/70")}>\n' +
+          "        blacksand\n      </span>\n    </span>\n",
       },
     ],
   },
@@ -1810,7 +1820,7 @@ export const makeRules = ({ updater, build }) => [
   },
   {
     id: "web/blacksand-interface-file",
-    why: "The Blacksand interface switches (logo, art, send ring, glow, version stamp, selection), per client, on by default",
+    why: "The Blacksand interface switches (send ring, glow, version stamp, selection), per client, on by default",
     kind: "write",
     file: "apps/web/src/blacksandInterface.ts",
     content: readFile("blacksandInterface.ts"),
@@ -1925,93 +1935,41 @@ export const makeRules = ({ updater, build }) => [
       },
     ],
   },
-  ...iconBundleRules(),
+  // The app icon: upstream's T3 Code icon with the blacksand badge, on every
+  // channel. The Icon Composer bundle (Liquid Glass) is upstream's own plus a
+  // badge layer; the PNGs are upstream's with the badge drawn on.
+  {
+    id: "desktop/app-icon-badge",
+    why: "The badge's image, beside upstream's T3 mark in its Icon Composer bundle",
+    kind: "write",
+    file: "assets/prod/app-icon.icon/Assets/blacksand-badge.svg",
+    content: BLACKSAND_BADGE_SVG,
+  },
+  {
+    id: "desktop/app-icon-badge-layer",
+    why: "Put the badge in front of upstream's layers (compiled by lib/build.mjs when Xcode 26+ is present)",
+    kind: "transform",
+    file: "assets/prod/app-icon.icon/icon.json",
+    transform: (source) => {
+      const icon = JSON.parse(source);
+      if (!Array.isArray(icon.groups)) throw new RuleDrift("desktop/app-icon-badge-layer: icon.json has no groups", { file: "assets/prod/app-icon.icon/icon.json" });
+      return `${JSON.stringify({ ...icon, groups: [BADGE_LAYER, ...icon.groups] }, null, 2)}\n`;
+    },
+  },
   {
     id: "desktop/app-icon-liquid-glass",
     why: "Package the layered icon when lib/build.mjs found Xcode 26+; otherwise the flat icns",
     file: "scripts/build-desktop-artifact.ts",
     edits: [{ find: '      icon: "icon.icns",', replace: '      icon: process.env.BLACKSAND_T3_MAC_ICON ?? "icon.icns",' }],
   },
-  {
-    id: "desktop/app-icon-flat-nightly",
-    why: "The flat Redacted icon (dark) where Liquid Glass isn't available: no Xcode, DMG volumes",
-    kind: "write",
-    overwrite: true,
-    file: "assets/nightly/nightly-macos-1024.png",
-    content: readBinary("redacted-1024.png"),
-  },
-  {
-    id: "desktop/app-icon-web-nightly-splash",
-    why: "The startup splash (index.html shows apple-touch-icon.png) and web favicons get the Redacted icon",
-    kind: "write",
-    overwrite: true,
-    file: "assets/nightly/nightly-web-apple-touch-180.png",
-    content: readBinary("redacted-180.png"),
-  },
-  {
-    id: "desktop/app-icon-web-nightly-favicon16",
-    why: "The Redacted icon as the web favicon",
-    kind: "write",
-    overwrite: true,
-    file: "assets/nightly/nightly-web-favicon-16x16.png",
-    content: readBinary("redacted-16.png"),
-  },
-  {
-    id: "desktop/app-icon-web-nightly-favicon32",
-    why: "The Redacted icon as the web favicon",
-    kind: "write",
-    overwrite: true,
-    file: "assets/nightly/nightly-web-favicon-32x32.png",
-    content: readBinary("redacted-32.png"),
-  },
-  {
-    id: "desktop/app-icon-web-nightly-favicon",
-    why: "The Redacted icon as the web favicon",
-    kind: "write",
-    overwrite: true,
-    file: "assets/nightly/nightly-web-favicon.ico",
-    content: readBinary("redacted-favicon.ico"),
-  },
-  {
-    id: "desktop/app-icon-web-stable-splash",
-    why: "The startup splash (index.html shows apple-touch-icon.png) and web favicons get the Redacted icon",
-    kind: "write",
-    overwrite: true,
-    file: "assets/prod/t3-black-web-apple-touch-180.png",
-    content: readBinary("redacted-180.png"),
-  },
-  {
-    id: "desktop/app-icon-web-stable-favicon16",
-    why: "The Redacted icon as the web favicon",
-    kind: "write",
-    overwrite: true,
-    file: "assets/prod/t3-black-web-favicon-16x16.png",
-    content: readBinary("redacted-16.png"),
-  },
-  {
-    id: "desktop/app-icon-web-stable-favicon32",
-    why: "The Redacted icon as the web favicon",
-    kind: "write",
-    overwrite: true,
-    file: "assets/prod/t3-black-web-favicon-32x32.png",
-    content: readBinary("redacted-32.png"),
-  },
-  {
-    id: "desktop/app-icon-web-stable-favicon",
-    why: "The Redacted icon as the web favicon",
-    kind: "write",
-    overwrite: true,
-    file: "assets/prod/t3-black-web-favicon.ico",
-    content: readBinary("redacted-favicon.ico"),
-  },
-  {
-    id: "desktop/app-icon-flat-stable",
-    why: "Same, for the stable channel",
-    kind: "write",
-    overwrite: true,
-    file: "assets/prod/black-macos-1024.png",
-    content: readBinary("redacted-1024.png"),
-  },
+  ...[
+    ["flat-stable", "assets/prod/black-macos-1024.png", "badge-macos-1024.png", "The flat icon where Liquid Glass isn't available: no Xcode 26+, DMG volumes"],
+    ["flat-nightly", "assets/nightly/nightly-macos-1024.png", "badge-macos-1024.png", "Same, for the nightly channel"],
+    ["linux-stable", "assets/prod/black-universal-1024.png", "badge-universal-1024.png", "The Linux app and launcher icon"],
+    ["linux-nightly", "assets/nightly/nightly-universal-1024.png", "badge-universal-1024.png", "Same, for the nightly channel"],
+    ["web-stable-splash", "assets/prod/t3-black-web-apple-touch-180.png", "badge-180.png", "The startup splash (index.html shows apple-touch-icon.png)"],
+    ["web-nightly-splash", "assets/nightly/nightly-web-apple-touch-180.png", "badge-180.png", "Same, for the nightly channel"],
+  ].map(([id, file, name, why]) => ({ id: `desktop/app-icon-${id}`, why, kind: "write", overwrite: true, file, content: readBinary(name) })),
   {
     id: "desktop/drift-report-file",
     why: "Hands the version stamp a build's report, screenshots included, from state/drift (lib/drift.mjs), and opens a staged build's preview (lib/preview.mjs)",
@@ -2188,15 +2146,18 @@ export const makeRules = ({ updater, build }) => [
       },
       {
         find: /(export function resolveDesktopProductName\(version: string\): string \{\n)/,
-        replace: '$1  if (version) return "Blacksand T3";\n',
+        replace: '$1  if (version) return "T3 Code (blacksand)";\n',
       },
     ],
   },
   {
     id: "desktop/identity-runtime-name",
-    why: "Name shown in menus, About and macOS Keychain prompts (upstream hardcodes \"T3 Code\")",
+    why: "Name shown in the menu bar, About, the window title, the Linux launcher and macOS Keychain prompts: T3 Code (blacksand), with no stage label after it",
     file: "apps/desktop/src/app/DesktopEnvironment.ts",
-    edits: [{ find: 'const APP_BASE_NAME = "T3 Code";', replace: 'const APP_BASE_NAME = "Blacksand T3";' }],
+    edits: [
+      { find: 'const APP_BASE_NAME = "T3 Code";', replace: 'const APP_BASE_NAME = "T3 Code (blacksand)";' },
+      { find: "    displayName: `${APP_BASE_NAME} (${stageLabel})`,\n", replace: "    displayName: APP_BASE_NAME,\n" },
+    ],
   },
   {
     id: "desktop/identity-package-name",
@@ -2816,13 +2777,14 @@ export const makeRules = ({ updater, build }) => [
 
   // ---------------------------------------------------------- privacy text --
   // Upstream's welcome screen and Settings → About say the app collects
-  // anonymous usage data and link T3's privacy policy. Rebranded, that claims Blacksand
-  // T3 collects it, which is false: the analytics and telemetry are gone
-  // (server/analytics-*, the OTLP rules). Before brand/name, which would turn the
-  // anchors' "T3 Code" into "Blacksand T3".
+  // anonymous usage data and link T3's privacy policy. Rebranded, that claims
+  // T3 Code (blacksand) collects it, which is false: the analytics and telemetry
+  // are gone (server/analytics-*, the OTLP rules). Before brand/name, which would
+  // turn the anchors' "T3 Code" into "T3 Code (blacksand)". The new sentences name
+  // T3 Code (blacksand), which brand/name leaves as it is.
   {
     id: "web/privacy-text-link",
-    why: "The privacy links open T3's privacy policy, which describes data Blacksand T3 doesn't send; open the README's list of what this build removes",
+    why: "The privacy links open T3's privacy policy, which describes data this build doesn't send; open Blacksand's list of what this build removes",
     file: "apps/web/src/legalLinks.ts",
     edits: [
       {
@@ -2833,7 +2795,7 @@ export const makeRules = ({ updater, build }) => [
   },
   {
     id: "web/privacy-text-welcome",
-    why: "The welcome screen says the app collects anonymous usage data; Blacksand T3 collects none",
+    why: "The welcome screen says the app collects anonymous usage data; this build collects none",
     file: "apps/web/src/components/onboarding/WelcomeWizard.tsx",
     edits: [
       {
@@ -2841,10 +2803,10 @@ export const makeRules = ({ updater, build }) => [
           "          T3 Code collects anonymous usage data to help us improve it. To read more about how your\n" +
           '          data is used and how to opt out, see our{" "}\n',
         replace:
-          "          Blacksand T3 collects no usage data: this build of the app has its analytics and telemetry\n" +
+          "          T3 Code (blacksand) collects no usage data: this build of the app has its analytics and telemetry\n" +
           '          removed. To see everything it removes and what still connects out, read the{" "}\n',
       },
-      { find: "            privacy policy\n          </a>\n", replace: "            Blacksand T3 README\n          </a>\n" },
+      { find: "            privacy policy\n          </a>\n", replace: "            Blacksand privacy notes\n          </a>\n" },
     ],
   },
   {
@@ -2854,7 +2816,7 @@ export const makeRules = ({ updater, build }) => [
     edits: [
       {
         find: 'description="How we handle your data, including the anonymous usage data T3 Code collects."',
-        replace: 'description="Blacksand T3 collects no usage data. Its README lists what this build removes and what still connects out."',
+        replace: 'description="T3 Code (blacksand) collects no usage data. Blacksand\'s privacy notes list what this build removes and what still connects out."',
       },
       { find: "              View policy\n", replace: "              Read more\n" },
     ],
@@ -2862,12 +2824,13 @@ export const makeRules = ({ updater, build }) => [
 
   // ----------------------------------------------------------------- brand --
   {
-    // Last: earlier rules anchor on some of these strings.
+    // Last: earlier rules anchor on some of these strings. The name keeps "T3
+    // Code", so text that already says T3 Code (blacksand) is left as it is.
     id: "brand/name",
     why: "Upstream hardcodes the product name in ~400 dialogs, menus, notifications, permission prompts and CLI messages",
     kind: "rebrand",
-    find: "T3 Code",
-    replace: "Blacksand T3",
+    find: /T3 Code(?! \(blacksand\))/,
+    replace: "T3 Code (blacksand)",
     roots: ["apps/web/src", "apps/web/index.html", "apps/desktop/src", "apps/server/src", "packages", "scripts/build-desktop-artifact.ts"],
     include: /\.(ts|tsx|html)$/,
     minCount: 200,

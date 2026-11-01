@@ -35,14 +35,14 @@ describe("blacksand interface switches", () => {
       },
     });
     const { setBlacksandInterface } = await load();
-    expect(() => setBlacksandInterface("art", false)).not.toThrow();
-    expect(attributes.get("data-t3b-art")).toBe("off");
+    expect(() => setBlacksandInterface("glow", false)).not.toThrow();
+    expect(attributes.get("data-t3b-glow")).toBe("off");
   });
   it("reads stored switches", async () => {
     stubDom({ getItem: (key: string) => (key === "blacksand:interface:stamp" ? "off" : null), setItem: () => {} });
     await load();
     expect(attributes.get("data-t3b-stamp")).toBe("off");
-    expect(attributes.get("data-t3b-wordmark")).toBe("on");
+    expect(attributes.get("data-t3b-send")).toBe("on");
   });
   it("registers each switch with Settings search under its title", async () => {
     stubDom({ getItem: () => null });

@@ -729,7 +729,7 @@ main() {
   fi
   case "$ROLE" in
     ui)
-      printf '\nOpen "Blacksand T3" from your app launcher, or run: blacksand t3 launch\n'
+      printf '\nOpen "T3 Code (blacksand)" from your app launcher, or run: blacksand t3 launch\n'
       ;;
     host)
       cat <<'NEXT'
@@ -745,7 +745,7 @@ NEXT
     both)
       cat <<'NEXT'
 
-Open "Blacksand T3" from your app launcher, or run: blacksand t3 launch
+Open "T3 Code (blacksand)" from your app launcher, or run: blacksand t3 launch
 For the local standby lane (tooling/t3code/docs/install/standby.md), e.g.:
   sudo scripts/add-agent-account.sh agent-standby --loopback-only --key ~/.ssh/blacksand.pub
 NEXT

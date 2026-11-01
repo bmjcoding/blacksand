@@ -39,7 +39,7 @@ function writeDesktopEntry() {
     [
       "[Desktop Entry]",
       "Type=Application",
-      "Name=Blacksand T3",
+      "Name=T3 Code (blacksand)",
       "Comment=T3 Code with telemetry stripped",
       `Exec="${EXECUTABLE}" %U`,
       `Icon=${ICON}`,

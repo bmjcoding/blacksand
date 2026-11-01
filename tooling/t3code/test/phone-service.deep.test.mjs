@@ -20,11 +20,11 @@ const isMac = process.platform === "darwin";
 /** A fake app whose app.asar is a packed archive, a regular file, as in a real build. */
 function packedApp() {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "t3b-phone-packed-")));
-  const app = path.join(dir, "Blacksand T3.app");
+  const app = path.join(dir, "T3 Code (blacksand).app");
   fs.mkdirSync(path.join(app, "Contents", "Resources"), { recursive: true });
   fs.mkdirSync(path.join(app, "Contents", "MacOS"), { recursive: true });
   fs.writeFileSync(path.join(app, "Contents", "Resources", "app.asar"), Buffer.alloc(4096, 1));
-  fs.symlinkSync(process.execPath, path.join(app, "Contents", "MacOS", "Blacksand T3"));
+  fs.symlinkSync(process.execPath, path.join(app, "Contents", "MacOS", "T3 Code (blacksand)"));
   return { dir, app };
 }
 
@@ -100,7 +100,7 @@ test("everything but --print-policy needs sudo from an admin account", () => {
 
 test("the installed app counts only as a packed archive whose server the app itself (Electron, as the account) can read", () => {
   const check = (app) =>
-    sourced(`APP=${JSON.stringify(app)} ELECTRON="$APP/Contents/MacOS/Blacksand T3" ASAR="$APP/Contents/Resources/app.asar" SERVER="$ASAR/apps/server/dist/bin.mjs" NAME=agent-a HOME_DIR=/tmp
+    sourced(`APP=${JSON.stringify(app)} ELECTRON="$APP/Contents/MacOS/T3 Code (blacksand)" ASAR="$APP/Contents/Resources/app.asar" SERVER="$ASAR/apps/server/dist/bin.mjs" NAME=agent-a HOME_DIR=/tmp
 as_user() { shift; "$@"; }
 if why="$(app_problem)"; then echo "PROBLEM $why"; else echo OK; fi`);
   const packed = packedApp();

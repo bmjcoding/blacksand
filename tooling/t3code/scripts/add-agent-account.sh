@@ -51,7 +51,7 @@
 
 set -euo pipefail
 
-APP="/Applications/Blacksand T3.app"
+APP="/Applications/T3 Code (blacksand).app"
 AGENT_GROUP=blacksand-agents
 # Remote Login's "Only these users" list; PAM (pam_sacl) checks it for every sshd.
 SSH_ACCESS_GROUP=com.apple.access_ssh
@@ -580,7 +580,7 @@ main() {
   [[ -z "$allow_from" ]] || ((!tailnet_only)) || die "--tailnet-only (the whole tailnet ranges) and --allow-from contradict each other"
   choose_allow_from "$allow_from" "$tailnet_only"
 
-  [[ -x "$APP/Contents/MacOS/Blacksand T3" ]] ||
+  [[ -x "$APP/Contents/MacOS/T3 Code (blacksand)" ]] ||
     die "$APP is missing; run ./install.sh --role host (or both) as an admin first"
   ADMIN_HOME="$(home_of "$SUDO_USER")"
 
@@ -645,7 +645,7 @@ Done. Next, as $NAME (ssh $( ((LOOPBACK)) && echo "-p $LOOPBACK_PORT ")$NAME@loc
   2. codex login                       (Codex keeps its login in a file)
   3. claude setup-token                (SSH sessions can't unlock the Keychain)
   4. $HELPER   (stores it, owner only)
-Then in Blacksand T3: Settings > Connections > Environments > Add environment > SSH: $target.
+Then in T3 Code (blacksand): Settings > Connections > Environments > Add environment > SSH: $target.
 NEXT
 }
 

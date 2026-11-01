@@ -40,7 +40,7 @@ On macOS, it also:
 - Installs git, Node, Rust and the 1Password CLI with Homebrew where they're missing.
 - Sets up the shared code-signing certificate from 1Password
   ([signing](signing-macos.md)).
-- Installs the app in `/Applications/Blacksand T3.app` when you're an admin, and in
+- Installs the app in `/Applications/T3 Code (blacksand).app` when you're an admin, and in
   `~/Applications` otherwise. It runs the updater as a LaunchAgent, which runs while
   you're logged in.
 
@@ -53,7 +53,7 @@ On Linux, it also:
 - On Ubuntu 23.10 and later, adds a one-line AppArmor profile so Electron's sandbox
   can start under Ubuntu's user-namespace restriction.
 - Extracts the app to `~/.local/share/blacksand/t3/app`, which needs no FUSE, and
-  adds "Blacksand T3" to your launcher. It runs the updater as a systemd user timer.
+  adds "T3 Code (blacksand)" to your launcher. It runs the updater as a systemd user timer.
   The timer runs while your user manager does. That's while you're logged in, or
   always after `loginctl enable-linger`.
 - Does no signing, because Linux keyrings don't tie access to an app's signature.

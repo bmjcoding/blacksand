@@ -1,5 +1,5 @@
-// node --test test/: the welcome screen and Settings → About no longer claim Blacksand
-// T3 collects usage data (rules web/privacy-text-*, feature privacy-text).
+// node --test test/: the welcome screen and Settings → About no longer claim
+// T3 Code (blacksand) collects usage data (rules web/privacy-text-*, feature privacy-text).
 // The fixtures are upstream's text, unchanged across its recent builds.
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -13,6 +13,8 @@ import { applyRules } from "../lib/strip-engine.mjs";
 
 const rules = makeRules({ updater: { node: "/usr/bin/node", launcher: "/opt/t3b/bin/t3", path: "/usr/bin" }, build: null });
 const ids = ["web/privacy-text-link", "web/privacy-text-welcome", "web/privacy-text-about"];
+/** `text` split where brand/name would rewrite it. */
+const brand = (text) => text.split(rules.find((rule) => rule.id === "brand/name").find);
 
 const UPSTREAM = {
   "apps/web/src/legalLinks.ts": 'export const PRIVACY_POLICY_URL = "https://t3.codes/privacy-policy";\n',
@@ -61,18 +63,20 @@ function applied() {
   return { failures, read };
 }
 
-test("the privacy sentences say Blacksand T3 collects no usage data, and the links open its README", () => {
+test("the privacy sentences say T3 Code (blacksand) collects no usage data, and the links open Blacksand's privacy notes", () => {
   const { failures, read } = applied();
   assert.deepEqual(failures, []);
   const all = Object.keys(UPSTREAM).map(read).join("\n");
   assert.doesNotMatch(all, /anonymous usage data/);
   assert.doesNotMatch(all, /t3\.codes/);
   assert.doesNotMatch(all, /privacy policy|View policy/);
-  assert.doesNotMatch(all, /T3 Code/, "nothing left for brand/name to turn into a false sentence");
+  // brand/name keeps "T3 Code (blacksand)" and rewrites any other "T3 Code": none is left to turn into a false sentence.
+  assert.doesNotMatch(all, /T3 Code(?! \(blacksand\))/, "nothing left for brand/name to turn into a false sentence");
+  assert.equal(brand(all).length, 1, "brand/name leaves the privacy sentences as they are");
   assert.match(read("apps/web/src/legalLinks.ts"), /"https:\/\/github\.com\/bmjcoding\/blacksand\/blob\/main\/tooling\/t3code\/docs\/security\/privacy\.md"/);
-  assert.match(read("apps/web/src/components/onboarding/WelcomeWizard.tsx"), /Blacksand T3 collects no usage data/);
-  assert.match(read("apps/web/src/components/onboarding/WelcomeWizard.tsx"), /href=\{PRIVACY_POLICY_URL\}[\s\S]*Blacksand T3 README\n {10}<\/a>/, "the import stays used");
-  assert.match(read("apps/web/src/components/settings/SettingsPanels.tsx"), /description="Blacksand T3 collects no usage data\./);
+  assert.match(read("apps/web/src/components/onboarding/WelcomeWizard.tsx"), /T3 Code \(blacksand\) collects no usage data: this build of the app has its analytics and telemetry\n {10}removed\./);
+  assert.match(read("apps/web/src/components/onboarding/WelcomeWizard.tsx"), /href=\{PRIVACY_POLICY_URL\}[\s\S]*Blacksand privacy notes\n {10}<\/a>/, "the import stays used");
+  assert.match(read("apps/web/src/components/settings/SettingsPanels.tsx"), /description="T3 Code \(blacksand\) collects no usage data\./);
   assert.match(read("apps/web/src/components/settings/SettingsPanels.tsx"), /Read more\n/);
 });
 

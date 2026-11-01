@@ -67,7 +67,7 @@ export const SCREENS = [
     name: "home",
     label: "Home",
     path: "/",
-    features: ["wordmark", "stage-art", "send-button", "styles", "glow-sidebar", "glow-update", "names"],
+    features: ["wordmark", "send-button", "styles", "glow-sidebar", "glow-update", "names"],
   },
   {
     name: "composer",

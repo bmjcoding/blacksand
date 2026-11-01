@@ -23,7 +23,7 @@ Five tests run only if you opt in:
 |---|---|
 | `BLACKSAND_T3_TEST_ELECTRON=<Electron binary>` | runs a real Electron app: an agent's frame reaches nothing over WebRTC, and device video arrives only through the WebRTC window |
 | `BLACKSAND_T3_REAL_PNPM=<pinned pnpm>` (two tests) | checks the real pinned binary, and that a project asking for another pnpm still runs it |
-| `BLACKSAND_T3_TEST_PACKED_APP=<Blacksand T3.app>` | runs the phone service's supervisor, the SSH runner sharing its server, an update, and shutdown, against a real packed build |
+| `BLACKSAND_T3_TEST_PACKED_APP=<T3 Code (blacksand).app>` | runs the phone service's supervisor, the SSH runner sharing its server, an update, and shutdown, against a real packed build |
 | `BLACKSAND_T3_PNPM_DIGESTS_ONLINE=1` | downloads the four pinned pnpm tarballs, and checks `PNPM_BINARY_SHA256` against them |
 
 The tests in `tooling/t3code/test/stripped/` run inside a stripped upstream checkout,

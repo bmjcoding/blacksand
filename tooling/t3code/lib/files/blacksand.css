@@ -5,72 +5,10 @@
 :root {
   /* Everything orange here is the selected theme's accent, so a theme or a
      custom copy with another accent recolours it all.
-     Ember is the accent lifted a step, for rings, text and links on black;
-     deep is the shade the wordmark's T3 settles into at its foot. */
+     Ember is the accent lifted a step, for rings, text and links on black. */
   --t3b-accent: var(--app-theme-accent, var(--primary));
   --t3b-ember: oklch(from var(--t3b-accent) calc(l + 0.06) c h);
-  --t3b-deep: oklch(from var(--t3b-accent) calc(l - 0.155) calc(c * 0.82) h);
   --t3b-black: #0a0a0a;
-}
-
-/* ------------------------------------------------------------- wordmark -- */
-
-/* 11px tall at the default 16px interface size; rem so it follows the
-   Settings -> Appearance interface size like the text around it. */
-.t3b-wordmark {
-  display: block;
-  flex-shrink: 0;
-  height: 0.6875rem;
-  width: auto;
-}
-
-/* T3 runs ember to accent to deep down its height (BlacksandBrand.tsx), and
-   BLACKOUT is a graphite gradient on dark themes. On light themes graphite
-   would vanish into nothing, so it's the sidebar's text colour instead. */
-html:not(.dark) .t3b-wordmark {
-  --t3b-ops-1: color-mix(in oklab, var(--sidebar-foreground, #111) 85%, transparent);
-  --t3b-ops-2: color-mix(in oklab, var(--sidebar-foreground, #111) 75%, transparent);
-  --t3b-ops-3: color-mix(in oklab, var(--sidebar-foreground, #111) 60%, transparent);
-}
-
-/* ---------------------------------------------------- nightly stage art -- */
-
-/* The bars start just past the wordmark: its left offset (set on the sidebar,
-   absent on the sign-in screen) plus its width, 10.445 x its 0.6875rem height,
-   plus a 9px gap. They're a fixed-size 186px tile repeated rightward, so a wider
-   sidebar shows more document instead of stretching the bars, and a narrower one
-   crops it; the last 24px fade so cut bars don't end abruptly. */
-/* The sidebar's own colour, so it sits flush in any theme; the bars are the
-   sidebar's text colour at a whisper, drawn through a mask. */
-.t3b-redacted {
-  --t3b-bars-left: calc(var(--workspace-titlebar-content-left, 20px) + 7.18rem + 9px);
-  position: relative;
-  overflow: hidden;
-  background: var(--sidebar);
-}
-
-.t3b-redacted-bars {
-  position: absolute;
-  top: 0;
-  right: 0;
-  height: 52px;
-  left: var(--t3b-bars-left);
-  background: color-mix(in oklab, var(--sidebar-foreground, #fff) 7%, transparent);
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='186' height='52' fill='%23171513'%3E%3Crect x='0' y='8' width='34' height='5' rx='1'/%3E%3Crect x='40' y='8' width='24' height='5' rx='1'/%3E%3Crect x='70' y='8' width='52' height='5' rx='1'/%3E%3Crect x='128' y='8' width='50' height='5' rx='1'/%3E%3Crect x='4' y='17' width='58' height='5' rx='1'/%3E%3Crect x='68' y='17' width='30' height='5' rx='1'/%3E%3Crect x='104' y='17' width='74' height='5' rx='1'/%3E%3Crect x='0' y='26' width='20' height='5' rx='1'/%3E%3Crect x='78' y='26' width='44' height='5' rx='1'/%3E%3Crect x='128' y='26' width='52' height='5' rx='1'/%3E%3Crect x='0' y='35' width='44' height='5' rx='1'/%3E%3Crect x='50' y='35' width='14' height='5' rx='1'/%3E%3Crect x='70' y='35' width='60' height='5' rx='1'/%3E%3Crect x='136' y='35' width='42' height='5' rx='1'/%3E%3Crect x='12' y='44' width='50' height='5' rx='1'/%3E%3Crect x='68' y='44' width='40' height='5' rx='1'/%3E%3Crect x='114' y='44' width='64' height='5' rx='1'/%3E%3C/svg%3E"), linear-gradient(90deg, #000 calc(100% - 24px), transparent);
-  mask-repeat: repeat-x, no-repeat;
-  mask-size: 186px 52px, 100% 100%;
-  mask-composite: intersect;
-}
-
-/* The accent strike through the gap in the bars' third row (x 26-70 of the
-   first tile). A sibling of the bars, not a child: their mask cuts that gap. */
-.t3b-redacted-strike {
-  position: absolute;
-  left: calc(var(--t3b-bars-left) + 26px);
-  top: 27px;
-  width: 44px;
-  height: 2px;
-  background: color-mix(in oklab, var(--t3b-accent) 35%, transparent);
 }
 
 /* ---------------------------------------------------------- send button -- */
@@ -93,6 +31,12 @@ html[data-t3b-send="on"] [data-t3b-send]:hover:not(:disabled) {
 
 html[data-t3b-send="on"] [data-t3b-send]:disabled {
   box-shadow: 0 0 0 1px color-mix(in oklab, var(--t3b-ember) 25%, transparent);
+}
+
+/* The ring replaces the starfield fill too. data-stage-art is set exactly when
+   upstream draws that art, as the button's first child. */
+html[data-t3b-send="on"] [data-t3b-send][data-stage-art="nightly"] > :first-child {
+  display: none;
 }
 
 /* ------------------------------------------------------------- composer -- */
@@ -123,8 +67,8 @@ html[data-t3b-send="on"] [data-slot="composer-shell"]:has([data-composer-banner-
 
 /* ------------------------------------------------------- version stamp -- */
 
-/* The build version in the window's bottom-right corner, styled as a redaction
-   stamp, with what the build changed on hover or focus. BlacksandBrand.tsx only
+/* The build version in the window's bottom-right corner, styled as a stamp,
+   with what the build changed on hover or focus. BlacksandBrand.tsx only
    renders it while Settings -> Appearance -> Version stamp is on. */
 .t3b-version-stamp {
   position: fixed;

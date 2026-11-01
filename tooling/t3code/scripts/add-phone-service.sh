@@ -38,8 +38,8 @@
 
 set -euo pipefail
 
-APP="/Applications/Blacksand T3.app"
-ELECTRON="$APP/Contents/MacOS/Blacksand T3"
+APP="/Applications/T3 Code (blacksand).app"
+ELECTRON="$APP/Contents/MacOS/T3 Code (blacksand)"
 ASAR="$APP/Contents/Resources/app.asar"
 SERVER="$ASAR/apps/server/dist/bin.mjs"
 AGENT_GROUP=blacksand-agents

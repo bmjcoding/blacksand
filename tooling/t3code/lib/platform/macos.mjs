@@ -42,12 +42,12 @@ function appsDir() {
 }
 
 const APPS = appsDir();
-const APP = path.join(APPS, "Blacksand T3.app");
-const APP_STAGED = path.join(APPS, ".Blacksand T3.new.app");
+const APP = path.join(APPS, "T3 Code (blacksand).app");
+const APP_STAGED = path.join(APPS, ".T3 Code (blacksand).new.app");
 // A verified build waiting for the running app to restart.
-const APP_PENDING = path.join(APPS, ".Blacksand T3.pending.app");
-const APP_PREVIOUS = path.join(APPS, ".Blacksand T3.previous.app");
-const APP_OUTGOING = path.join(APPS, ".Blacksand T3.outgoing.app");
+const APP_PENDING = path.join(APPS, ".T3 Code (blacksand).pending.app");
+const APP_PREVIOUS = path.join(APPS, ".T3 Code (blacksand).previous.app");
+const APP_OUTGOING = path.join(APPS, ".T3 Code (blacksand).outgoing.app");
 const UPDATE_LABEL = "dev.blacksand.update";
 // The host role's updater: a LaunchDaemon running as you, so it keeps running
 // with nobody logged in (agent accounts' sessions don't keep yours alive).
@@ -429,8 +429,8 @@ export default {
     return {
       tmpdir: stages.tmpdir,
       findArtifact() {
-        const [app] = findPaths([path.join(WORK, "release"), ...stages.ours()], (entry) => entry.isDirectory() && entry.name === "Blacksand T3.app");
-        if (!app) throw new Error("build finished but no 'Blacksand T3.app' was found");
+        const [app] = findPaths([path.join(WORK, "release"), ...stages.ours()], (entry) => entry.isDirectory() && entry.name === "T3 Code (blacksand).app");
+        if (!app) throw new Error("build finished but no 'T3 Code (blacksand).app' was found");
         return app;
       },
       cleanup: stages.cleanup,

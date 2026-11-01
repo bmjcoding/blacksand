@@ -81,9 +81,9 @@ button offers the release again.
   update or rollback first finishes it, or puts the previous build back. It may stop
   with "`state/activation.json` is damaged (…)" or "says its build went in, but
   nothing is installed". Then the journal is one this install can't trust. Compare
-  the app folders with `state/current.json` by hand, and make sure `Blacksand T3.app`
-  is the build that file names. The app folders are `Blacksand T3.app` and the hidden
-  `.Blacksand T3.previous`, `.outgoing`, `.new` and `.pending` copies beside it. Then
+  the app folders with `state/current.json` by hand, and make sure `T3 Code (blacksand).app`
+  is the build that file names. The app folders are `T3 Code (blacksand).app` and the hidden
+  `.T3 Code (blacksand).previous`, `.outgoing`, `.new` and `.pending` copies beside it. Then
   remove `state/activation.json`.
 - **Every command stops with an error about `state/install.json`.** The file is
   unreadable or invalid. `blacksand t3 configure --role ui` (or `host`, `both`)
