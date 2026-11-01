@@ -11,18 +11,18 @@ import { DEADLINES, UPSTREAM_URL, gitFailure, publicGit } from "./git.mjs";
 
 // fileURLToPath, not URL.pathname: that stays percent-encoded (a clone path with a space).
 export const ROOT = path.dirname(path.dirname(fs.realpathSync(fileURLToPath(import.meta.url))));
-export const LAUNCHER = path.join(ROOT, "bin", "t3blackout");
-export const T3B_HOME = process.env.T3BLACKOUT_HOME ?? path.join(os.homedir(), ".t3blackout");
+export const LAUNCHER = path.join(ROOT, "bin", "t3");
+export const T3B_HOME = process.env.BLACKSAND_T3_HOME ?? path.join(os.homedir(), ".blacksand/t3");
 
 // Upstream is fetched and built by a separate, unprivileged account that
 // install.sh sets up (lib/builder.mjs), so dependency install and build scripts
 // never run as you. Without one, nothing upstream runs unless you chose to build
-// as you (install.sh --unisolated-build, or CI's T3BLACKOUT_UNISOLATED_BUILD=1:
+// as you (install.sh --unisolated-build, or CI's BLACKSAND_T3_UNISOLATED_BUILD=1:
 // lib/install-config.mjs buildAsYouProblem); then it runs as you under build/.
-export const BUILDER_USER = "_t3blackout";
-export const BUILDER_HOME = process.platform === "darwin" ? "/private/var/t3blackout-build" : "/var/lib/t3blackout-build";
-export const BUILDER_MARKER = path.join(BUILDER_HOME, ".t3blackout-builder");
-export const IS_BUILDER = process.env.T3BLACKOUT_ROLE === "builder";
+export const BUILDER_USER = "_blacksand-build";
+export const BUILDER_HOME = process.platform === "darwin" ? "/private/var/blacksand-build" : "/var/lib/blacksand-build";
+export const BUILDER_MARKER = path.join(BUILDER_HOME, ".blacksand-builder");
+export const IS_BUILDER = process.env.BLACKSAND_T3_ROLE === "builder";
 export const USE_BUILDER = !IS_BUILDER && fs.existsSync(BUILDER_MARKER);
 const DATA = IS_BUILDER || USE_BUILDER ? BUILDER_HOME : path.join(ROOT, "build");
 export const MIRROR = path.join(DATA, "upstream");
@@ -31,22 +31,22 @@ export const WORK = path.join(DATA, "work");
 export const OUT = path.join(DATA, "out");
 export const STATE = IS_BUILDER ? path.join(BUILDER_HOME, "state") : path.join(ROOT, "state");
 /**
- * Where a T3 Blackout server on this machine drops a marker to ask for an update
+ * Where a Blacksand T3 server on this machine drops a marker to ask for an update
  * (rule server/self-update-requests-host-build): "Update everything" from a
  * desktop reaching this host over SSH. The scheduled updater's launchd job
  * watches it (macOS).
  */
 export const UPDATE_REQUESTS =
-  process.env.T3BLACKOUT_UPDATE_REQUESTS ??
-  (process.platform === "darwin" ? "/Users/Shared/t3blackout/update-requests" : "/var/tmp/t3blackout-update-requests");
+  process.env.BLACKSAND_T3_UPDATE_REQUESTS ??
+  (process.platform === "darwin" ? "/Users/Shared/blacksand/update-requests" : "/var/tmp/blacksand-update-requests");
 
 fs.mkdirSync(STATE, { recursive: true });
 
 export function log(message) {
-  const line = `[t3blackout ${new Date().toISOString()}] ${message}`;
+  const line = `[blacksand-t3 ${new Date().toISOString()}] ${message}`;
   console.log(line);
   // Owner-only: commands and their errors end up here.
-  fs.appendFileSync(path.join(STATE, "t3blackout.log"), line + "\n", { mode: 0o600 });
+  fs.appendFileSync(path.join(STATE, "blacksand-t3.log"), line + "\n", { mode: 0o600 });
 }
 
 /** `text` with every one of `secrets` (non-empty strings) masked, for errors and logs. */
@@ -154,7 +154,7 @@ export const sleepUnless = (ms, early) =>
  */
 export function trackStageDirs(platformName) {
   const prefix = `t3code-desktop-${platformName}-stage-`;
-  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "t3blackout-build-"));
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), "blacksand-build-"));
   const ours = () =>
     fs
       .readdirSync(tmpdir)

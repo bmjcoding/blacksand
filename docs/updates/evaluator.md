@@ -14,8 +14,8 @@ The work is split so the signing key never shares a runner with upstream code.
 
 | Job | Runs | Token and secrets | Output |
 |---|---|---|---|
-| `evaluate` | `packages/t3/bin/t3blackout evaluate` on each new upstream nightly release, newest first: builds and smoke-tests them | read-only `contents`, plus `actions: read` for the last run's stage records; no secrets | a proposed `pin.json`, a report, resolved lockfiles and stage records, uploaded as an artifact whatever happens |
-| `commit` | on a fresh runner that runs no upstream or npm code: `packages/t3/bin/t3blackout pin-check --candidate` re-derives every gate it can from git, npm and the advisory sources, then signs and pushes the pin | `contents: write`; the evaluator key, only in the final sign-and-push step | an evaluator-signed commit changing `pin.json` |
+| `evaluate` | `blacksand t3 evaluate` on each new upstream nightly release, newest first: builds and smoke-tests them | read-only `contents`, plus `actions: read` for the last run's stage records; no secrets | a proposed `pin.json`, a report, resolved lockfiles and stage records, uploaded as an artifact whatever happens |
+| `commit` | on a fresh runner that runs no upstream or npm code: `blacksand t3 pin-check --candidate` re-derives every gate it can from git, npm and the advisory sources, then signs and pushes the pin | `contents: write`; the evaluator key, only in the final sign-and-push step | an evaluator-signed commit changing `pin.json` |
 | `alerts` | advisories against the pin actually on `main` | `contents: read`, `issues: write` | GitHub issues |
 
 ## What holds a release back
@@ -24,7 +24,7 @@ The evaluator pins the newest release that passes every gate. A release is held 
 it:
 
 - adds a dependency version published less than **3 days** ago
-  (`T3BLACKOUT_MIN_AGE_DAYS`; a value that isn't a non-negative number stops the CLI
+  (`BLACKSAND_T3_MIN_AGE_DAYS`; a value that isn't a non-negative number stops the CLI
   rather than switching the gate off). Upstream's own code isn't held back, only new
   third-party packages, which is where a hijacked release does its damage. The
   [fast lane](fast-lane.md) waives the wait for vetted security fixes;
@@ -52,7 +52,7 @@ The `commit` job checks, before anything is signed:
 
 `evaluate --ref <tag>` evaluates one release by hand, for a hotfix worth taking now.
 Another track needs a first pin in a commit the owner signs
-(`packages/t3/bin/t3blackout evaluate --channel stable --baseline <tag> --write`, run locally).
+(`blacksand t3 evaluate --channel stable --baseline <tag> --write`, run locally).
 Until then, every machine refuses it.
 
 ## Alerts
@@ -130,7 +130,7 @@ naming it.
 The jobs that build install `libsecret-1-dev` and `imagemagick` with apt (upstream's
 Linux packager checks for them). They get pnpm through `install.sh`'s
 `install_pnpm`, from tarballs pinned by digest, never through Corepack. They build as
-the runner's user with `T3BLACKOUT_UNISOLATED_BUILD=1`, because CI has no build account.
+the runner's user with `BLACKSAND_T3_UNISOLATED_BUILD=1`, because CI has no build account.
 
 ## Limits
 

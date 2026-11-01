@@ -35,8 +35,8 @@ function toolLock(tool, deps) {
 }
 
 const STAGE_ONLY = ["@electron-webauthn/types@1.4.0", "@bufbuild/protobuf@2.0.1", "@cursor/sdk@1.0.0", "electron-webauthn@1.3.1"];
-/** This repo's build code, as stage records name it (lib/inventory.mjs blackoutDigest). */
-const BLACKOUT = sha("b");
+/** This repo's build code, as stage records name it (lib/inventory.mjs blacksandDigest). */
+const BLACKSAND = sha("b");
 const CLOSURE = ["node-datachannel@0.32.3", "prebuild-install@7.1.3", "tar-fs@2.1.5"];
 const PIN = {
   version: 1,
@@ -44,7 +44,7 @@ const PIN = {
   deviceTools: [TOOL],
   deviceToolLocks: { [TOOL]: lockEntry(toolLock(TOOL, CLOSURE)) },
 };
-const record = (overrides = {}) => JSON.stringify(stageRecord({ sha: sha("0"), locks: [STAGE_LOCK], blackout: BLACKOUT, builtAt: "2026-10-30T18:00:00.000Z", ...overrides }));
+const record = (overrides = {}) => JSON.stringify(stageRecord({ sha: sha("0"), locks: [STAGE_LOCK], blacksand: BLACKSAND, builtAt: "2026-10-30T18:00:00.000Z", ...overrides }));
 /** Upstream at any commit: its lockfile, its device tool pins and the packager's sources. */
 const show = (at, file) => (file === "pnpm-lock.yaml" ? UPSTREAM : (STAGE_SOURCES[file] ?? TOOLS));
 
@@ -56,21 +56,21 @@ test("a device tool's closure comes from pin.json's frozen lockfile, checked aga
 });
 
 test("a stage record is used only for the commit, build code and platform it was made with", async () => {
-  const read = readStageRecord(record(), { sha: sha("0"), blackout: BLACKOUT });
+  const read = readStageRecord(record(), { sha: sha("0"), blacksand: BLACKSAND });
   assert.deepEqual(read.locks, [STAGE_LOCK]);
   assert.equal(read.platform, stagePlatform());
-  const checked = await checkStageRecord(record(), { sha: sha("0"), show, workLock: RESOLVED, blackout: BLACKOUT, overrides: OVERRIDES }, { meta: npmMeta });
+  const checked = await checkStageRecord(record(), { sha: sha("0"), show, workLock: RESOLVED, blacksand: BLACKSAND, overrides: OVERRIDES }, { meta: npmMeta });
   for (const pkg of STAGE_ONLY) assert.ok(checked.packages.includes(pkg), pkg);
-  assert.throws(() => readStageRecord(record(), { sha: sha("1"), blackout: BLACKOUT }), /for 0000000000, not 1111111111/);
-  assert.throws(() => readStageRecord(record(), { sha: sha("0"), blackout: sha("c") }), /other Blackout build code/);
-  assert.throws(() => readStageRecord(record({ platform: "darwin-arm64" }), { sha: sha("0"), blackout: BLACKOUT, platform: "linux-x64" }), /made on darwin-arm64, not linux-x64/);
-  assert.throws(() => readStageRecord(record({ platform: "win32-x64" }), { sha: sha("0"), blackout: BLACKOUT }), /win32-x64, which Blackout doesn't build on/);
-  await assert.rejects(checkStageRecord(record({ locks: ["lockfileVersion: '5.4'\n"] }), { sha: sha("0"), show, workLock: RESOLVED, blackout: BLACKOUT, overrides: OVERRIDES }, { meta: npmMeta }), /lockfile isn't what a build of 0000000000 stages: .*isn't supported/);
-  assert.throws(() => readStageRecord(JSON.stringify({ ...JSON.parse(record()), v: 1 }), { sha: sha("0"), blackout: BLACKOUT }), /version 1 isn't 2/);
+  assert.throws(() => readStageRecord(record(), { sha: sha("1"), blacksand: BLACKSAND }), /for 0000000000, not 1111111111/);
+  assert.throws(() => readStageRecord(record(), { sha: sha("0"), blacksand: sha("c") }), /other Blacksand build code/);
+  assert.throws(() => readStageRecord(record({ platform: "darwin-arm64" }), { sha: sha("0"), blacksand: BLACKSAND, platform: "linux-x64" }), /made on darwin-arm64, not linux-x64/);
+  assert.throws(() => readStageRecord(record({ platform: "win32-x64" }), { sha: sha("0"), blacksand: BLACKSAND }), /win32-x64, which Blacksand doesn't build on/);
+  await assert.rejects(checkStageRecord(record({ locks: ["lockfileVersion: '5.4'\n"] }), { sha: sha("0"), show, workLock: RESOLVED, blacksand: BLACKSAND, overrides: OVERRIDES }, { meta: npmMeta }), /lockfile isn't what a build of 0000000000 stages: .*isn't supported/);
+  assert.throws(() => readStageRecord(JSON.stringify({ ...JSON.parse(record()), v: 1 }), { sha: sha("0"), blacksand: BLACKSAND }), /version 1 isn't 2/);
   assert.throws(() => stageRecord({ sha: sha("0"), locks: [] }), /no staged lockfiles/);
 });
 
-const base = { sha: sha("0"), show, resolvedLock: RESOLVED, overrides: OVERRIDES, blackout: BLACKOUT };
+const base = { sha: sha("0"), show, resolvedLock: RESOLVED, overrides: OVERRIDES, blacksand: BLACKSAND };
 const net = { meta: npmMeta };
 
 test("the alert inventory covers the staged install and every device tool's closure", async () => {
@@ -84,9 +84,9 @@ test("the alert inventory covers the staged install and every device tool's clos
   assert.equal(partial.gaps.length, 2);
   assert.match(partial.gaps[0], /expo-device-hub@0\.19\.0's dependencies: pin\.json has no reviewed dependency lockfile/);
   assert.match(partial.gaps[1], /no stage record for 0000000000/);
-  const stale = await alertInventory({ ...base, toolPackages: () => [TOOL], stage: record(), blackout: sha("c") }, net);
+  const stale = await alertInventory({ ...base, toolPackages: () => [TOOL], stage: record(), blacksand: sha("c") }, net);
   assert.ok(!stale.packages.includes(STAGE_ONLY[0]));
-  assert.match(stale.gaps[0], /other Blackout build code/);
+  assert.match(stale.gaps[0], /other Blacksand build code/);
 });
 
 test("advisories are looked up in the staged install and the tool closures too, and gaps are reported", async () => {
@@ -97,7 +97,7 @@ test("advisories are looked up in the staged install and the tool closures too, 
     toolPackages: toolClosurePackages,
     stageRecord: (at) => (at === sha("0") ? record() : null),
     npmMeta,
-    blackout: () => BLACKOUT,
+    blacksand: () => BLACKSAND,
     openAdvisories: async (packages) => {
       seen.push(packages);
       return [{ id: "GHSA-stage", severity: "HIGH", packages: [{ pkg: STAGE_ONLY[0], fixed: ["1.0.7"] }] }];
@@ -180,7 +180,7 @@ function fakeIo({ tags = [PINNED, NEWEST], builds = {}, carried = null, propose 
       return { skipped: [], stageLocks: [STAGE_LOCK], ...builds[at] };
     },
     carriedStage: () => carried,
-    blackout: () => BLACKOUT,
+    blacksand: () => BLACKSAND,
     log: () => {},
   };
   return { io, calls };
@@ -191,8 +191,8 @@ test("the evaluate job keeps a stage record for each release it builds, and for 
   const moved = fakeIo();
   const pinnedNew = await evaluateChannel({ channel: "nightly", pin: PIN, build: true }, moved.io);
   assert.equal(pinnedNew.pin.channels.nightly.ref, NEWEST);
-  assert.deepEqual(readStageRecord(JSON.stringify(pinnedNew.stages.get(sha("a"))), { sha: sha("a"), blackout: BLACKOUT }).locks, [STAGE_LOCK]);
-  assert.equal(pinnedNew.stages.get(sha("a")).blackout, BLACKOUT);
+  assert.deepEqual(readStageRecord(JSON.stringify(pinnedNew.stages.get(sha("a"))), { sha: sha("a"), blacksand: BLACKSAND }).locks, [STAGE_LOCK]);
+  assert.equal(pinnedNew.stages.get(sha("a")).blacksand, BLACKSAND);
   assert.deepEqual(moved.calls.build.map((b) => b.sha), [sha("a")], "the pinned release isn't rebuilt when a new one is pinned");
   // Nothing newer: the record from the last run is carried over, nothing is built.
   const kept = record();

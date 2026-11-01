@@ -1,5 +1,5 @@
 // node --test test/*.test.mjs: nothing in a build sends people to stock T3 (npx t3, t3.codes
-// downloads, upstream's release pages): stock T3 would run outside T3 Blackout's privacy build.
+// downloads, upstream's release pages): stock T3 would run outside Blacksand T3's privacy build.
 // Each stock replacement is strict, and a final assertion fails the build on any match left.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -11,7 +11,7 @@ import { featureIndex } from "../lib/features.mjs";
 import { STOCK_GUIDANCE, makeRules } from "../lib/rules.mjs";
 import { applyRules, findAbsentViolations } from "../lib/strip-engine.mjs";
 
-const rules = makeRules({ updater: { node: "/usr/bin/node", launcher: "/opt/t3b/bin/t3blackout", path: "/usr/bin" }, build: null });
+const rules = makeRules({ updater: { node: "/usr/bin/node", launcher: "/opt/t3b/bin/t3", path: "/usr/bin" }, build: null });
 const index = featureIndex(rules);
 const byId = new Map(rules.map((rule) => [rule.id, rule]));
 const assertion = byId.get("stock/no-stock-guidance");
@@ -40,7 +40,7 @@ test("the stock-guidance patterns catch upstream's ways to stock T3, not its ver
     "Remove it the same way (`npm uninstall -g t3`, or delete the checkout).",
     "needs a manual update",
     "npx t3code-extras",
-    "~/.t3blackout/bin/t3blackout update",
+    "~/.blacksand/t3/bin/t3 update",
     "`t3 pair`",
   ]) {
     assert.ok(!matchesStock(label), label);

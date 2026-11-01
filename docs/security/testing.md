@@ -13,17 +13,17 @@ npm run test:deep   # the deep tier: signed histories, installer runs, property 
 It needs Node 24 or later and git 2.55.0 or later. The deep tier takes about a minute
 on a recent Mac; [CONTRIBUTING.md](../../CONTRIBUTING.md) says what belongs in each. It works in throwaway folders, repositories and SSH keys, with local fakes
 for npm, GitHub, OSV and tailscaled. It doesn't touch your clone, `~/.ssh`,
-`~/.t3blackout` or the installed app. CI runs it on every push and pull request (`ci.yml`), and again
+`~/.blacksand/t3` or the installed app. CI runs it on every push and pull request (`ci.yml`), and again
 before each evaluation (`evaluate.yml`).
 
 Five tests are skipped unless you opt in:
 
 | Variable | What the test then does |
 |---|---|
-| `T3BLACKOUT_TEST_ELECTRON=<Electron binary>` | runs a real Electron app: an agent's frame reaches nothing over WebRTC, and device video arrives only through the WebRTC window |
-| `T3BLACKOUT_REAL_PNPM=<pinned pnpm>` (two tests) | checks the real pinned binary, and that a project asking for another pnpm still runs it |
-| `T3BLACKOUT_TEST_PACKED_APP=<T3 Blackout.app>` | runs the phone service's supervisor, the SSH runner sharing its server, an update, and shutdown, against a real packed build |
-| `T3BLACKOUT_PNPM_DIGESTS_ONLINE=1` | downloads the four pinned pnpm tarballs, and checks `PNPM_BINARY_SHA256` against them |
+| `BLACKSAND_T3_TEST_ELECTRON=<Electron binary>` | runs a real Electron app: an agent's frame reaches nothing over WebRTC, and device video arrives only through the WebRTC window |
+| `BLACKSAND_T3_REAL_PNPM=<pinned pnpm>` (two tests) | checks the real pinned binary, and that a project asking for another pnpm still runs it |
+| `BLACKSAND_T3_TEST_PACKED_APP=<Blacksand T3.app>` | runs the phone service's supervisor, the SSH runner sharing its server, an update, and shutdown, against a real packed build |
+| `BLACKSAND_T3_PNPM_DIGESTS_ONLINE=1` | downloads the four pinned pnpm tarballs, and checks `PNPM_BINARY_SHA256` against them |
 
 The tests in `packages/t3/test/stripped/` run inside a stripped upstream checkout, in upstream's
 own Vitest and Playwright setup. `build.yml` runs them after each build

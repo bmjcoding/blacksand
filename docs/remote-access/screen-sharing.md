@@ -38,7 +38,7 @@ Sharing works on loopback, and the forward follows once tailscaled is up.
 
 ## The check
 
-A root check (`dev.t3blackout.screen-sharing-check`) runs at boot and every minute.
+A root check (`dev.blacksand.screen-sharing-check`) runs at boot and every minute.
 Within about a minute, it undoes or stops what's wrong:
 
 - Apple's version loaded or its switch on (System Settings can do that): it unloads

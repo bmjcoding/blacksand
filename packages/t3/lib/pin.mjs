@@ -1,5 +1,5 @@
 // pin.json: the upstream release each channel builds, chosen by the evaluator
-// (bin/t3blackout evaluate, run by .github/workflows/evaluate.yml) and committed
+// (bin/t3 evaluate, run by .github/workflows/evaluate.yml) and committed
 // with the bot key. Every machine builds exactly this, so a desktop and the hosts
 // it connects to over SSH converge on the same version (each installs on its own
 // schedule). Self-update accepts a bot-signed commit only when it changes this

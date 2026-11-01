@@ -13,7 +13,7 @@ as a comment, so a trailing note would become arguments.
 
 | What | Minimum | Why |
 |---|---|---|
-| git | 2.55.0 | The first release that filters a server's terminal control codes (CVE-2024-52005). It includes every earlier fix. `install.sh` and every git call T3 Blackout makes refuse older versions. Apple's git (2.54.0, Apple Git-157) counts as 2.54.0. |
+| git | 2.55.0 | The first release that filters a server's terminal control codes (CVE-2024-52005). It includes every earlier fix. `install.sh` and every git call Blacksand T3 makes refuse older versions. Apple's git (2.54.0, Apple Git-157) counts as 2.54.0. |
 | Node | 24.22.1 on 24.x, or 26.12.1 | Fixes a Brotli decoder RCE (CVE-2026-111497) and TLS hostname bypasses from the October 2026 security release. `install.sh` refuses older versions. |
 | pnpm | exactly 12.14.0 | Pinned by digest. `install.sh` installs it. Don't install it yourself ([raising the pin](../updates/pnpm-pin.md)). |
 | Tailscale | 1.104.4 | 1.104.2 rejects the compromised eMudhra intermediate CAs (TS-2026-013). 1.104.4 fixes TS-2026-014, -016 and -017. Only needed if you use Tailscale. |
@@ -23,7 +23,7 @@ as a comment, so a trailing note would become arguments.
 Apple silicon or Intel, from your admin account.
 
 1. **Xcode Command Line Tools:** `xcode-select --install` (you confirm the dialog).
-   Full Xcode is optional for T3 Blackout itself. You need it to create the Apple
+   Full Xcode is optional for Blacksand T3 itself. You need it to create the Apple
    Development signing certificate ([signing](../install/signing-macos.md)), and to
    run iOS Simulators on the Mac that runs them ([iOS](../devices/ios.md)). Xcode 26
    or later also gives the app icon its Liquid Glass rendering.
@@ -98,7 +98,7 @@ Omarchy/Arch, Ubuntu/Debian or Fedora/RHEL, on x64 or arm64, desktop role only.
   the build account.
 - **Node** doesn't need to be preinstalled. Unless a Node on your `PATH` already
   meets the floor, `install.sh` installs Node 24 from nodejs.org into
-  `~/.local/share/t3blackout/node`, checked against the `SHASUMS256.txt` published
+  `~/.local/share/blacksand/t3/node`, checked against the `SHASUMS256.txt` published
   beside it.
 - **Network time** on, so the clock is right ([cloning](../install/clone.md#the-clock)).
 

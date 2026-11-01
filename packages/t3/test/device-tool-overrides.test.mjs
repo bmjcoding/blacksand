@@ -304,7 +304,7 @@ test("the alert inventory holds the raised tool and its frozen closure, not the 
   const show = (at, file) => (file === "pnpm-lock.yaml" ? UPSTREAM : JSON.stringify({ "agent-device": "0.21.31" }));
   const asked = [];
   const { packages, tools } = await alertInventory(
-    { sha: "0".repeat(40), show, resolvedLock: RESOLVED, toolPackages: (tool) => (asked.push(tool), [tool]), stage: null, overrides: [{ selector: "vuln@1.0.0", version: "1.0.1", advisories: ["GHSA-test"] }], toolOverrides: [AGENT], blackout: "b" },
+    { sha: "0".repeat(40), show, resolvedLock: RESOLVED, toolPackages: (tool) => (asked.push(tool), [tool]), stage: null, overrides: [{ selector: "vuln@1.0.0", version: "1.0.1", advisories: ["GHSA-test"] }], toolOverrides: [AGENT], blacksand: "b" },
     { meta: async (name) => ({ "newdep": { versions: { "3.0.0": {} } }, vuln: { versions: { "1.0.1": { dependencies: { newdep: "^3.0.0" } } } } })[name] ?? null },
   );
   assert.deepEqual(tools, ["agent-device@0.21.35"]);

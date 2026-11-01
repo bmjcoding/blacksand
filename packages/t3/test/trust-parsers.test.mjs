@@ -243,12 +243,12 @@ test("raiseCatalog reads quoting, comments, ranges, aliases and named catalogs",
     "overrides:",
     "  undici: 8.11.2",
   ]).split("\n");
-  assert.equal(out[1], "  undici: '8.12.2' # t3blackout security override (was 8.11.2)");
-  assert.equal(out[2], '  "qs": ^6.16.1 # t3blackout security override (was ^6.10.0)');
+  assert.equal(out[1], "  undici: '8.12.2' # blacksand security override (was 8.11.2)");
+  assert.equal(out[2], '  "qs": ^6.16.1 # blacksand security override (was ^6.10.0)');
   assert.equal(out[3], "  react: 19.0.0");
-  assert.equal(out[4], "  sharp: ~0.35.5 # t3blackout security override (was ~0.35.1)");
-  assert.equal(out[8], "    undici: 8.12.2 # t3blackout security override (was 8.3.0)");
-  assert.equal(out[9], "    fetcher: npm:undici@^8.12.2 # t3blackout security override (was npm:undici@^8.0.0-beta.1)");
+  assert.equal(out[4], "  sharp: ~0.35.5 # blacksand security override (was ~0.35.1)");
+  assert.equal(out[8], "    undici: 8.12.2 # blacksand security override (was 8.3.0)");
+  assert.equal(out[9], "    fetcher: npm:undici@^8.12.2 # blacksand security override (was npm:undici@^8.0.0-beta.1)");
   assert.equal(out[10], "  modern: {qs: 6.17.0, undici: 8.12.2}");
   assert.equal(out[12], "  undici: 8.11.2", "only catalogs are touched");
   assert.equal(catalog(["catalog:", "  undici: ^8.12.2", "  qs: 7.0.0"]), "catalog:\n  undici: ^8.12.2\n  qs: 7.0.0");

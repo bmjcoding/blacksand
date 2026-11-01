@@ -18,7 +18,7 @@ const SHA = "97e35bcf23e4dcf34c2dcffadd37c08db0e01e52";
 function fakeClone({ pin = true } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "t3b-build-clone-"));
   for (const dir of ["bin", "lib"]) fs.mkdirSync(path.join(root, dir));
-  fs.writeFileSync(path.join(root, "bin", "t3blackout"), "#!/usr/bin/env node\n");
+  fs.writeFileSync(path.join(root, "bin", "t3"), "#!/usr/bin/env node\n");
   fs.writeFileSync(path.join(root, "lib", "x.mjs"), "export {};\n");
   if (pin) {
     const value = {

@@ -120,7 +120,7 @@ export function fixture({ knownHosts = "", knownTools = "", locks = [OLD_DEPS, O
   // The registry's clock agrees with the test's `now` unless a test says otherwise (lib/selfupdate.mjs clockProblem).
   // Both run the old verifier and the new one (src/trust) on the same clone, and fail on any difference (bothUpdate, bothVerify).
   const update = (opts = {}) => bothUpdate({ repo: clone, remote: origin, upstream, report: (line) => logs.push(line), reviewClosure: passClosure, clock: async () => opts.now ?? Date.now(), ...opts });
-  /** verifyHead on `repo`, as bin/t3blackout's update runs it, with no advisories open. */
+  /** verifyHead on `repo`, as bin/t3's update runs it, with no advisories open. */
   const verify = (repo, opts = {}) => bothVerify({ repo, upstream, report: (line) => logs.push(line), reviewClosure: passClosure, advisories: async () => [], clock: async () => opts.now ?? Date.now(), ...opts });
   /** A new clone of origin as it is now (what install.sh's first build builds); `args` such as --depth go to git clone. */
   const fresh = (name = "fresh", args = []) => {

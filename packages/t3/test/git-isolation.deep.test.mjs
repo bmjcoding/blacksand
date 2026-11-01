@@ -257,7 +257,7 @@ test("a mirror's origin must be upstream, its only remote, with no proxy or help
 
 // ----------------------------------------------------- self-update's fetch --
 
-const GITHUB = "https://github.com/bmjcoding/t3blackout.git";
+const GITHUB = "https://github.com/bmjcoding/blacksand.git";
 
 /** A program that leaves `marker` behind when git runs it as a transport or an SSH command. */
 function plantedTransport(dir, name) {
@@ -308,14 +308,14 @@ test("githubOrigin: the clone's own origin in any GitHub URL form; anything else
   const f = fixture();
   for (const [url, want] of [
     [GITHUB, GITHUB],
-    ["https://github.com/bmjcoding/t3blackout", GITHUB],
-    ["https://github.com/bmjcoding/t3blackout/", GITHUB],
-    ["git@github.com:bmjcoding/t3blackout.git", GITHUB],
-    ["ssh://git@github.com/bmjcoding/t3blackout.git", GITHUB],
-    ["git@github-alias:bmjcoding/t3blackout.git", null],
-    ["https://example.org/github.com/bmjcoding/t3blackout.git", null],
-    ["https://github.com.example.org/bmjcoding/t3blackout.git", null],
-    ["https://github.com/bmjcoding/t3blackout.git/extra", null],
+    ["https://github.com/bmjcoding/blacksand", GITHUB],
+    ["https://github.com/bmjcoding/blacksand/", GITHUB],
+    ["git@github.com:bmjcoding/blacksand.git", GITHUB],
+    ["ssh://git@github.com/bmjcoding/blacksand.git", GITHUB],
+    ["git@github-alias:bmjcoding/blacksand.git", null],
+    ["https://example.org/github.com/bmjcoding/blacksand.git", null],
+    ["https://github.com.example.org/bmjcoding/blacksand.git", null],
+    ["https://github.com/bmjcoding/blacksand.git/extra", null],
     [f.origin, null],
   ]) {
     run(f.clone, ["remote", "set-url", "origin", url]);
@@ -360,7 +360,7 @@ test("a rewrite in the clone's own configuration that hides github.com stops sel
   assert.equal(await f.update({ remote: null }), "skipped");
   assert.equal(planted.ran(), false);
   assert.equal(f.head(), before);
-  assert.match(f.logs.at(-1), /self-update skipped: couldn't fetch \(refusing to reach https:\/\/github\.com\/bmjcoding\/t3blackout\.git from .*sets url\.ext::.*\.insteadof/);
+  assert.match(f.logs.at(-1), /self-update skipped: couldn't fetch \(refusing to reach https:\/\/github\.com\/bmjcoding\/blacksand\.git from .*sets url\.ext::.*\.insteadof/);
 });
 
 test("a global rewrite that hides github.com (ext:: or an SSH host alias) can't steer self-update's fetch, which goes to GitHub over HTTPS", async () => {
@@ -389,7 +389,7 @@ test("a global rewrite that hides github.com (ext:: or an SSH host alias) can't 
     // (8.7.1, Apple's git) or "to github.com:443 over proxy 127.0.0.1" (8.23.0, Homebrew's).
     assert.match(
       f.logs.at(-1),
-      /self-update skipped: couldn't fetch \(fatal: unable to access 'https:\/\/github\.com\/bmjcoding\/t3blackout\.git\/': Failed to connect to (127\.0\.0\.1 port \d+|github\.com(:| port )443 over proxy 127\.0\.0\.1) /,
+      /self-update skipped: couldn't fetch \(fatal: unable to access 'https:\/\/github\.com\/bmjcoding\/blacksand\.git\/': Failed to connect to (127\.0\.0\.1 port \d+|github\.com(:| port )443 over proxy 127\.0\.0\.1) /,
       kind,
     );
   }
@@ -403,7 +403,7 @@ test("an origin that isn't a GitHub repository isn't fetched at all; a local one
   assert.match(f.logs.at(-1), /couldn't fetch \(origin isn't a github\.com repository URL/);
   assert.equal(fs.existsSync(path.join(f.clone, ".git", "FETCH_HEAD")), false);
   // An SSH host alias as origin itself is no GitHub URL either.
-  run(f.clone, ["remote", "set-url", "origin", "git@github-alias:bmjcoding/t3blackout.git"]);
+  run(f.clone, ["remote", "set-url", "origin", "git@github-alias:bmjcoding/blacksand.git"]);
   assert.equal(await f.update({ remote: null }), "skipped");
   assert.match(f.logs.at(-1), /origin isn't a github\.com repository URL/);
   // Named explicitly, the local fixture goes through publicGit too (file transport, the clone's configuration checked).

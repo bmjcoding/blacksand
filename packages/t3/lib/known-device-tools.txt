@@ -1,5 +1,5 @@
 # Device tools upstream pins in apps/server/src/device/deviceToolVersions.json, as
-# name@version. The app npm-installs these into ~/.t3blackout/tools when device
+# name@version. The app npm-installs these into ~/.blacksand/t3/tools when device
 # support is turned on, so they never pass through the strip rules or the host scan.
 # Every update fails if upstream pins a version not listed here (or cleared by the
 # evaluator in pin.json). Each installs with `npm ci` from the dependency closure

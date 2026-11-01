@@ -234,7 +234,7 @@ export function raiseCatalog(yaml, overrides = readOverrides()) {
     const quote = value.style === "single" ? "'" : value.style === "double" ? '"' : "";
     const lineEnd = out.indexOf("\n", value.end) === -1 ? out.length : out.indexOf("\n", value.end);
     const rest = out.slice(value.end, lineEnd);
-    const note = !flow && /^\s*(#.*)?\r?$/.test(rest) ? ` # t3blackout security override (was ${value.text})${rest.endsWith("\r") ? "\r" : ""}` : rest;
+    const note = !flow && /^\s*(#.*)?\r?$/.test(rest) ? ` # blacksand security override (was ${value.text})${rest.endsWith("\r") ? "\r" : ""}` : rest;
     out = `${out.slice(0, value.start)}${quote}${text}${quote}${note}${out.slice(lineEnd)}`;
   }
   return out;

@@ -46,7 +46,7 @@ export async function tripped(code, { cli = false, cwd = scratch("run"), home = 
   const log = path.join(logDir, "tripwire.jsonl");
   const child = spawn(process.execPath, [...(cli ? ["--require", TRIPWIRE] : []), "-e", code], {
     cwd,
-    env: { PATH, HOME: home, ...(cli ? {} : { NODE_OPTIONS: `--require ${JSON.stringify(TRIPWIRE)}` }), T3BLACKOUT_TRIPWIRE_LOG: log },
+    env: { PATH, HOME: home, ...(cli ? {} : { NODE_OPTIONS: `--require ${JSON.stringify(TRIPWIRE)}` }), BLACKSAND_T3_TRIPWIRE_LOG: log },
     stdio: "ignore",
   });
   const timer = setTimeout(() => child.kill("SIGKILL"), 15_000);

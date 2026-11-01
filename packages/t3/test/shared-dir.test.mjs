@@ -10,12 +10,12 @@ import { spawnSync } from "node:child_process";
 import { syncBuiltinESMExports } from "node:module";
 
 import { aclWriteGrants, clearRequests, ensureRequestDir, ensureSharedDir, publishShared } from "../lib/shared-dir.mjs";
-/** A private stand-in for /Users/Shared: <tmp>/Shared/t3blackout/update-requests. */
+/** A private stand-in for /Users/Shared: <tmp>/Shared/blacksand/update-requests. */
 function sharedRoot() {
   const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "t3b-shared-")));
   const shared = path.join(base, "Shared");
   fs.mkdirSync(shared, { mode: 0o755 });
-  const root = path.join(shared, "t3blackout");
+  const root = path.join(shared, "blacksand");
   return { base, shared, root, requests: path.join(root, "update-requests") };
 }
 
@@ -99,12 +99,12 @@ test("published files are 644 and replaced whole", () => {
 
 const isMac = process.platform === "darwin";
 
-/** <tmp>/a/b/Shared/t3blackout/update-requests, every level 755. */
+/** <tmp>/a/b/Shared/blacksand/update-requests, every level 755. */
 function layout() {
   const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "t3b-shared-")));
   const shared = path.join(base, "a", "b", "Shared");
   fs.mkdirSync(shared, { recursive: true, mode: 0o755 });
-  const root = path.join(shared, "t3blackout");
+  const root = path.join(shared, "blacksand");
   return { base, a: path.join(base, "a"), shared, root, requests: path.join(root, "update-requests") };
 }
 

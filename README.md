@@ -1,6 +1,6 @@
-# T3 Blackout
+# Blacksand T3
 
-T3 Blackout builds [T3 Code](https://github.com/pingdotgg/t3code) from upstream
+Blacksand T3 builds [T3 Code](https://github.com/pingdotgg/t3code) from upstream
 source with its telemetry, stock auto-updater and other calls home removed. Each
 machine rebuilds the release this repository pins, after checking that release
 itself. Optionally, coding agents run in separate macOS accounts on an always-on
@@ -63,8 +63,8 @@ Check the [prerequisites](docs/getting-started/prerequisites.md) first. Git must
 2.55.0 or later before you clone. Then:
 
 ```sh
-git clone https://github.com/bmjcoding/t3blackout.git
-cd t3blackout
+git clone https://github.com/bmjcoding/blacksand.git
+cd blacksand
 ```
 
 Before running any script, [put the clone at the full commit SHA you trust](docs/install/clone.md#put-it-at-the-commit-you-trust).
@@ -75,10 +75,10 @@ Then run `packages/t3/install.sh`. For a desktop plus an always-on host, follow
 
 The app's startup error links here.
 
-- **Go back one build:** `~/.t3blackout/bin/t3blackout rollback`.
+- **Go back one build:** `blacksand t3 rollback`.
 - **Rebuild the release you're on:** quit the app, then run
-  `~/.t3blackout/bin/t3blackout update --force`.
-- The last update's log is `packages/t3/state/t3blackout.log` in your clone.
+  `blacksand t3 update --force`.
+- The last update's log is `packages/t3/state/blacksand-t3.log` in your clone.
 
 More in [troubleshooting](docs/troubleshooting.md).
 

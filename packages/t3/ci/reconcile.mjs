@@ -65,9 +65,9 @@ const GHSA = /^GHSA(-[23456789cfghjmpqrvwx]{4}){3}$/;
 const REPOSITORY = /^[\w.-]+\/[\w.-]+$/;
 const CVE = /^CVE-\d{4}-\d{4,}$/;
 const RUN = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/actions\/runs\/\d+$/;
-const MARKER = /^<!-- t3blackout (\{.*\}) -->[ \t]*$/;
+const MARKER = /^<!-- blacksand (\{.*\}) -->[ \t]*$/;
 /** The hidden line an issue's own text starts with: notes above it are kept, like those below its marker. */
-const START = "<!-- t3blackout text -->";
+const START = "<!-- blacksand text -->";
 /** GitHub's limit on an issue's body or a comment, in characters. */
 const LIMIT = 65_536;
 const MAX_UNITS = 200;
@@ -116,7 +116,7 @@ const titleOf = (text) => oneLine(text).slice(0, 250);
 
 /** The hidden marker naming what an issue or comment is, on a line of its own. */
 export const markerOf = (meta) =>
-  `<!-- t3blackout ${JSON.stringify({ v: 1, ...meta }).replace(/[<>&\u2028\u2029]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`)} -->`;
+  `<!-- blacksand ${JSON.stringify({ v: 1, ...meta }).replace(/[<>&\u2028\u2029]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`)} -->`;
 
 /** `text`'s lines outside fenced code blocks, with their indexes (CommonMark: a fence closes on a run of its own character at least as long). */
 function* outsideCode(text) {
@@ -311,10 +311,10 @@ const seenFrom = (entries) => {
 /** A marker's `seen` read back: Map hash -> rating. */
 const recordOf = (seen) => new Map((seen.match(/.{17}/g) ?? []).map((entry) => [entry.slice(0, 16), RATING[entry[16]]]));
 
-/** Throws unless `report` is what `bin/t3blackout advisories` writes. */
+/** Throws unless `report` is what `bin/t3 advisories` writes. */
 export function readReport(report) {
   if (!report || typeof report !== "object" || !CHANNELS.has(report.channel) || typeof report.release !== "string" || !Array.isArray(report.open)) {
-    throw new Error("not an advisory report from bin/t3blackout advisories");
+    throw new Error("not an advisory report from bin/t3 advisories");
   }
   if (!Array.isArray(report.gaps) || !report.gaps.every((gap) => typeof gap === "string")) throw new Error("the advisory report doesn't say what it couldn't cover (gaps)");
   for (const a of report.open) {
@@ -655,7 +655,7 @@ async function reconcileCoverage({ report, owned, complete }, gh, bot) {
 }
 
 /**
- * Reconciles the channel's security issues with `report` (bin/t3blackout
+ * Reconciles the channel's security issues with `report` (bin/t3
  * advisories, against the pin on main). `gh`: githubClient (github.mjs).
  * `run`: this run's page (security-issues.mjs), whose log lists everything.
  */

@@ -2,11 +2,11 @@
 // boot block (lib/files/boot-env.ts, rule desktop/boot-env) keeps it off the network: no web
 // contents sends WebRTC over UDP, and the app's session sends TURN and ICE over TCP to a proxy
 // that refuses them. That left WebRTC-only device streams (EAS Simulator) without video, so the
-// app window's top frame, and only it, may open one hidden window by BLACKOUT_WEBRTC_WINDOW's
-// name (lib/files/blackoutWebRtcWindow.ts, rules desktop/webrtc-window*): it alone gets the
+// app window's top frame, and only it, may open one hidden window by BLACKSAND_WEBRTC_WINDOW's
+// name (lib/files/blacksandWebRtcWindow.ts, rules desktop/webrtc-window*): it alone gets the
 // default policy back, never leaves about:blank, and closes with its page.
-// With T3BLACKOUT_TEST_ELECTRON=<an Electron binary> it also runs a real probe: an agent's HTML
-// preview (a sandboxed, opaque-origin frame under T3 Blackout's sandbox CSP) aims STUN, TURN and
+// With BLACKSAND_T3_TEST_ELECTRON=<an Electron binary> it also runs a real probe: an agent's HTML
+// preview (a sandboxed, opaque-origin frame under Blacksand T3's sandbox CSP) aims STUN, TURN and
 // ICE at local UDP and TCP listeners while the app page beside it receives a device-style
 // WebRTC video stream from a separate process.
 import { test } from "node:test";
@@ -24,8 +24,8 @@ import * as vm from "node:vm";
 
 const FILES = new URL("../lib/files/", import.meta.url);
 const BOOT = new URL("boot-env.ts", FILES);
-const { BLACKOUT_WEBRTC_WINDOW, blackoutWebRtcWindows } = await import(new URL("blackoutWebRtcWindow.ts", FILES));
-const realm = await import(new URL("blackoutWebRtcRealm.ts", FILES));
+const { BLACKSAND_WEBRTC_WINDOW, blacksandWebRtcWindows } = await import(new URL("blacksandWebRtcWindow.ts", FILES));
+const realm = await import(new URL("blacksandWebRtcRealm.ts", FILES));
 
 const bootBlock = () => {
   const match = /^\{\n[\s\S]*^\}\n/m.exec(fs.readFileSync(BOOT, "utf8"));
@@ -128,10 +128,10 @@ class FakeContents extends EventEmitter {
 /** The app as boot-env.ts and the rule set it up; open() is window.open from `frame` in the app's window. */
 function app() {
   const { electron, emit } = boot();
-  const windows = blackoutWebRtcWindows(electron);
+  const windows = blacksandWebRtcWindows(electron);
   const owner = new FakeContents();
   const open = (frame, details = {}) => {
-    const answer = windows.open(owner, { frameName: `${BLACKOUT_WEBRTC_WINDOW}-0f8c1e2a-3b4d-4e5f-8a9b-0c1d2e3f4a5b`, url: "about:blank", features: "", disposition: "new-window", referrer: { url: "", policy: "default" }, ...details });
+    const answer = windows.open(owner, { frameName: `${BLACKSAND_WEBRTC_WINDOW}-0f8c1e2a-3b4d-4e5f-8a9b-0c1d2e3f4a5b`, url: "about:blank", features: "", disposition: "new-window", referrer: { url: "", policy: "default" }, ...details });
     if (answer?.action !== "allow") return { answer };
     const child = new FakeContents({ opener: frame });
     emit("web-contents-created", {}, child);
@@ -149,8 +149,8 @@ test("only the page's own name for it, at about:blank, is the WebRTC window; eve
   const { owner, open } = app();
   assert.equal(open(owner.mainFrame, { frameName: "other" }).answer, null);
   // The fixed name alone, which any frame can give itself, isn't the helper.
-  assert.equal(open(owner.mainFrame, { frameName: BLACKOUT_WEBRTC_WINDOW }).answer, null);
-  assert.equal(open(owner.mainFrame, { frameName: `${BLACKOUT_WEBRTC_WINDOW}-not-a-uuid` }).answer, null);
+  assert.equal(open(owner.mainFrame, { frameName: BLACKSAND_WEBRTC_WINDOW }).answer, null);
+  assert.equal(open(owner.mainFrame, { frameName: `${BLACKSAND_WEBRTC_WINDOW}-not-a-uuid` }).answer, null);
   assert.deepEqual(open(owner.mainFrame, { url: "https://example.com/" }).answer, { action: "deny" });
   const { answer } = open(owner.mainFrame);
   assert.equal(answer.action, "allow");
@@ -161,7 +161,7 @@ test("the app's top frame gets a window with the default policy back, marked onc
   const { owner, open } = app();
   const { child } = open(owner.mainFrame);
   assert.deepEqual(child.policies, ["disable_non_proxied_udp", "default"], "boot-env.ts first, then the exception");
-  assert.deepEqual(child.scripts, ["window.t3blackoutWebRtc = true;"]);
+  assert.deepEqual(child.scripts, ["window.blacksandWebRtc = true;"]);
   await tick();
   assert.equal(child.isDestroyed(), false);
   assert.deepEqual(child.openHandler(), { action: "deny" }, "it opens nothing");
@@ -222,14 +222,14 @@ test("outside the desktop app's top frame the device stream uses the page's own 
   try {
     globalThis.RTCPeerConnection = PagePeer;
     delete globalThis.window;
-    assert.equal(await realm.blackoutPeerConnection(), PagePeer);
+    assert.equal(await realm.blacksandPeerConnection(), PagePeer);
     let opened = 0;
     globalThis.window = { open: () => opened++, top: {} };
-    assert.equal(await realm.blackoutPeerConnection(), PagePeer);
+    assert.equal(await realm.blacksandPeerConnection(), PagePeer);
     globalThis.window = { desktopBridge: {}, open: () => opened++, top: {} };
-    assert.equal(await realm.blackoutPeerConnection(), PagePeer, "a subframe");
+    assert.equal(await realm.blacksandPeerConnection(), PagePeer, "a subframe");
     assert.equal(opened, 0);
-    assert.equal(realm.BLACKOUT_WEBRTC_WINDOW, BLACKOUT_WEBRTC_WINDOW, "both halves use one name");
+    assert.equal(realm.BLACKSAND_WEBRTC_WINDOW, BLACKSAND_WEBRTC_WINDOW, "both halves use one name");
   } finally {
     for (const [name, value] of Object.entries(saved)) {
       if (value === undefined) delete globalThis[name];
@@ -249,9 +249,9 @@ const [mode, url, bootFile, dir] = process.argv.slice(-4);
 app.setPath("userData", path.join(dir, "user-data-" + mode));
 if (mode !== "none") eval(require("node:module").stripTypeScriptTypes(/^\\{\\n[\\s\\S]*^\\}\\n/m.exec(require("node:fs").readFileSync(bootFile, "utf8"))[0]));
 app.whenReady().then(async () => {
-  const windows = mode === "window" ? (await import(path.join(dir, "window.mjs"))).blackoutWebRtcWindows(require("electron")) : null;
+  const windows = mode === "window" ? (await import(path.join(dir, "window.mjs"))).blacksandWebRtcWindows(require("electron")) : null;
   const win = new BrowserWindow({ show: false, webPreferences: { preload: path.join(dir, "preload.cjs"), sandbox: true, contextIsolation: true, backgroundThrottling: false } });
-  // Upstream's handler denies every window; the rule asks blackoutWebRtc.open() first.
+  // Upstream's handler denies every window; the rule asks blacksandWebRtc.open() first.
   win.webContents.setWindowOpenHandler((details) => windows?.open(win.webContents, details) ?? { action: "deny" });
   win.webContents.on("console-message", (event) => {
     const text = event.message;
@@ -286,16 +286,16 @@ const stream = canvas.captureStream(30);
   }
 })();
 `;
-// The app page: readWebRtc()'s steps, with the constructor blackoutWebRtcRealm.ts gives it.
+// The app page: readWebRtc()'s steps, with the constructor blacksandWebRtcRealm.ts gives it.
 const PAGE = `
-import { blackoutPeerConnection } from "/realm.mjs";
+import { blacksandPeerConnection } from "/realm.mjs";
 const log = (...p) => console.log(["PROBE", ...p].join(" "));
 const frame = document.createElement("iframe");
 frame.src = "http://localhost:" + location.port + "/frame" + location.search;
 document.body.append(frame);
 let frames = 0;
 try {
-  const Peer = await blackoutPeerConnection();
+  const Peer = await blacksandPeerConnection();
   const pc = new Peer({ iceTransportPolicy: "all" });
   pc.addTransceiver("video", { direction: "recvonly" });
   const video = document.createElement("video");
@@ -350,7 +350,7 @@ async function all(Peer) {
   try {
     await all(RTCPeerConnection);
     let Peer = null;
-    try { Peer = window.open("", ${JSON.stringify(BLACKOUT_WEBRTC_WINDOW)})?.RTCPeerConnection ?? null; } catch (error) { log("window", error.name); }
+    try { Peer = window.open("", ${JSON.stringify(BLACKSAND_WEBRTC_WINDOW)})?.RTCPeerConnection ?? null; } catch (error) { log("window", error.name); }
     if (Peer) { log("window", "reachable"); await all(Peer); }
   } catch (error) {
     log("error", String(error));
@@ -361,19 +361,19 @@ async function all(Peer) {
 })();
 `;
 
-const electron = process.env.T3BLACKOUT_TEST_ELECTRON;
+const electron = process.env.BLACKSAND_T3_TEST_ELECTRON;
 const lan = Object.values(os.networkInterfaces())
   .flat()
   .find((address) => address?.family === "IPv4" && !address.internal)?.address;
 
-test("a real Electron app: the agent's frame reaches nothing over WebRTC, and the device stream gets video only through the WebRTC window", { skip: !electron ? "set T3BLACKOUT_TEST_ELECTRON to an Electron binary" : !lan ? "no non-loopback IPv4 address" : false, timeout: 400_000 }, async () => {
-  const { T3BLACKOUT_SANDBOXED_CSP } = await import(new URL("t3blackoutCsp.ts", FILES));
+test("a real Electron app: the agent's frame reaches nothing over WebRTC, and the device stream gets video only through the WebRTC window", { skip: !electron ? "set BLACKSAND_T3_TEST_ELECTRON to an Electron binary" : !lan ? "no non-loopback IPv4 address" : false, timeout: 400_000 }, async () => {
+  const { BLACKSAND_T3_SANDBOXED_CSP } = await import(new URL("blacksandCsp.ts", FILES));
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "t3b-webrtc-"));
   const strip = (name) => stripTypeScriptTypes(fs.readFileSync(new URL(name, FILES), "utf8"));
   fs.writeFileSync(path.join(dir, "main.cjs"), MAIN);
   fs.writeFileSync(path.join(dir, "preload.cjs"), PRELOAD);
   fs.writeFileSync(path.join(dir, "device.cjs"), DEVICE_MAIN);
-  fs.writeFileSync(path.join(dir, "window.mjs"), strip("blackoutWebRtcWindow.ts"));
+  fs.writeFileSync(path.join(dir, "window.mjs"), strip("blacksandWebRtcWindow.ts"));
   let udpHits = 0;
   let tcpHits = 0;
   let pings = 0;
@@ -398,10 +398,10 @@ test("a real Electron app: the agent's frame reaches nothing over WebRTC, and th
     if (url.pathname === "/device/answer") { const sdp = await read(req); answers.shift()?.(sdp); return res.end(); }
     if (url.pathname === "/offer") { offers.push(await read(req)); answers.push((sdp) => res.end(sdp)); return pair(); }
     if (url.pathname === "/device") return res.writeHead(200, { "Content-Type": "text/html" }).end(`<!doctype html><script>${DEVICE}</script>`);
-    if (url.pathname === "/realm.mjs") return res.writeHead(200, { "Content-Type": "text/javascript" }).end(strip("blackoutWebRtcRealm.ts"));
+    if (url.pathname === "/realm.mjs") return res.writeHead(200, { "Content-Type": "text/javascript" }).end(strip("blacksandWebRtcRealm.ts"));
     if (url.pathname === "/frame") {
-      // The headers the server gives an agent's HTML preview (t3blackoutGrantedFileCsp).
-      res.writeHead(200, { "Content-Type": "text/html", "Content-Security-Policy": `sandbox allow-scripts allow-forms allow-popups allow-downloads, ${T3BLACKOUT_SANDBOXED_CSP}` });
+      // The headers the server gives an agent's HTML preview (blacksandGrantedFileCsp).
+      res.writeHead(200, { "Content-Type": "text/html", "Content-Security-Policy": `sandbox allow-scripts allow-forms allow-popups allow-downloads, ${BLACKSAND_T3_SANDBOXED_CSP}` });
       return res.end(`<!doctype html><script>${FRAME}</script>`);
     }
     res.writeHead(200, { "Content-Type": "text/html" }).end(`<!doctype html><body><script type="module">${PAGE}</script>`);

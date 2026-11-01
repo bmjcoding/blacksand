@@ -50,4 +50,4 @@ dseditgroup -o edit -a agent-claude -t user _developer`, then try again.
    list devices'`.
 
 Installing your own builds on it also needs your Apple Account's signing in that
-account's Xcode. This hasn't been tried with T3 Blackout yet.
+account's Xcode. This hasn't been tried with Blacksand T3 yet.

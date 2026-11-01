@@ -1,4 +1,4 @@
-// The evaluator's commit job (bin/t3blackout pin-check, .github/workflows/
+// The evaluator's commit job (bin/t3 pin-check, .github/workflows/
 // evaluate.yml): the only place the evaluator's signing key is used, on a fresh
 // runner that runs no upstream or npm code. The evaluate job built upstream, so
 // its pin.json and resolved lockfiles are only a proposal: everything that can be

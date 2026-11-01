@@ -2,7 +2,7 @@
 
 > **Applies to:** every role. macOS and Linux sections below.
 
-The hourly updater keeps T3 Blackout itself current
+The hourly updater keeps Blacksand T3 itself current
 ([how updates arrive](../updates/how-updates-arrive.md)). `install.sh` installs only
 what's missing or below a floor the code enforces: Node 24.22.1 or 26.12.1, git
 2.55.0, and exactly the pinned pnpm. It doesn't upgrade anything else. The rest is
@@ -41,6 +41,6 @@ yours to keep current.
 ## Linux
 
 - Your distribution's packages, with its own update tool. The git floor still applies.
-- Node: if `install.sh` installed it (`~/.local/share/t3blackout/node`), it replaces
+- Node: if `install.sh` installed it (`~/.local/share/blacksand/t3/node`), it replaces
   it only when the Node on your `PATH` is below the floor. Rerun `packages/t3/install.sh` after
-  a release of T3 Blackout raises the floor.
+  a release of Blacksand T3 raises the floor.

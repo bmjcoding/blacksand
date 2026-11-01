@@ -35,7 +35,7 @@ update, and the installed build stays.
 9. **Sign and install** (signing on macOS only). The build account hands back an
    unsigned app; you scan it again, sign it and install it.
 
-`packages/t3/bin/t3blackout check --build` runs steps 1–7 without installing.
+`blacksand t3 check --build` runs steps 1–7 without installing.
 
 ## The smoke test
 

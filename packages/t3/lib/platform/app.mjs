@@ -132,7 +132,7 @@ function finish(journal, entry, commit, what) {
 
 /** Throws if an earlier transaction is still open: recoverActivation() first. */
 function begin(journal, entry) {
-  if (exists(journal)) throw new Error(`an earlier install or rollback didn't finish (${journal}); run t3blackout update to finish it`);
+  if (exists(journal)) throw new Error(`an earlier install or rollback didn't finish (${journal}); run blacksand t3 update to finish it`);
   fs.rmSync(entry.slots.outgoing, { recursive: true, force: true });
   writeJsonAtomic(journal, entry);
 }
@@ -233,7 +233,7 @@ const SERVER_ENTRY = /[/\\]app\.asar[/\\]apps[/\\]server[/\\]dist[/\\]bin\.mjs(\
  * (ELECTRON_RUN_AS_NODE on the server entry). Only the desktop holds an update
  * back: a server keeps running the build it started from after the swap, and the
  * next SSH connection replaces it with the installed one
- * (lib/files/ssh-runner-blackout.sh).
+ * (lib/files/ssh-runner-blacksand.sh).
  */
 export const isDesktopCommand = (commandLine, executableDir) =>
   commandLine.startsWith(executableDir) && !SERVER_ENTRY.test(commandLine);

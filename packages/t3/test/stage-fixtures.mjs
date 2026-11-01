@@ -44,7 +44,7 @@ export function fakeStage(resolved = lockfile(["is-number@7.0.0"]), installed = 
   const root = scratch("root");
   const app = path.join(root, "t3code-desktop-mac-stage-x", "app");
   fs.mkdirSync(app, { recursive: true });
-  fs.writeFileSync(path.join(app, "package.json"), '{"name":"t3blackout","dependencies":{"is-number":"^7.0.0"}}\n');
+  fs.writeFileSync(path.join(app, "package.json"), '{"name":"blacksand-t3","dependencies":{"is-number":"^7.0.0"}}\n');
   fs.writeFileSync(path.join(app, "pnpm-workspace.yaml"), "supportedArchitectures:\n  os:\n    - darwin\n");
   const vp = path.join(root, "real-vp.cjs");
   fs.writeFileSync(
@@ -68,12 +68,12 @@ else {
   fs.writeFileSync(path.join(root, "verified.yaml"), lockfile(["is-number@7.0.0"]));
   const env = {
     PATH: process.env.PATH,
-    T3BLACKOUT_REAL_VP: real,
-    T3BLACKOUT_REAL_NPM: findOnPath("npm", process.env.PATH, "/nonexistent") ?? "",
-    T3BLACKOUT_SHIM_DIR: path.join(root, "shims"),
-    T3BLACKOUT_STAGE_ROOT: root,
-    T3BLACKOUT_VERIFIED_LOCK: path.join(root, "verified.yaml"),
-    T3BLACKOUT_STAGE_RECORD: path.join(root, "record.jsonl"),
+    BLACKSAND_T3_REAL_VP: real,
+    BLACKSAND_T3_REAL_NPM: findOnPath("npm", process.env.PATH, "/nonexistent") ?? "",
+    BLACKSAND_T3_SHIM_DIR: path.join(root, "shims"),
+    BLACKSAND_T3_STAGE_ROOT: root,
+    BLACKSAND_T3_VERIFIED_LOCK: path.join(root, "verified.yaml"),
+    BLACKSAND_T3_STAGE_RECORD: path.join(root, "record.jsonl"),
   };
   const calls = () => fs.readFileSync(path.join(root, "calls.log"), "utf8").trim().split("\n");
   // Runs the guard on `dir` (the app folder by default), quietly: it reports what it checked.

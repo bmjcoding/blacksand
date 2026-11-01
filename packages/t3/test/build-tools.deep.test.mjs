@@ -46,7 +46,7 @@ function buildToolsScratch() {
   const dir = scratch();
   const content = `#!/bin/sh\necho ${PNPM_VERSION}\n`;
   const digest = sha256(content);
-  const tools = path.join(dir, "Application Support", "t3blackout", "tools");
+  const tools = path.join(dir, "Application Support", "blacksand", "tools");
   fs.mkdirSync(path.join(dir, "Application Support"));
   const lockcheck = path.join(dir, "lockcheck.mjs");
   fs.writeFileSync(
@@ -106,7 +106,7 @@ function descendants(pid) {
 
 /** installSh's `script` in the background: its output so far, and its end. A lock it waits for long fails it in 20 s. */
 function installShAsync(script, env = {}) {
-  const child = spawn("bash", ["-c", `source ${JSON.stringify(new URL("../install.sh", import.meta.url).pathname)}\nset +e\n${script}`], { env: { ...process.env, T3BLACKOUT_TOOLS_LOCK_WAIT_SECONDS: "20", ...env } });
+  const child = spawn("bash", ["-c", `source ${JSON.stringify(new URL("../install.sh", import.meta.url).pathname)}\nset +e\n${script}`], { env: { ...process.env, BLACKSAND_T3_TOOLS_LOCK_WAIT_SECONDS: "20", ...env } });
   let out = "";
   child.stdout.on("data", (chunk) => (out += chunk));
   child.stderr.on("data", (chunk) => (out += chunk));
@@ -145,7 +145,7 @@ test("install_build_pnpm stages the pinned tools beside the old, sets modes and 
       assert.equal(stat.mode & 0o777, stat.isDirectory() || stat.mode & 0o100 ? 0o755 : 0o644, entry);
       if (process.platform === "darwin") assert.equal(aclProblem(full), null, entry);
     }
-    assert.equal(fs.statSync(path.join(t.dir, "Application Support", "t3blackout")).mode & 0o777, 0o755, "the parent it made too");
+    assert.equal(fs.statSync(path.join(t.dir, "Application Support", "blacksand")).mode & 0o777, 0o755, "the parent it made too");
     const opts = { target: pnpmTarget(), digests: { [pnpmTarget()]: t.digest }, rootOwned: false };
     checkVitePlusHome(path.join(t.tools, "vite-plus"), opts);
     assert.deepEqual(besideTools(t), [], "nothing left beside it");
@@ -182,7 +182,7 @@ test("install.sh's build_tools_problem runs lib/pnpm.mjs's check, then checks wh
     assert.match(tree.stdout, new RegExp(`${STAND_IN_BUILDER} can't open: .*vite-plus/locked\nstatus 1`), tree.stdout + tree.stderr);
     assert.match(tree.stdout, new RegExp(`${STAND_IN_BUILDER} can change: [\\s\\S]*status 1`), "these files are this account's to change");
     // The account runs as the build account's own setup does, before its ready marker.
-    const setup = INSTALL_SH.slice(0, INSTALL_SH.indexOf('  as_builder touch "$BUILDER_HOME/.t3blackout-builder"'));
+    const setup = INSTALL_SH.slice(0, INSTALL_SH.indexOf('  as_builder touch "$BUILDER_HOME/.blacksand-builder"'));
     assert.ok(setup.lastIndexOf("\n  install_build_pnpm sudo\n") > setup.lastIndexOf("setup_builder"), "install_build_pnpm runs in the build account's setup, before its marker");
     assert.doesNotMatch(INSTALL_SH, /install_pnpm "\$BUILDER_HOME\/\.local"/);
   } finally {
@@ -336,7 +336,7 @@ const ACL_SKIP = process.platform !== "darwin" && "macOS ACLs";
 const aclLines = (file) => spawnSync("/bin/ls", ["-lde", "--", file], { encoding: "utf8" }).stdout.split("\n").slice(1).filter((line) => line.trim());
 
 test("the tools' lock only root, admins and the build account can open: root:admin 0640 and one ACL entry, checked exactly", () => {
-  assert.deepEqual(toolsLockPolicy({ platform: "darwin", builder: "_t3blackout" }), { uid: 0, gid: 80, mode: 0o640, acl: ["user:_t3blackout allow read"] });
+  assert.deepEqual(toolsLockPolicy({ platform: "darwin", builder: "_blacksand-build" }), { uid: 0, gid: 80, mode: 0o640, acl: ["user:_blacksand-build allow read"] });
   assert.deepEqual(toolsLockPolicy({ platform: "linux" }), { uid: 0, gid: 0, mode: 0o644, acl: [] }, "no agent accounts there, as for the build account's home");
   assert.equal(toolsLockPolicy({ platform: "darwin" }).mode & 0o007, 0, "nothing for other accounts");
   assert.equal(toolsLockPolicy({ platform: "darwin" }).mode & 0o222 & ~0o200, 0, "nobody but root may write it");
@@ -344,19 +344,19 @@ test("the tools' lock only root, admins and the build account can open: root:adm
   const lock = "/x/tools.lock";
   const stat = (over = {}) => () => ({ uid: 0, gid: 80, mode: 0o100640, dev: 1, ino: 2, isSymbolicLink: () => over.link === true, isFile: () => over.file !== false, ...over });
   const listing = (...entries) => () => ({ status: 0, stdout: [`-rw-r-----+ 1 root  admin  0 Oct 31 10:00 ${lock}`, ...entries.map((entry, i) => ` ${i}: ${entry}`)].join("\n") });
-  const check = (over, run = listing("user:_t3blackout allow read")) => toolsLockProblem(lock, { platform: "darwin", builder: "_t3blackout", lstat: stat(over), run, ancestors: () => null });
+  const check = (over, run = listing("user:_blacksand-build allow read")) => toolsLockProblem(lock, { platform: "darwin", builder: "_blacksand-build", lstat: stat(over), run, ancestors: () => null });
   assert.equal(check({}), null);
   assert.match(check({ link: true }), /is a symlink/);
   assert.match(check({ file: false }), /isn't a regular file/);
   assert.match(check({ mode: 0o100644 }), /mode 644, not uid 0, gid 80, mode 640/, "the 0644 one any account could open");
   assert.match(check({ gid: 20 }), /group gid 20/, "staff: every standard account, agents included");
   assert.match(check({ uid: 501 }), /owner uid 501/);
-  assert.match(check({}, listing()), /access control list is empty, not user:_t3blackout allow read/);
-  assert.match(check({}, listing("user:_t3blackout allow read", "group:everyone allow read")), /group:everyone allow read/);
-  assert.match(check({}, listing("user:_t3blackout inherited allow read")), /inherited/);
-  assert.match(check({}, listing("user:agent1 allow read")), /user:agent1 allow read, not user:_t3blackout allow read/);
+  assert.match(check({}, listing()), /access control list is empty, not user:_blacksand-build allow read/);
+  assert.match(check({}, listing("user:_blacksand-build allow read", "group:everyone allow read")), /group:everyone allow read/);
+  assert.match(check({}, listing("user:_blacksand-build inherited allow read")), /inherited/);
+  assert.match(check({}, listing("user:agent1 allow read")), /user:agent1 allow read, not user:_blacksand-build allow read/);
   assert.match(check({}, () => ({ status: 1, stdout: "" })), /can't be read/);
-  assert.match(toolsLockProblem(lock, { platform: "darwin", builder: "_t3blackout", lstat: stat(), run: listing("user:_t3blackout allow read"), ancestors: () => "/x isn't root's (owner uid 501)" }), /the directories above .*: \/x isn't root's/);
+  assert.match(toolsLockProblem(lock, { platform: "darwin", builder: "_blacksand-build", lstat: stat(), run: listing("user:_blacksand-build allow read"), ancestors: () => "/x isn't root's (owner uid 501)" }), /the directories above .*: \/x isn't root's/);
   assert.match(toolsLockProblem(lock, { platform: "darwin", lstat: () => { throw Object.assign(new Error("gone"), { code: "ENOENT" }); }, ancestors: () => null }), /isn't there/);
 });
 
@@ -381,11 +381,11 @@ test("an account outside the lock's group and ACL can't open it, the one its ent
     assert.deepEqual(aclLines(lock), [` 0: user:${STAND_IN_BUILDER} allow read`]);
     // Two readers (builds) at once; the writer (an install's shell) waits for both, then holds it alone.
     const [a, b] = [await lockBuildTools({ file: lock, shared: true, rootOwned: false, waitMs: 1000 }), await lockBuildTools({ file: lock, shared: true, rootOwned: false, waitMs: 1000 })];
-    const writer = installSh(`${passStubs(t)}\nhold_tools_lock && echo HELD`, { env: { T3BLACKOUT_TOOLS_LOCK_WAIT_SECONDS: "1" } });
+    const writer = installSh(`${passStubs(t)}\nhold_tools_lock && echo HELD`, { env: { BLACKSAND_T3_TOOLS_LOCK_WAIT_SECONDS: "1" } });
     assert.doesNotMatch(writer.stdout, /HELD/);
     assert.match(writer.stderr, /gave up after 1 s waiting for the build tools' lock .*: a build is using the build tools, or another \.\/install\.sh is replacing them \(`lsof .*` shows what holds it\)/);
     await a();
-    assert.doesNotMatch(installSh(`${passStubs(t)}\nhold_tools_lock && echo HELD`, { env: { T3BLACKOUT_TOOLS_LOCK_WAIT_SECONDS: "1" } }).stdout, /HELD/, "one reader left is enough");
+    assert.doesNotMatch(installSh(`${passStubs(t)}\nhold_tools_lock && echo HELD`, { env: { BLACKSAND_T3_TOOLS_LOCK_WAIT_SECONDS: "1" } }).stdout, /HELD/, "one reader left is enough");
     await b();
     const alone = installShAsync(`${passStubs(t)}\nhold_tools_lock && echo HELD\nsleep 30`);
     t.runs = [alone];

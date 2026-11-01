@@ -4,8 +4,8 @@
 // pnpm's own version switching is off in the build's environment, a release whose
 // package.json asks for another pnpm stops the build, and upstream's Vite+ runs the
 // same binary from a home the build hands it, which may hold nothing else.
-// T3BLACKOUT_REAL_PNPM=<the pinned pnpm binary> also runs the real one;
-// T3BLACKOUT_PNPM_DIGESTS_ONLINE=1 derives PNPM_BINARY_SHA256 again from the registry.
+// BLACKSAND_T3_REAL_PNPM=<the pinned pnpm binary> also runs the real one;
+// BLACKSAND_T3_PNPM_DIGESTS_ONLINE=1 derives PNPM_BINARY_SHA256 again from the registry.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -73,7 +73,7 @@ test("the pin is lib/pnpm.mjs's alone, and install.sh puts root's tools where bu
   assert.equal(ROOT_VITE_PLUS_HOME, path.join(BUILD_TOOLS_ROOT, "vite-plus"));
   // On macOS not under /usr/local (an Intel Mac's Homebrew owns it), but under a root-owned tree.
   assert.ok(buildToolsRoot("darwin").startsWith("/Library/Application Support/"), buildToolsRoot("darwin"));
-  assert.equal(runsAsBuilder(), os.userInfo().username === "_t3blackout", "these tests don't run as the build account");
+  assert.equal(runsAsBuilder(), os.userInfo().username === "_blacksand-build", "these tests don't run as the build account");
 });
 
 test("the build's environment turns pnpm's version switching off, both ways pnpm 12 reads it", () => {
@@ -94,7 +94,7 @@ test("a release that asks for the pinned pnpm builds; one that asks for any othe
     assert.equal(pnpmPinProblem(ok), null, ok);
   }
   for (const [text, says] of [
-    [manifest({ packageManager: "pnpm@12.16.1" }), /asks for pnpm@12\.16\.1 \(packageManager in package\.json\), not pnpm 12\.14\.0, the one T3 Blackout pins/],
+    [manifest({ packageManager: "pnpm@12.16.1" }), /asks for pnpm@12\.16\.1 \(packageManager in package\.json\), not pnpm 12\.14\.0, the one Blacksand T3 pins/],
     // Older is another pnpm too: pnpm switches down as readily as up.
     [manifest({ packageManager: "pnpm@12.12.0" }), /pnpm@12\.12\.0/],
     [manifest({ packageManager: "pnpm@12.16.1+sha512.0000" }), /pnpm@12\.16\.1\+sha512\.0000/],
@@ -199,7 +199,7 @@ test("the stage guard and the packager's pnpm shim run only the verified file, w
     fs.mkdirSync(app, { recursive: true });
     fs.writeFileSync(path.join(app, "package.json"), manifest({}));
     fs.writeFileSync(path.join(dir, "verified.yaml"), "lockfileVersion: '9.0'\n");
-    const env = { PATH: "/usr/bin:/bin", T3BLACKOUT_REAL_PNPM: fake.file, T3BLACKOUT_SHIM_DIR: path.join(dir, "shims"), T3BLACKOUT_STAGE_ROOT: dir, T3BLACKOUT_VERIFIED_LOCK: path.join(dir, "verified.yaml"), T3BLACKOUT_STAGE_RECORD: path.join(dir, "record.jsonl") };
+    const env = { PATH: "/usr/bin:/bin", BLACKSAND_T3_REAL_PNPM: fake.file, BLACKSAND_T3_SHIM_DIR: path.join(dir, "shims"), BLACKSAND_T3_STAGE_ROOT: dir, BLACKSAND_T3_VERIFIED_LOCK: path.join(dir, "verified.yaml"), BLACKSAND_T3_STAGE_RECORD: path.join(dir, "record.jsonl") };
     // The guard installs with what verifiedPnpm accepts (by default install.sh's file; given
     // here so the test doesn't depend on what's installed in this HOME): not the stand-in.
     await assert.rejects(guardedInstall(app, env, { installer: () => verifiedPnpm({ file: fake.file, rootOwned: false }) }), /isn't the pinned pnpm 12\.14\.0/);
@@ -235,7 +235,7 @@ test("the stage guard checks pnpm again right before each run, so one run's code
       checks.push(sha256(fs.readFileSync(file)) === digests[pnpmTarget()] ? "pinned" : "swapped");
       return verifiedPnpm({ file, digests, rootOwned: false });
     };
-    const env = { PATH: "/usr/bin:/bin", T3BLACKOUT_SHIM_DIR: path.join(dir, "shims"), T3BLACKOUT_STAGE_ROOT: dir, T3BLACKOUT_VERIFIED_LOCK: path.join(dir, "verified.yaml"), T3BLACKOUT_STAGE_RECORD: path.join(dir, "record.jsonl") };
+    const env = { PATH: "/usr/bin:/bin", BLACKSAND_T3_SHIM_DIR: path.join(dir, "shims"), BLACKSAND_T3_STAGE_ROOT: dir, BLACKSAND_T3_VERIFIED_LOCK: path.join(dir, "verified.yaml"), BLACKSAND_T3_STAGE_RECORD: path.join(dir, "record.jsonl") };
     await assert.rejects(guardedInstall(app, env, { installer }), /isn't the pinned pnpm 12\.14\.0/);
     assert.deepEqual(checks, ["pinned", "pinned", "swapped"], "checked first, before the resolution, and before the install");
     assert.deepEqual(fs.readFileSync(log, "utf8").trim().split("\n"), ["install --prod --lockfile-only --ignore-scripts"], "the swapped binary never ran");
@@ -270,7 +270,7 @@ test("the build account's pnpm must be root's, and only root's to change, all th
     assert.equal(rootOwnedProblem(binary, fakeStat({ [binary]: { uid: 0, mode: 0o100755 } })), null);
     assert.match(rootOwnedProblem(binary, fakeStat({ [grandparent]: { uid: 0, mode: 0o40775 } })), new RegExp(`^${grandparent} is writable by more than root \\(mode 775\\)`));
     assert.match(rootOwnedProblem(binary, fakeStat({ [ROOT_PNPM_PREFIX]: { uid: 501, mode: 0o40755 } })), /pnpm isn't root's \(owner uid 501\)/);
-    assert.match(rootOwnedProblem(binary, fakeStat({ [path.dirname(BUILD_TOOLS_ROOT)]: { uid: 0, mode: 0o120755, link: true } })), /t3blackout is a symlink/);
+    assert.match(rootOwnedProblem(binary, fakeStat({ [path.dirname(BUILD_TOOLS_ROOT)]: { uid: 0, mode: 0o120755, link: true } })), /blacksand is a symlink/);
     assert.match(rootOwnedProblem(binary, fakeStat({ [binary]: { uid: 0, mode: 0o100757 } })), /writable by more than root \(mode 757\)/);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -292,7 +292,7 @@ test("an access control list granting more than root, or write access for this a
     const allRoot = (at) => ({ uid: 0, mode: 0o40755, isSymbolicLink: () => false });
     const tool = "/x/tools/pnpm";
     assert.equal(rootOwnedProblem(tool, { lstat: allRoot, acl: () => null, writable: () => false }), null);
-    assert.match(rootOwnedProblem(tool, { lstat: allRoot, acl: (at) => (at === "/x" ? "has an access control list that allows more than root (0: user:_t3blackout allow add_subdirectory,delete_child)" : null), writable: () => false }), /^\/x has an access control list/);
+    assert.match(rootOwnedProblem(tool, { lstat: allRoot, acl: (at) => (at === "/x" ? "has an access control list that allows more than root (0: user:_blacksand-build allow add_subdirectory,delete_child)" : null), writable: () => false }), /^\/x has an access control list/);
     assert.match(rootOwnedProblem(tool, { lstat: allRoot, acl: () => null, writable: (at) => at === "/x/tools" }), /^\/x\/tools is writable by /);
     assert.throws(() => verifiedPnpm({ file: tool, rootOwned: true, lstat: allRoot, acl: () => "has an access control list that allows more than root (0: group:everyone allow write)", writable: () => false }), /must be root's and only root's to change \(\/x\/tools\/pnpm: \/x\/tools\/pnpm has an access control list/);
   } finally {
@@ -324,7 +324,7 @@ test("tools the running account can't get to are refused with what to do, not a 
   }
 });
 
-test("the Vite+ home is exactly what T3 Blackout gave it: entries, kinds, launchers, binary and, for the build account, owner", () => {
+test("the Vite+ home is exactly what Blacksand T3 gave it: entries, kinds, launchers, binary and, for the build account, owner", () => {
   const dir = scratch();
   try {
     const fake = fakePnpm(dir, path.join(dir, "calls.log"));
@@ -338,7 +338,7 @@ test("the Vite+ home is exactly what T3 Blackout gave it: entries, kinds, launch
     checkVitePlusHome(home, opts);
     // A launcher replaced, the binary left alone.
     fs.writeFileSync(path.join(bin, "pnpm"), "#!/bin/sh\necho replaced\n");
-    assert.throws(() => checkVitePlusHome(home, opts), /pnpm isn't Vite\+'s launcher as T3 Blackout writes it/);
+    assert.throws(() => checkVitePlusHome(home, opts), /pnpm isn't Vite\+'s launcher as Blacksand T3 writes it/);
     // A launcher made a symlink (to the binary, even), a lock gone, a directory swapped for a file.
     fresh();
     fs.rmSync(path.join(bin, "pnpx"));
@@ -405,7 +405,7 @@ test("upstream's Vite+ runs the pinned pnpm from a home the build seeds, and may
     for (const extra of [["package_manager", "pnpm", "12.16.1"], ["package_manager", "npm"], ["node"]]) {
       seedVitePlusHome(home, fake.file);
       fs.mkdirSync(path.join(home, ...extra), { recursive: true });
-      assert.throws(() => checkVitePlusHome(home, opts), /upstream's Vite\+ home isn't what T3 Blackout gave it \(fetched or added: /, extra.join("/"));
+      assert.throws(() => checkVitePlusHome(home, opts), /upstream's Vite\+ home isn't what Blacksand T3 gave it \(fetched or added: /, extra.join("/"));
     }
     // Its binary swapped: the build stops too.
     seedVitePlusHome(home, fake.file);
@@ -443,9 +443,9 @@ test("CI installs the pinned pnpm through install.sh, never Corepack", () => {
   }
 });
 
-const REAL = process.env.T3BLACKOUT_REAL_PNPM;
+const REAL = process.env.BLACKSAND_T3_REAL_PNPM;
 
-test("real pnpm: the pinned binary verifies, and with the build's settings a project asking for another pnpm still runs it", { skip: !REAL && "set T3BLACKOUT_REAL_PNPM to the pinned pnpm (<prefix>/lib/node_modules/pnpm/pnpm)" }, () => {
+test("real pnpm: the pinned binary verifies, and with the build's settings a project asking for another pnpm still runs it", { skip: !REAL && "set BLACKSAND_T3_REAL_PNPM to the pinned pnpm (<prefix>/lib/node_modules/pnpm/pnpm)" }, () => {
   const file = verifiedPnpm({ file: REAL });
   const root = scratch();
   try {
@@ -467,7 +467,7 @@ test("real pnpm: the pinned binary verifies, and with the build's settings a pro
   }
 });
 
-test("online: PNPM_BINARY_SHA256 is what the pinned tarballs carry", { skip: process.env.T3BLACKOUT_PNPM_DIGESTS_ONLINE !== "1" && "set T3BLACKOUT_PNPM_DIGESTS_ONLINE=1 (downloads four pnpm tarballs)" }, () => {
+test("online: PNPM_BINARY_SHA256 is what the pinned tarballs carry", { skip: process.env.BLACKSAND_T3_PNPM_DIGESTS_ONLINE !== "1" && "set BLACKSAND_T3_PNPM_DIGESTS_ONLINE=1 (downloads four pnpm tarballs)" }, () => {
   const result = spawnSync(process.execPath, [new URL("../lib/pnpm.mjs", import.meta.url).pathname, "digests"], { encoding: "utf8", timeout: 300_000 });
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(JSON.parse(result.stdout), PNPM_BINARY_SHA256);

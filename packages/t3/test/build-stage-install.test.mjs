@@ -85,9 +85,9 @@ test("the staged install resolves without scripts, is checked, then installs fro
   await stage.install();
   assert.deepEqual(stage.calls(), ["install --prod --lockfile-only --ignore-scripts", "install --prod --frozen-lockfile"]);
   assert.match(fs.readFileSync(path.join(stage.app, "pnpm-workspace.yaml"), "utf8"), /minimumReleaseAge: \d+\nminimumReleaseAgeStrict: true\nminimumReleaseAgeExclude:\n {2}- "is-number@7\.0\.0"/);
-  assert.equal(JSON.parse(fs.readFileSync(stage.env.T3BLACKOUT_STAGE_RECORD, "utf8")).dir, stage.app);
+  assert.equal(JSON.parse(fs.readFileSync(stage.env.BLACKSAND_T3_STAGE_RECORD, "utf8")).dir, stage.app);
   // The build's check afterwards: every node_modules in the stage was checked.
-  verifyStageInstalls(stage.stages, stage.env.T3BLACKOUT_STAGE_RECORD);
+  verifyStageInstalls(stage.stages, stage.env.BLACKSAND_T3_STAGE_RECORD);
   // What the config says: the minimum age in minutes, strict, and the verified versions excluded.
   const config = releaseAgeConfig(new Set(["a@1.0.0", "a@1.1.0", "@s/b@2.0.0"]), 3);
   assert.match(config, /^minimumReleaseAge: 4320$/m);
@@ -113,7 +113,7 @@ test("the staged install may not install from the stage's own folders, which no 
 test("the guard runs only as the rule calls it, once per stage folder, inside the build's temp folder, and refuses loosened settings", async () => {
   const stage = fakeStage();
   await assert.rejects(main("guard", ["install"], { cwd: stage.app, env: stage.env }), /the guard runs `vp install --prod` only/);
-  assert.equal(await quietly(() => main("guard", ["install", "--prod"], { cwd: stage.app, env: stage.env, installer: () => stage.env.T3BLACKOUT_REAL_VP })), 0);
+  assert.equal(await quietly(() => main("guard", ["install", "--prod"], { cwd: stage.app, env: stage.env, installer: () => stage.env.BLACKSAND_T3_REAL_VP })), 0);
   await assert.rejects(stage.install(), /already installed once/);
   await assert.rejects(stage.install(scratch("outside")), /isn't in the build's private temp folder/);
   // Upstream turning off pnpm's checks in the stage's own config.
@@ -124,7 +124,7 @@ test("the guard runs only as the rule calls it, once per stage folder, inside th
 
 test("the build refuses a stage installed around the guard, or changed after its check", async () => {
   const stage = fakeStage();
-  const record = stage.env.T3BLACKOUT_STAGE_RECORD;
+  const record = stage.env.BLACKSAND_T3_STAGE_RECORD;
   assert.throws(() => verifyStageInstalls(stage.stages, record), /never ran/);
   await stage.install();
   const checked = verifyStageInstalls(stage.stages, record);
@@ -142,14 +142,14 @@ test("the build refuses a stage installed around the guard, or changed after its
   fs.rmSync(path.join(stage.app, "node_modules", "evil"), { recursive: true });
   verifyStageInstalls(stage.stages, record);
   // The manifest the check was for isn't the one there now.
-  fs.writeFileSync(path.join(stage.app, "package.json"), '{"name":"t3blackout","dependencies":{"is-number":"^7.0.0","evil":"*"}}\n');
+  fs.writeFileSync(path.join(stage.app, "package.json"), '{"name":"blacksand-t3","dependencies":{"is-number":"^7.0.0","evil":"*"}}\n');
   assert.throws(() => verifyStageInstalls(stage.stages, record), /isn't the one checked/);
 });
 
 test("a stage record that doesn't list the installed files fails the build instead of passing unchecked", async () => {
   const stage = fakeStage();
   await stage.install();
-  const record = stage.env.T3BLACKOUT_STAGE_RECORD;
+  const record = stage.env.BLACKSAND_T3_STAGE_RECORD;
   const { files, ...rest } = JSON.parse(fs.readFileSync(record, "utf8"));
   assert.ok(files);
   fs.writeFileSync(record, `${JSON.stringify(rest)}\n`);
@@ -276,19 +276,19 @@ test("the rule routes upstream's two staged installs through the guard, and a th
   };
   const done = await apply(packager());
   assert.deepEqual(done.failures, []);
-  assert.equal(done.text.match(/const installCommand = blackoutStageInstall\(\);/g).length, 2);
+  assert.equal(done.text.match(/const installCommand = blacksandStageInstall\(\);/g).length, 2);
   assert.doesNotMatch(done.text, /resolveSpawnCommand\("vp", \[\.\.\.STAGE_INSTALL_ARGS\]\)/);
-  assert.match(done.text, /process\.env\.T3BLACKOUT_STAGE_GUARD/);
+  assert.match(done.text, /process\.env\.BLACKSAND_T3_STAGE_GUARD/);
   assert.equal((await apply(packager('function more() {\n  const installCommand = yield* resolveSpawnCommand("vp", [...STAGE_INSTALL_ARGS]);\n}'))).failures.length, 1);
   assert.equal((await apply(packager("const again = [...STAGE_INSTALL_ARGS];"))).failures.length, 1);
 });
 
 test("shims stand in for vp, pnpm, npm and yarn, and refuse an unexpected install in the stage", async () => {
   const stage = fakeStage();
-  const env = shimEnv({ dir: path.join(stage.root, "shims"), env: { PATH: process.env.PATH }, stageRoot: stage.root, verifiedLock: stage.env.T3BLACKOUT_VERIFIED_LOCK, record: stage.env.T3BLACKOUT_STAGE_RECORD });
+  const env = shimEnv({ dir: path.join(stage.root, "shims"), env: { PATH: process.env.PATH }, stageRoot: stage.root, verifiedLock: stage.env.BLACKSAND_T3_VERIFIED_LOCK, record: stage.env.BLACKSAND_T3_STAGE_RECORD });
   for (const tool of ["vp", "pnpm", "npm", "yarn"]) assert.ok(fs.statSync(path.join(stage.root, "shims", tool)).mode & 0o100, tool);
   assert.ok(env.PATH.startsWith(path.join(stage.root, "shims") + ":"));
-  assert.ok(!env.T3BLACKOUT_REAL_NPM.startsWith(path.join(stage.root, "shims")));
+  assert.ok(!env.BLACKSAND_T3_REAL_NPM.startsWith(path.join(stage.root, "shims")));
   const errors = [];
   const error = console.error;
   console.error = (line) => errors.push(line);

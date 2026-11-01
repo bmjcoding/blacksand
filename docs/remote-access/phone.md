@@ -3,12 +3,12 @@
 > **Applies to:** macOS, host role. Optional. Not yet supported on Linux
 > ([what it would need](../getting-started/roles.md#not-yet-supported-on-linux)).
 
-T3 Blackout removes T3 Connect, the relay the phone app normally uses. Instead, the
+Blacksand T3 removes T3 Connect, the relay the phone app normally uses. Instead, the
 phone reaches one agent account's server directly over Tailscale. Tailscale Serve
 publishes HTTPS on the host's MagicDNS name, and the policy allows `tcp:443` from the
 phone's tag only. Serve forwards it to that account's server on the host's loopback.
 
-- A launchd job (`dev.t3blackout.phone.<account>`) runs the server at boot, as the
+- A launchd job (`dev.blacksand.phone.<account>`) runs the server at boot, as the
   agent account, logged in or not, on `127.0.0.1` only.
 - The desktop's SSH connection to the same account shares that server, so the phone
   and the desktop see the same threads.
@@ -41,7 +41,7 @@ phone's tag only. Serve forwards it to that account's server on the host's loopb
    the T3 Code app on the phone: **Add environment →** Address
    `t3b-host.<tailnet>.ts.net` → the code. If you retry, clear the Address field first.
 
-Use the app, not the phone's browser: T3 Blackout's web UI only connects to loopback.
+Use the app, not the phone's browser: Blacksand T3's web UI only connects to loopback.
 
 | Option | What it does |
 |---|---|
@@ -54,7 +54,7 @@ Use the app, not the phone's browser: T3 Blackout's web UI only connects to loop
 If the server is starting when the desktop connects (a first start, or just after an
 update), the desktop waits up to 90 seconds, then asks you to connect again. It never
 starts a second server. The server's log is in that account's
-`~/.t3blackout/phone/`, readable by that account only, because it holds pairing links.
+`~/.blacksand/t3/phone/`, readable by that account only, because it holds pairing links.
 
 **Lost phone:** revoke its session (desktop → this environment **→ Settings → Sharing &
 access → Authorized clients → Revoke**), and remove the device in the admin console.
@@ -70,7 +70,7 @@ tailnet's Serve, or a real phone.
 
 - **The phone app is upstream's** stock T3 Code. It pairs directly as above, but
   keeps its own telemetry and offers T3 Connect sign-in. There are no push
-  notifications, because they need T3 Connect. A T3 Blackout phone build is planned.
+  notifications, because they need T3 Connect. A Blacksand T3 phone build is planned.
 - It adds an HTTPS listener in tailscaled for the devices your policy allows. Its
   certificate puts the host's MagicDNS name in public CT logs.
 - A paired phone holds a session with that agent account's powers until you revoke it.

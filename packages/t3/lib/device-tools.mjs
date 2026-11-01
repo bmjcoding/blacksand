@@ -70,7 +70,7 @@ export function approvedToolLock(pin, pinJson) {
   if (!entry) {
     throw new Error(
       `pin.json has no reviewed dependency lockfile for device tool ${pin} (deviceToolLocks). ` +
-        "The evaluator proposes one when it clears the tool; for a version you reviewed by hand, run `t3blackout device-tool-lock` and commit pin.json, signed.",
+        "The evaluator proposes one when it clears the tool; for a version you reviewed by hand, run `blacksand t3 device-tool-lock` and commit pin.json, signed.",
     );
   }
   if (typeof entry.lock !== "string" || sha256(entry.lock) !== entry.sha256) throw new Error(`pin.json's lockfile for ${pin} doesn't match its sha256`);
@@ -91,7 +91,7 @@ export async function toolPublishedAt(pin) {
  */
 export function resolveToolClosure(pin, { before, npm = "npm", registry = REGISTRY } = {}) {
   // The real path: npm keys the lockfile by paths relative to it (/var vs /private/var on macOS).
-  const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "t3blackout-tool-closure-")));
+  const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "blacksand-tool-closure-")));
   try {
     const manifest = toolManifest(pin);
     fs.writeFileSync(path.join(dir, "package.json"), manifest);

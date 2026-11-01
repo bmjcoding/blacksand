@@ -54,6 +54,6 @@ export async function localApi(initial, { afterGet, afterPost, failGet = false, 
   const sockets = new Set();
   server.on("connection", (s) => (sockets.add(s), s.on("close", () => sockets.delete(s))));
   await new Promise((resolve) => server.listen(socket, resolve));
-  return { socket, env: { T3BLACKOUT_TAILSCALED_SOCKET: socket }, config: () => config, posts, gets: () => gets, close: () => new Promise((r) => (sockets.forEach((s) => s.destroy()), server.close(r))) };
+  return { socket, env: { BLACKSAND_T3_TAILSCALED_SOCKET: socket }, config: () => config, posts, gets: () => gets, close: () => new Promise((r) => (sockets.forEach((s) => s.destroy()), server.close(r))) };
 }
 

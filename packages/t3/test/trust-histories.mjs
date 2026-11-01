@@ -266,7 +266,7 @@ export function render(world, history, layout) {
       "pin.json": pinText(0, true, false),
       "lib/known-device-tools.txt": "# read by hand\ntrust-su-tool@1.0.0\n",
       "lib/known-hosts.txt": "\n",
-      "bin/t3blackout": "#!/bin/sh\n",
+      "bin/t3": "#!/bin/sh\n",
       "README.md": "generated\n",
     },
     mono: layout === "monorepo",

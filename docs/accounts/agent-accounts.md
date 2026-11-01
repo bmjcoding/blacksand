@@ -13,9 +13,9 @@ reaches that server over SSH.
 |---|---|
 | An agent account can't read your files | your home is `chmod go-rwx` (`install.sh`); agent homes are `0700` with no ACL entries except macOS's own `everyone deny delete` |
 | An agent account can't read another's | the same: each agent home is private to its owner |
-| An agent account can't add SSH keys | its key is in root-owned `/etc/ssh/t3blackout/authorized_keys/<account>`; agent accounts' own `~/.ssh/authorized_keys` files are ignored |
+| An agent account can't add SSH keys | its key is in root-owned `/etc/ssh/blacksand/authorized_keys/<account>`; agent accounts' own `~/.ssh/authorized_keys` files are ignored |
 | SSH gives an agent account only what T3 needs | key logins only, forwarding to this Mac's loopback only; no agent, X11, remote or socket forwarding, no tunnels |
-| Only agent accounts log in over SSH | Remote Login's access list is exactly the members of `t3blackout-agents`; your admin account can't SSH in |
+| Only agent accounts log in over SSH | Remote Login's access list is exactly the members of `blacksand-agents`; your admin account can't SSH in |
 | No password logins at all | password and keyboard-interactive logins off for everyone, root login off |
 | Logins only from tailnet addresses | sshd refuses every login whose source address isn't a tailnet address or this Mac's loopback (see below for the limits) |
 | An agent account can't drive another account's server | each server requires pairing credentials, loopback clients included (upstream's server authentication) |
@@ -30,7 +30,7 @@ per Mac, shared by every account ([Android](../devices/android.md)).
 ## Your SSH key
 
 Pick the key agent accounts will accept. Save its public half as
-`~/.ssh/t3blackout.pub` on every machine that logs in: the desktop, and the host for
+`~/.ssh/blacksand.pub` on every machine that logs in: the desktop, and the host for
 local checks. Create `~/.ssh` with `mkdir -m 700 ~/.ssh` if needed. With 1Password,
 open the SSH key item and download its public key. 1Password syncs the private key,
 so both machines can use it. Another agent, or a key file, works too.
@@ -42,9 +42,9 @@ keys in the agent a login can fail before it reaches the right one. Put this in
 socket if it isn't 1Password's:
 
 ```
-# The key agent accounts accept, and only it, for the machines T3 Blackout logs in to.
+# The key agent accounts accept, and only it, for the machines Blacksand T3 logs in to.
 Host t3b-host localhost 127.0.0.1 ::1
-  IdentityFile ~/.ssh/t3blackout.pub
+  IdentityFile ~/.ssh/blacksand.pub
   IdentitiesOnly yes
 
 Host *
@@ -60,7 +60,7 @@ ssh -G agent-claude@t3b-host | grep -E '^identit'
 ```
 
 The first lists your keys. The second shows `identitiesonly yes` and `identityfile
-~/.ssh/t3blackout.pub`. Whoever can use this key can log in to every agent account,
+~/.ssh/blacksand.pub`. Whoever can use this key can log in to every agent account,
 so treat it accordingly ([keys and incidents](../security/keys-and-incidents.md)).
 
 ## Create an agent account
@@ -68,7 +68,7 @@ so treat it accordingly ([keys and incidents](../security/keys-and-incidents.md)
 On the host, from your admin account, in the clone:
 
 ```sh
-sudo packages/t3/scripts/add-agent-account.sh agent-claude --key ~/.ssh/t3blackout.pub
+sudo packages/t3/scripts/add-agent-account.sh agent-claude --key ~/.ssh/blacksand.pub
 ```
 
 macOS asks you to choose the new account's password. Keep it in your password
@@ -76,18 +76,18 @@ manager; it's only for logging in at the screen. A `### Error:-14120` line from
 `sysadminctl` while it creates the account is harmless. The script:
 
 - creates `agent-claude` as a standard account if it doesn't exist, puts it in the
-  group `t3blackout-agents`, and locks its home and yours as the table above says.
+  group `blacksand-agents`, and locks its home and yours as the table above says.
   It stops if your account can still open that home;
 - authorizes exactly that one public key, in root's file, rewritten on every run;
-- writes `/etc/ssh/sshd_config.d/010-t3blackout.conf` with the SSH settings above,
+- writes `/etc/ssh/sshd_config.d/010-blacksand.conf` with the SSH settings above,
   and the source filter. Before keeping the file, sshd itself checks it against two
   dozen sample addresses. If anything is off, the previous file goes back and the
   script stops;
 - sets Remote Login's access list (`com.apple.access_ssh`) to exactly the members of
-  `t3blackout-agents`, removing your admin account and nested groups such as
+  `blacksand-agents`, removing your admin account and nested groups such as
   "Administrators";
 - installs the Claude token helper, root-owned, at
-  `/usr/local/libexec/t3blackout/set-claude-token`, because agent accounts can't open
+  `/usr/local/libexec/blacksand/set-claude-token`, because agent accounts can't open
   your home or the clone in it;
 - copies the pricing table the updater published, so cost estimates work in that
   account.
@@ -110,7 +110,7 @@ sudo sshd -T -C user=agent-claude,host=tailnet,addr=100.101.1.1 | grep -i '^deny
 ```
 
 - `GroupMembership` lists only your agent accounts, and `NestedGroups` says `No such key`.
-- The first `sshd -T` prints `AuthorizedKeysFile /etc/ssh/t3blackout/authorized_keys/%u`,
+- The first `sshd -T` prints `AuthorizedKeysFile /etc/ssh/blacksand/authorized_keys/%u`,
   `PasswordAuthentication no`, `AllowTcpForwarding local` and `PermitOpen 127.0.0.1:*
   localhost:* [::1]:*`. Apple's sshd capitalizes the keywords.
 - A LAN address (`192.168.1.9`) prints `DenyUsers *`; a tailnet address prints nothing.
@@ -128,13 +128,13 @@ SSH in any more:
 ```sh
 read -r "T3B_DESKTOP_IPV4?Paste the desktop's Tailscale IPv4 address: "
 read -r "T3B_DESKTOP_IPV6?Paste the desktop's Tailscale IPv6 address: "
-sudo packages/t3/scripts/add-agent-account.sh agent-claude --key ~/.ssh/t3blackout.pub --allow-from "$T3B_DESKTOP_IPV4,$T3B_DESKTOP_IPV6"
+sudo packages/t3/scripts/add-agent-account.sh agent-claude --key ~/.ssh/blacksand.pub --allow-from "$T3B_DESKTOP_IPV4,$T3B_DESKTOP_IPV6"
 sudo sshd -T -C "user=agent-claude,host=desktop,addr=$T3B_DESKTOP_IPV4" | grep -i '^denyusers'
 sudo sshd -T -C user=agent-claude,host=other,addr=100.101.1.1 | grep -i '^denyusers'
 ```
 
 The desktop's address prints no `DenyUsers`, and `100.101.1.1` now prints `DenyUsers
-*`. The setting is global and saved in `/etc/ssh/t3blackout/allow-from`. Later runs
+*`. The setting is global and saved in `/etc/ssh/blacksand/allow-from`. Later runs
 keep it and say so. `--tailnet-only` goes back to the whole tailnet ranges.
 `--allow-from` takes tailnet addresses only. A rebuilt desktop gets new addresses, so
 run this again with them. `--allow-lan` also allows your local network (key-only);

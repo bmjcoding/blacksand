@@ -3,7 +3,7 @@
 > **Applies to:** every role. Host-side rows are macOS-only, because only macOS has
 > the host role.
 
-This page says what T3 Blackout protects, from whom, where each control is enforced,
+This page says what Blacksand T3 protects, from whom, where each control is enforced,
 and which test checks it. It also lists what it deliberately doesn't protect.
 
 ## Assets
@@ -34,13 +34,13 @@ and which test checks it. It also lists what it deliberately doesn't protect.
 ```mermaid
 flowchart LR
   subgraph desktop["Desktop: your account"]
-    app["T3 Blackout app<br/>CSP: loopback only"]
+    app["Blacksand T3 app<br/>CSP: loopback only"]
     dupd["updater and self-update"]
-    dbuild["build account _t3blackout"]
+    dbuild["build account _blacksand-build"]
   end
   subgraph host["Always-on host (macOS)"]
     hupd["admin account: updater,<br/>Screen Sharing (optional)"]
-    hbuild["build account _t3blackout"]
+    hbuild["build account _blacksand-build"]
     subgraph agents["agent accounts (untrusted)"]
       srv["T3 server and provider CLIs"]
     end
@@ -80,7 +80,7 @@ passing a control first.
 |---|---|---|---|
 | Read your files or credentials | your home `go-rwx`; agent homes `0700` with no ACL but macOS's deny-delete | `install.sh`, `packages/t3/scripts/add-agent-account.sh` | `install.deep.test.mjs`, `agent-accounts.deep.test.mjs` |
 | Add its own SSH key, or forward to other hosts | root-owned keys file; forwarding to this Mac's loopback only; no agent, X11 or remote forwarding | `packages/t3/scripts/add-agent-account.sh` | `agent-accounts.deep.test.mjs` |
-| Drive another account's server | each server requires pairing credentials, loopback included (upstream's authentication); each account's own `~/.t3blackout` and private `server.env` | upstream server authentication; `packages/t3/lib/files/ssh-runner-blackout.sh` for private environment handling | `ssh-runner.deep.test.mjs` (private environment only); pairing and session authentication checked by hand against a packed server in a macOS VM |
+| Drive another account's server | each server requires pairing credentials, loopback included (upstream's authentication); each account's own `~/.blacksand/t3` and private `server.env` | upstream server authentication; `packages/t3/lib/files/ssh-runner-blacksand.sh` for private environment handling | `ssh-runner.deep.test.mjs` (private environment only); pairing and session authentication checked by hand against a packed server in a macOS VM |
 | Stall updates by holding the build tools' lock | lock is `root:admin` 0640 plus one ACL entry for the build account, checked exactly | `install.sh`, `packages/t3/lib/pnpm.mjs` | `build-tools.deep.test.mjs` |
 | Tamper with the update-request folder | sticky `1733` folder in a `755` shared folder; the whole path checked, ACLs included | `packages/t3/lib/shared-dir.mjs` | `shared-dir.test.mjs` |
 | Listen on Screen Sharing's port to fake a sign-in prompt | root jobs hold 15900 and 15901; the forward moves only to a verified holder, while parked | `packages/t3/scripts/enable-screen-sharing.sh` | `screen-sharing-check.deep.test.mjs`, `screen-sharing-commands.deep.test.mjs` |
@@ -122,7 +122,7 @@ passing a control first.
 | A malicious install script | scripts for five packages only; staged install guarded; builds as the build account | `packages/t3/lib/rules.mjs`, `packages/t3/lib/stage-install.mjs`, `packages/t3/lib/builder.mjs` | `build-artifact.test.mjs`, `build-stage-install.test.mjs`, `build-builder.test.mjs` |
 | A hostile device tool | frozen reviewed closures; no install scripts; native archives by hash | `packages/t3/lib/device-tools.mjs`, `packages/t3/lib/native-assets.mjs` | `device-tools.test.mjs`, `native-assets.test.mjs` |
 | A swapped pnpm (Corepack, `packageManager`) | pinned binary, checked by SHA-256 before every run | `packages/t3/lib/pnpm.mjs` | `pinned-pnpm.test.mjs` |
-| Upstream's UI loads remote content or leaks over WebRTC | loopback-only CSP; WebRTC UDP blocked, TCP to a refusing proxy | `packages/t3/lib/files/t3blackoutCsp.ts`, `packages/t3/lib/files/boot-env.ts` | `app-webrtc.test.mjs`, `packages/t3/test/stripped/blackout*Csp.test.ts` |
+| Upstream's UI loads remote content or leaks over WebRTC | loopback-only CSP; WebRTC UDP blocked, TCP to a refusing proxy | `packages/t3/lib/files/blacksandCsp.ts`, `packages/t3/lib/files/boot-env.ts` | `app-webrtc.test.mjs`, `packages/t3/test/stripped/blacksand*Csp.test.ts` |
 | The app sends you to stock T3 | stock-guidance rules, and a final strict assertion | `packages/t3/lib/rules.mjs` | `app-stock-guidance.test.mjs` |
 
 ### Loss, and ordinary failures
@@ -140,7 +140,7 @@ passing a control first.
 
 These are out of scope by design. Nothing in the code tries to cover them.
 
-- **Runtime network enforcement.** T3 Blackout doesn't limit what the agents, the CLIs
+- **Runtime network enforcement.** Blacksand T3 doesn't limit what the agents, the CLIs
   or the app reach at runtime. Sandbox the agents with your own tooling. Codex's and
   Claude Code's own sandboxes work normally. Enforcement outside this repository is
   planned.

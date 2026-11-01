@@ -15,7 +15,7 @@ import { featureIndex } from "../lib/features.mjs";
 import { STOCK_GUIDANCE, makeRules } from "../lib/rules.mjs";
 import { applyRules } from "../lib/strip-engine.mjs";
 
-const rules = makeRules({ updater: { node: "/usr/bin/node", launcher: "/opt/t3b/bin/t3blackout", path: "/usr/bin" }, build: null });
+const rules = makeRules({ updater: { node: "/usr/bin/node", launcher: "/opt/t3b/bin/t3", path: "/usr/bin" }, build: null });
 const byId = new Map(rules.map((rule) => [rule.id, rule]));
 const index = featureIndex(rules);
 const matchesStock = (text) => STOCK_GUIDANCE.some(({ pattern }) => pattern.test(text));
@@ -165,7 +165,7 @@ test("the web never looks up T3's npm releases, itself (3940) or through a serve
   assert.match(applies("web/no-npm-release-poll", WEB_3940), /HttpClient\.get\(\n {8}"data:application\/json,\{\}",/);
   assert.match(applies("web/no-npm-release-poll", WEB_3940.replace("(spec)", "(version)")), /"data:application\/json,\{\}"/);
   const next = applies("web/no-npm-release-poll", WEB_3956);
-  assert.match(next, /return new ServerNpmReleaseError\(\{ reason: "T3 Blackout doesn't look up releases on npm: .*`t3blackout update --channel nightly`/);
+  assert.match(next, /return new ServerNpmReleaseError\(\{ reason: "Blacksand T3 doesn't look up releases on npm: .*`blacksand t3 update --channel nightly`/);
   assert.doesNotMatch(next, /npmReleaseLookup === true/);
   drifts("web/no-npm-release-poll", WEB_3940 + WEB_3956, /found 2/);
   drifts("web/no-npm-release-poll", "export const npmReleaseAtom = 1;\n", /found 0/);
@@ -185,8 +185,8 @@ test("the server answers every npm release lookup itself, never with npm or the 
   assert.equal(applies("server/no-npm-release-lookup", WS_3940, { audited: true }), WS_3940, "an audited file from before 3956 has no lookup, and nothing changes");
   drifts("server/no-npm-release-lookup", WS_3940, /none of the audited upstream versions/);
   const next = applies("server/no-npm-release-lookup", WS_3956);
-  assert.match(next, /import \* as NpmRelease from "\.\/cloud\/npmRelease\.ts";\nimport \{ ServerNpmReleaseError as BlackoutNpmReleaseError \} from "@t3tools\/contracts";\n/);
-  assert.match(next, /Layer\.succeed\(\n {6}NpmRelease\.NpmRelease,\n {6}NpmRelease\.NpmRelease\.of\(\{\n {8}get: \(\) => Effect\.fail\(new BlackoutNpmReleaseError\(\{ reason: "T3 Blackout doesn't look up releases on npm/);
+  assert.match(next, /import \* as NpmRelease from "\.\/cloud\/npmRelease\.ts";\nimport \{ ServerNpmReleaseError as BlacksandNpmReleaseError \} from "@t3tools\/contracts";\n/);
+  assert.match(next, /Layer\.succeed\(\n {6}NpmRelease\.NpmRelease,\n {6}NpmRelease\.NpmRelease\.of\(\{\n {8}get: \(\) => Effect\.fail\(new BlacksandNpmReleaseError\(\{ reason: "Blacksand T3 doesn't look up releases on npm/);
   assert.doesNotMatch(next, /Layer\.provide\(NpmRelease\.layer\)/);
   // The RPC method still served, the service renamed or provided elsewhere: stop.
   drifts("server/no-npm-release-lookup", WS_3940 + "        [WS_METHODS.serverGetNpmRelease]: (input) => releases.get(input),\n", /found 0/);
@@ -230,7 +230,7 @@ const WIZARD_3956 =
   '              <code className="font-mono">npx t3 serve</code>, then run:\n' +
   '              On a tailnet, run <code className="font-mono">npx t3 pair --tailscale</code> instead.\n';
 
-test("onboarding names T3 Blackout's t3 command at 3940 and 3956, tailnet pairing included", () => {
+test("onboarding names Blacksand T3's t3 command at 3940 and 3956, tailnet pairing included", () => {
   for (const [source, tailnet] of [
     [WIZARD_3940, '<code className="font-mono">--tailscale</code> to pair over your tailnet once the host\'s admin has run{" "}'],
     [WIZARD_3956, 'On a tailnet, run <code className="font-mono">t3 pair --tailscale</code> instead, once the host\'s admin has run{" "}'],
@@ -241,7 +241,7 @@ test("onboarding names T3 Blackout's t3 command at 3940 and 3956, tailnet pairin
     assert.match(out, /<code className="font-mono">t3 serve<\/code> \(Settings → About installs the t3 command\)/);
     assert.match(out, /command="t3 connect"[\s\S]*command="t3 pair"/);
     // The Serve mapping is the admin's (scripts/add-phone-service.sh), never the agent account's.
-    assert.match(out, /<code className="font-mono">sudo scripts\/add-phone-service\.sh<\/code> for this account \(T3 Blackout's phone service\)\./);
+    assert.match(out, /<code className="font-mono">sudo scripts\/add-phone-service\.sh<\/code> for this account \(Blacksand T3's phone service\)\./);
   }
   // A tailnet hint dropped, or worded some third way, stops the update.
   drifts("web/no-stock-commands-onboarding", WIZARD_3956.replace(/ {14}On a tailnet.*\n/, ""), /found 0/);
@@ -269,7 +269,7 @@ const noT3Up = (text) => assert.doesNotMatch(text, /`t3 up\b|\bt3 up --|upComman
 test("3973's `t3 up` and `t3 status` leave the CLI, and nothing points to them", () => {
   const cli = applies("server/no-t3-up", BINCLI_3973);
   noT3Up(cli.replace('import { connectCommand, statusCommand, upCommand } from "./cli/up.ts";\n', ""));
-  assert.match(cli, /Other Macs reach T3 Blackout over SSH[^"]*sudo scripts\/add-phone-service\.sh <agent account> --pair/);
+  assert.match(cli, /Other Macs reach Blacksand T3 over SSH[^"]*sudo scripts\/add-phone-service\.sh <agent account> --pair/);
   assert.equal(applies("server/no-t3-up", BINCLI_3956, { audited: true }), BINCLI_3956);
   drifts("server/no-t3-up", BINCLI_3956, /none of the audited upstream versions/);
   // Renamed, the commands are still registered: drift.
@@ -298,15 +298,15 @@ const PAIR_3973 = PAIR_COMMON + '            "This URL is only reachable from th
 
 test("`t3 pair` points to SSH and the host's phone service, and never writes a Tailscale Serve mapping", () => {
   for (const source of [PAIR_3956, PAIR_3973]) {
-    const out = applies("server/pair-blackout-routes", source);
+    const out = applies("server/pair-blacksand-routes", source);
     noT3Up(out);
     assert.doesNotMatch(out, /T3 Connect|re-run with --tailscale|ensureTailscaleServe\(/);
     assert.match(out, /\n {4}yield\* new TailscaleServeFailedError\(\{ servePort: input\.servePort, cause: localTarget \}\);\n/);
-    assert.match(out, /leaves Serve to the host's admin\. From the admin account, in the T3 Blackout clone, run \\`sudo scripts\/add-phone-service\.sh <agent account> --https-port \$\{String\(this\.servePort\)\}\\`/);
+    assert.match(out, /leaves Serve to the host's admin\. From the admin account, in the Blacksand T3 clone, run \\`sudo scripts\/add-phone-service\.sh <agent account> --https-port \$\{String\(this\.servePort\)\}\\`/);
     assert.equal((out.match(/sudo scripts\/add-phone-service\.sh <agent account> --pair/g) ?? []).length, 2, "both notes name the phone service");
   }
-  drifts("server/pair-blackout-routes", PAIR_3956.replace("    yield* ensureTailscaleServe({\n", "    yield* configureServe({\n"), /found 0/);
-  assert.equal(index.get("server/pair-blackout-routes"), undefined, "strict");
+  drifts("server/pair-blacksand-routes", PAIR_3956.replace("    yield* ensureTailscaleServe({\n", "    yield* configureServe({\n"), /found 0/);
+  assert.equal(index.get("server/pair-blacksand-routes"), undefined, "strict");
 });
 
 // --------------------------------------------- upstream's background service --
@@ -329,24 +329,24 @@ const BOOT_SERVICE =
   '      return "The service is not running. Check the service log and `systemctl --user status t3code.service`, then run `t3 service install`.";\n';
 const serviceGuidance = (text) => STOCK_GUIDANCE.find(({ label }) => label === "t3 service install").pattern.test(text);
 
-test("`t3 service install` and its repair route say what T3 Blackout does instead, and the install itself is refused", () => {
+test("`t3 service install` and its repair route say what Blacksand T3 does instead, and the install itself is refused", () => {
   // The guidance pattern: the service's install and repair, not its removal or restart.
   for (const text of ["run `t3 service install`", "~/.local/bin/t3 service install", "`t3 service update` repairs"]) assert.ok(serviceGuidance(text), text);
   for (const text of ["remove it with `t3 service uninstall`", "`t3 service restart`", "`t3 service status`"]) assert.ok(!serviceGuidance(text), text);
   for (const [source, options] of [[SERVICE_CLI_3940, { audited: true }], [SERVICE_CLI_3956, { audited: true, shipped: true }], [SERVICE_CLI_3977, {}]]) {
     const out = applies("server/no-t3-up-service", source, options);
     assert.ok(!out.split("\n").some(serviceGuidance), out);
-    assert.match(out, /Command\.withDescription\("Not in T3 Blackout\. T3 Blackout sets up no background service\. Other Macs reach T3 Blackout over SSH/);
-    assert.match(out, /Status: not installed\\n {2}T3 Blackout sets up no background service\./);
-    assert.equal((out.match(/T3 Blackout sets up no background service, so remove this one with `t3 service uninstall`\./g) ?? []).length, 2, "the downgrade and repair hints");
-    assert.match(out, /reconcileService = Effect\.fn\("cli\.service\.reconcile"\)\(function\* \(options\?: \{\n[^]*?\}\) \{\n {2}\/\/ t3blackout: no background service[^\n]*\n {2}yield\* new BootService\.BootServiceInstallError\(\{ cause: "t3blackout" \}\);\n/, "install and update stop before anything is written");
+    assert.match(out, /Command\.withDescription\("Not in Blacksand T3\. Blacksand T3 sets up no background service\. Other Macs reach Blacksand T3 over SSH/);
+    assert.match(out, /Status: not installed\\n {2}Blacksand T3 sets up no background service\./);
+    assert.equal((out.match(/Blacksand T3 sets up no background service, so remove this one with `t3 service uninstall`\./g) ?? []).length, 2, "the downgrade and repair hints");
+    assert.match(out, /reconcileService = Effect\.fn\("cli\.service\.reconcile"\)\(function\* \(options\?: \{\n[^]*?\}\) \{\n {2}\/\/ blacksand: no background service[^\n]*\n {2}yield\* new BootService\.BootServiceInstallError\(\{ cause: "blacksand" \}\);\n/, "install and update stop before anything is written");
   }
   // 3956 and 3969's extra hint: once in exactly those files, nowhere else.
   drifts("server/no-t3-up-service", SERVICE_CLI_3956, /found 1 \(and this file is none of the audited upstream versions that have it\)/, { audited: true });
   const boot = applies("server/no-stock-service-install", BOOT_SERVICE);
   assert.ok(!boot.split("\n").some(serviceGuidance), boot);
-  assert.match(boot, /\}\) \{\n {4}\/\/ t3blackout: no background service[^\n]*\n {4}yield\* new BootServiceInstallError\(\{ cause: "t3blackout" \}\);\n {4}const manager = yield\* requireManager;/, "refused before anything is set up or downloaded");
-  assert.match(boot, /return this\.cause === "t3blackout" \? "T3 Blackout sets up no background service\. Other Macs/);
+  assert.match(boot, /\}\) \{\n {4}\/\/ blacksand: no background service[^\n]*\n {4}yield\* new BootServiceInstallError\(\{ cause: "blacksand" \}\);\n {4}const manager = yield\* requireManager;/, "refused before anything is set up or downloaded");
+  assert.match(boot, /return this\.cause === "blacksand" \? "Blacksand T3 sets up no background service\. Other Macs/);
   assert.equal(index.get("server/no-stock-service-install"), undefined, "strict");
   const order = rules.map((rule) => rule.id);
   for (const id of ["server/no-stock-service-install", "server/no-t3-up-service"]) assert.ok(order.indexOf(id) < order.indexOf("stock/no-stock-guidance"));
@@ -355,10 +355,10 @@ test("`t3 service install` and its repair route say what T3 Blackout does instea
 test("the server never writes Tailscale Serve itself; `--tailscale-serve` says the admin does", () => {
   const server = applies("server/no-tailscale-serve-config", 'import { disableTailscaleServe, ensureTailscaleServe } from "@t3tools/tailscale";\n              return yield* ensureTailscaleServe({\n');
   assert.match(server, /import \{ disableTailscaleServe, ensureTailscaleServe as upstreamEnsureTailscaleServe \} from "@t3tools\/tailscale";\n/);
-  assert.match(server, /const ensureTailscaleServe = \(_input: Parameters<typeof upstreamEnsureTailscaleServe>\[0\]\) =>\n {2}Effect\.fail\(new Error\("T3 Blackout leaves Tailscale Serve to the host's admin: [^"]*sudo scripts\/add-phone-service\.sh <agent account>[^"]*without --tailscale-serve\."\)\);\n/);
+  assert.match(server, /const ensureTailscaleServe = \(_input: Parameters<typeof upstreamEnsureTailscaleServe>\[0\]\) =>\n {2}Effect\.fail\(new Error\("Blacksand T3 leaves Tailscale Serve to the host's admin: [^"]*sudo scripts\/add-phone-service\.sh <agent account>[^"]*without --tailscale-serve\."\)\);\n/);
   assert.doesNotMatch(server.slice(server.indexOf("const ensureTailscaleServe")), /upstreamEnsureTailscaleServe\(/, "upstream's writer is never called");
   const flag = applies("server/no-tailscale-serve-flag", '    "Configure Tailscale Serve to expose this backend over HTTPS on the Tailnet.",\n');
-  assert.match(flag, /"Not in T3 Blackout, which leaves Tailscale Serve to the host's admin \(`sudo scripts\/add-phone-service\.sh <agent account>`\)\.",/);
+  assert.match(flag, /"Not in Blacksand T3, which leaves Tailscale Serve to the host's admin \(`sudo scripts\/add-phone-service\.sh <agent account>`\)\.",/);
   for (const id of ["server/no-tailscale-serve-config", "server/no-tailscale-serve-flag"]) assert.equal(index.get(id), undefined, `${id} is strict`);
 });
 
@@ -424,7 +424,7 @@ test("every addedAfter edit names audited releases by tag and sha-256, and write
 
 // ------------------------------------------------------- no stock T3 runtime --
 
-const NO_RUNTIME = /T3 Blackout runs only the build its own updater makes: update it with `~\/\.t3blackout\/bin\/t3blackout update` on each Mac\. T3 Blackout sets up no background service, so remove this one with `t3 service uninstall`\./;
+const NO_RUNTIME = /Blacksand T3 runs only the build its own updater makes: update it with `~\/\.blacksand\/t3\/bin\/t3 update` on each Mac\. Blacksand T3 sets up no background service, so remove this one with `t3 service uninstall`\./;
 const PINNED_RUNTIME_3977 =
   "  override get message(): string {\n    return this.exitCode === undefined\n      ? `Pinned runtime install failed while ${this.step}.`\n      : `Pinned runtime install failed while ${this.step} (exit code ${this.exitCode}).`;\n  }\n" +
   'const installPinnedRuntime = Effect.fn("cloud.pinned_runtime.ensure_installed")(function* (\n  input: PinnedRuntimeInstallInput,\n) {\n  const { fs } = input;\n  const paths = pinnedRuntimePaths(input.path, input.baseDir, input.version, input.platform);\n' +
@@ -437,23 +437,23 @@ const SELF_UPDATE_DESKTOP =
   '    if (capability === "desktop-managed") {\n      const unsafeCrossing = input.channel === undefined ? null : crossesTrackUnsafely(input);\n      if (unsafeCrossing !== null) return yield* failWith(unsafeCrossing);\n' +
   '      return yield* failWith(\n        "This server is managed by the T3 Code desktop app on its machine; update the desktop app to update it.",\n      );\n    }\n    if (capability === null) {\n';
 const SELF_UPDATE_STOCK = SELF_UPDATE_DESKTOP + '      return yield* failWith(\n        "Remote updates require the T3 Code background service. Run `t3 service install` on the server machine.",\n      );\n    }\n' + SELF_UPDATE_TAIL;
-const SELF_UPDATE_HOST = SELF_UPDATE_DESKTOP + '      return { targetVersion: input.targetVersion, method: "blackout-host" as const };\n    }\n' + SELF_UPDATE_TAIL;
+const SELF_UPDATE_HOST = SELF_UPDATE_DESKTOP + '      return { targetVersion: input.targetVersion, method: "blacksand-host" as const };\n    }\n' + SELF_UPDATE_TAIL;
 
 test("the pinned-runtime installer refuses before its cache lookup, so no cached stock runtime runs", () => {
   const out = applies("server/no-stock-runtime", PINNED_RUNTIME_3977);
-  const refusal = out.indexOf('  yield* new PinnedRuntimeInstallError({ step: "t3blackout" });\n');
+  const refusal = out.indexOf('  yield* new PinnedRuntimeInstallError({ step: "blacksand" });\n');
   assert.ok(refusal > 0, out);
   for (const later of ["const { fs } = input;", "pinnedRuntimePaths(", "fs.exists(paths.versionDir)"]) assert.ok(out.indexOf(later) > refusal, `${later} comes after the refusal`);
-  assert.match(out, /if \(this\.step === "t3blackout"\) return "T3 Blackout runs only the build/);
+  assert.match(out, /if \(this\.step === "blacksand"\) return "Blacksand T3 runs only the build/);
   assert.match(JSON.parse(/return ("[^\n]*");\n/.exec(out)[1]), NO_RUNTIME);
   assert.match(out, /Pinned runtime install failed while \$\{this\.step\}\./, "its other failures read as before");
   drifts("server/no-stock-runtime", PINNED_RUNTIME_3977.replace("  const { fs } = input;\n", "  const { fs, path } = input;\n"), /found 0/);
   assert.equal(index.get("server/no-stock-runtime"), undefined, "strict");
 });
 
-test("`t3 update` says what T3 Blackout does and is refused before it looks anything up", () => {
+test("`t3 update` says what Blacksand T3 does and is refused before it looks anything up", () => {
   const out = applies("server/no-stock-update-cli", UPDATE_CLI_3977);
-  assert.match(out, /"Not in T3 Blackout\. T3 Blackout runs only the build its own updater makes/);
+  assert.match(out, /"Not in Blacksand T3\. Blacksand T3 runs only the build its own updater makes/);
   assert.doesNotMatch(out, /Download a newer t3/);
   const refusal = out.indexOf("      yield* new CliUpdateError({ reason: ");
   assert.ok(refusal > 0 && refusal < out.indexOf("resolveCliAuthConfig(") && refusal < out.indexOf("runUpdate("), out);
@@ -471,7 +471,7 @@ test("a server's self-update never switches runtimes, with host-update-requests 
     assert.match(out, /This server is managed by the T3 Code desktop app/, `${shape}: the desktop app's own update stays`);
     for (const line of out.split("\n")) assert.ok(!matchesStock(line), `${shape}: stock guidance: ${line}`);
   }
-  assert.match(applies("server/no-stock-runtime-self-update", SELF_UPDATE_HOST), /method: "blackout-host" as const/, "the host build request stays");
+  assert.match(applies("server/no-stock-runtime-self-update", SELF_UPDATE_HOST), /method: "blacksand-host" as const/, "the host build request stays");
   drifts("server/no-stock-runtime-self-update", SELF_UPDATE_HOST.replace("crossesTrackUnsafely(input);\n    if", "crossesTrackUnsafely(input, track);\n    if"), /found 0/);
   assert.equal(index.get("server/no-stock-runtime-self-update"), undefined, "strict");
   // It runs after host-update-requests, which rewrites the text the left-out shape expects.
@@ -508,14 +508,14 @@ test("the update-track note and Update everything's host wait fit 3940 and 3956"
     "            {AsyncResult.isFailure(release)\n              ? npmReleaseFailureMessage(release.cause)\n              : AsyncResult.isSuccess(release)\n                ? `Could not find the latest ${label} release in this environment's npm registry.`\n                : \"Checking releases…\"}\n",
   ]) {
     const out = applies("web/update-track-pinned", dialog(description));
-    assert.match(out, /pin\.json pins for each track[\s\S]*t3blackout update --channel \$\{channel === "nightly" \? "nightly" : "stable"\}/);
+    assert.match(out, /pin\.json pins for each track[\s\S]*blacksand t3 update --channel \$\{channel === "nightly" \? "nightly" : "stable"\}/);
     assert.doesNotMatch(out, /npmReleaseAtom\(|release\.cause|Try again later/);
   }
   const wait3940 = '    if (\n      selfUpdate !== "desktop-managed" &&\n      (!releaseArchivesPublished ||\n';
-  assert.match(applies("web/self-update-blackout-host-no-npm-wait", wait3940), /selfUpdate !== "blackout-host" &&\n {6}\(!releaseArchivesPublished/);
+  assert.match(applies("web/self-update-blacksand-host-no-npm-wait", wait3940), /selfUpdate !== "blacksand-host" &&\n {6}\(!releaseArchivesPublished/);
   const collector3956 = "  targetVersion: string,\n): {\n  readonly targets: ServerUpdateTarget[];\n  readonly skipped: SkippedMachine[];\n} {\n";
-  assert.equal(applies("web/self-update-blackout-host-no-npm-wait", collector3956), collector3956, "3956 waits for no registry: nothing to change");
-  drifts("web/self-update-blackout-host-no-npm-wait", collector3956.replace("  targetVersion: string,\n", "  targetVersion: string,\n  releaseArchivesPublished: boolean,\n"), /found 0/);
+  assert.equal(applies("web/self-update-blacksand-host-no-npm-wait", collector3956), collector3956, "3956 waits for no registry: nothing to change");
+  drifts("web/self-update-blacksand-host-no-npm-wait", collector3956.replace("  targetVersion: string,\n", "  targetVersion: string,\n  releaseArchivesPublished: boolean,\n"), /found 0/);
 });
 
 // ------------------------------------------------------------------- the helpers --

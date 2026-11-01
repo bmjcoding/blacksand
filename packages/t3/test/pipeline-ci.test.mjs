@@ -54,7 +54,7 @@ test("the runner fragment decodes as its template literal would, and refuses wha
 });
 
 test("the injected SSH runner, rendered, parses as /bin/sh", () => {
-  const fragment = fs.readFileSync(new URL("../lib/files/ssh-runner-blackout.sh", import.meta.url), "utf8");
+  const fragment = fs.readFileSync(new URL("../lib/files/ssh-runner-blacksand.sh", import.meta.url), "utf8");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "t3b-runner-"));
   try {
     const file = path.join(dir, "runner.sh");

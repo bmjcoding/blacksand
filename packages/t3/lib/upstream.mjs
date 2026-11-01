@@ -13,7 +13,7 @@ export { UPSTREAM_URL };
  * A release must be this old before it's built, so a bad one has time to be
  * noticed and pulled upstream first. `--ref` skips it.
  */
-export const SOAK_HOURS = Number(process.env.T3BLACKOUT_SOAK_HOURS ?? 48);
+export const SOAK_HOURS = Number(process.env.BLACKSAND_T3_SOAK_HOURS ?? 48);
 
 export const hasMirror = () => fs.existsSync(path.join(MIRROR, ".git"));
 

@@ -1,5 +1,5 @@
 // node --test test/: the SSH runner agent accounts start servers through
-// (lib/files/ssh-runner-blackout.sh, rule ssh/runner-installed-blackout-only), run
+// (lib/files/ssh-runner-blacksand.sh, rule ssh/runner-installed-blacksand-only), run
 // against a fake app bundle and home: it runs the installed app's server with a
 // private server.env; each server keeps a record (start time, build, command
 // line) that names the runner while it starts the server, so a reconnect stops a
@@ -20,7 +20,7 @@ import { decodeTemplate } from "../ci/render-runner.mjs";
 
 // -------------------------------------------------------- running the server --
 
-const SOURCE = fs.readFileSync(new URL("../lib/files/ssh-runner-blackout.sh", import.meta.url), "utf8");
+const SOURCE = fs.readFileSync(new URL("../lib/files/ssh-runner-blacksand.sh", import.meta.url), "utf8");
 const isMac = process.platform === "darwin";
 
 test("the runner survives being a TypeScript template literal", () => {
@@ -36,24 +36,24 @@ const rendered = () => `#!/bin/sh\nset -eu\nT3_ARCHIVE_VERSION='9.9.9'\n${new Fu
 function host() {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "t3b-runner-")));
   const home = path.join(dir, "home");
-  const app = path.join(dir, "T3 Blackout.app");
+  const app = path.join(dir, "Blacksand T3.app");
   fs.mkdirSync(path.join(app, "Contents", "MacOS"), { recursive: true });
   fs.mkdirSync(path.join(app, "Contents", "Resources"), { recursive: true });
   fs.writeFileSync(path.join(app, "Contents", "Resources", "app.asar"), "build 1");
   // A server loops until killed, so it shows in ps with its arguments; anything else echoes.
   fs.writeFileSync(
-    path.join(app, "Contents", "MacOS", "T3 Blackout"),
+    path.join(app, "Contents", "MacOS", "Blacksand T3"),
     '#!/bin/sh\nif [ "$2" = serve ] && [ -z "${T3B_FAKE_ONESHOT:-}" ]; then while :; do sleep 1; done; fi\nprintf "%s|%s\\n" "$*" "${T3B_TEST_TOKEN:-}"\n',
     { mode: 0o755 },
   );
   fs.mkdirSync(home, { mode: 0o700 });
   const runner = path.join(dir, "run-t3.sh");
   fs.writeFileSync(runner, rendered(), { mode: 0o700 });
-  const shared = path.join(dir, "Shared", "t3blackout");
+  const shared = path.join(dir, "Shared", "blacksand");
   fs.mkdirSync(shared, { recursive: true, mode: 0o755 });
-  const env = { PATH: process.env.PATH, HOME: home, T3BLACKOUT_APP: app, T3BLACKOUT_UPDATE_REQUESTS: path.join(shared, "update-requests") };
+  const env = { PATH: process.env.PATH, HOME: home, BLACKSAND_T3_APP: app, BLACKSAND_T3_UPDATE_REQUESTS: path.join(shared, "update-requests") };
   const run = (args, extra = {}) => spawnSync(runner, args, { encoding: "utf8", env: { ...env, ...extra } });
-  return { dir, home, app, shared, runner, run, t3b: path.join(home, ".t3blackout") };
+  return { dir, home, app, shared, runner, run, t3b: path.join(home, ".blacksand/t3") };
 }
 
 function writeEnv(t3b, { dirMode = 0o700, fileMode = 0o600 } = {}) {
@@ -84,6 +84,12 @@ test("a server.env others could read or swap is refused", () => {
   fs.renameSync(path.join(t3b, "server.env"), path.join(dir, "elsewhere.env"));
   fs.symlinkSync(path.join(dir, "elsewhere.env"), path.join(t3b, "server.env"));
   assert.equal(run(["--version"]).status, 1, "symlink");
+  // The folder above it too: ~/.blacksand a link to somewhere else.
+  const linked = host();
+  const elsewhere = path.join(linked.dir, "elsewhere");
+  writeEnv(path.join(elsewhere, "t3"));
+  fs.symlinkSync(elsewhere, path.join(linked.home, ".blacksand"));
+  assert.equal(linked.run(["--version"]).status, 1, "parent symlink");
 });
 
 test("ACL entries on server.env are removed before it's read", { skip: !isMac && "macOS ACLs" }, () => {
@@ -133,7 +139,7 @@ if (process.argv[2] === "serve") {
 function recordsHost() {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "t3b-runner-")));
   const home = path.join(dir, "home");
-  const app = path.join(dir, "T3 Blackout.app");
+  const app = path.join(dir, "Blacksand T3.app");
   const asar = path.join(app, "Contents", "Resources", "app.asar");
   const build = (where) => {
     fs.mkdirSync(path.join(where, "apps", "server", "dist"), { recursive: true });
@@ -141,15 +147,15 @@ function recordsHost() {
   };
   build(asar);
   fs.mkdirSync(path.join(app, "Contents", "MacOS"), { recursive: true });
-  fs.symlinkSync(process.execPath, path.join(app, "Contents", "MacOS", "T3 Blackout"));
+  fs.symlinkSync(process.execPath, path.join(app, "Contents", "MacOS", "Blacksand T3"));
   fs.mkdirSync(home, { mode: 0o700 });
   const runner = path.join(dir, "run-t3.sh");
   fs.writeFileSync(runner, rendered(), { mode: 0o700 });
-  const env = { PATH: process.env.PATH, HOME: home, T3BLACKOUT_APP: app, T3BLACKOUT_UPDATE_REQUESTS: path.join(dir, "Shared", "t3blackout", "update-requests") };
+  const env = { PATH: process.env.PATH, HOME: home, BLACKSAND_T3_APP: app, BLACKSAND_T3_UPDATE_REQUESTS: path.join(dir, "Shared", "blacksand", "update-requests") };
   const run = (args) => spawnSync(runner, args, { encoding: "utf8", env });
   const servers = [];
   const start = (extra = {}) => {
-    const child = spawn(runner, ["serve", "--host", "127.0.0.1", "--port", "1", "--base-dir", path.join(home, ".t3blackout")], { env: { ...env, ...extra }, stdio: "ignore" });
+    const child = spawn(runner, ["serve", "--host", "127.0.0.1", "--port", "1", "--base-dir", path.join(home, ".blacksand/t3")], { env: { ...env, ...extra }, stdio: "ignore" });
     servers.push(child);
     return child;
   };
@@ -160,7 +166,7 @@ function recordsHost() {
     fs.rmSync(asar, { recursive: true });
     fs.renameSync(next, asar);
   };
-  const records = path.join(home, ".t3blackout", "ssh-servers");
+  const records = path.join(home, ".blacksand/t3", "ssh-servers");
   const cleanup = () => servers.forEach((child) => child.kill("SIGKILL"));
   return { dir, home, app, runner, run, start, newBuild, records, cleanup };
 }
@@ -192,7 +198,7 @@ test("each server keeps its own record: its start time, build and command line",
     assert.match(build, /^\d+:\d+:\d+:\d+$/);
     assert.ok(await waitFor(() => ps("args", server.pid).includes(" serve ")), "running as the server");
     assert.equal(args, ps("args", server.pid).trim());
-    assert.ok(args.startsWith(`${h.app}/Contents/MacOS/T3 Blackout ${h.app}/Contents/Resources/app.asar/apps/server/dist/bin.mjs serve `));
+    assert.ok(args.startsWith(`${h.app}/Contents/MacOS/Blacksand T3 ${h.app}/Contents/Resources/app.asar/apps/server/dist/bin.mjs serve `));
     assert.equal(fs.statSync(h.records).mode & 0o077, 0, "records are private");
   } finally {
     h.cleanup();
@@ -208,11 +214,11 @@ test("a failed second start doesn't erase the running server's record; the stale
     await new Promise((resolve) => failed.once("exit", resolve));
     assert.ok(fs.existsSync(path.join(h.records, String(first.pid))), "the first server's record is intact");
     // Same build: nothing stops, and the dead start's record is cleared.
-    assert.equal(h.run(["__blackout-stop-stale-server"]).status, 0);
+    assert.equal(h.run(["__blacksand-stop-stale-server"]).status, 0);
     assert.equal(alive(first.pid), true);
     assert.equal(fs.existsSync(path.join(h.records, String(failed.pid))), false);
     h.newBuild();
-    const stop = h.run(["__blackout-stop-stale-server"]);
+    const stop = h.run(["__blacksand-stop-stale-server"]);
     assert.equal(stop.status, 0, stop.stderr);
     assert.ok(await waitFor(() => first.exitCode !== null || first.signalCode !== null), "stale: stopped");
     assert.deepEqual(fs.readdirSync(h.records), []);
@@ -230,7 +236,7 @@ test("a stale server that ignores SIGTERM is killed, and its record goes only th
     assert.ok(await waitFor(() => ps("args", server.pid).includes(" serve ")));
     await sleep(200); // its SIGTERM handler is in place
     h.newBuild();
-    const stop = h.run(["__blackout-stop-stale-server"]);
+    const stop = h.run(["__blacksand-stop-stale-server"]);
     assert.equal(stop.status, 0, stop.stderr);
     assert.equal(server.signalCode ?? (await new Promise((resolve) => server.once("exit", (code, signal) => resolve(signal)))), "SIGKILL");
     assert.equal(fs.existsSync(record), false);
@@ -246,7 +252,7 @@ test("a stale server that can't be stopped keeps its record and fails the connec
   fs.mkdirSync(h.records, { recursive: true, mode: 0o700 });
   const record = path.join(h.records, "1");
   fs.writeFileSync(record, `${startedOf(1)}\nold-build\n${ps("args", 1).trim()}\n`);
-  const stop = h.run(["__blackout-stop-stale-server"]);
+  const stop = h.run(["__blacksand-stop-stale-server"]);
   assert.equal(stop.status, 1);
   assert.match(stop.stderr, /server 1 still runs a build this host has replaced and did not stop/);
   assert.equal(fs.existsSync(record), true, "kept until it's gone");
@@ -261,10 +267,10 @@ test("a reused pid is never taken for the recorded server", async () => {
     const record = path.join(h.records, String(other.pid));
     // Same pid and command line, another start time: an earlier process with that pid.
     fs.writeFileSync(record, `Thu Jan  1 00:00:00 1970\nold-build\n${ps("args", other.pid).trim()}\n`);
-    assert.equal(h.run(["__blackout-stop-stale-server"]).status, 0);
+    assert.equal(h.run(["__blacksand-stop-stale-server"]).status, 0);
     // Same pid and start time, another command line (another server's base folder).
     fs.writeFileSync(record, `${startedOf(other.pid)}\nold-build\n${ps("args", other.pid).trim()} --base-dir /elsewhere\n`);
-    assert.equal(h.run(["__blackout-stop-stale-server"]).status, 0);
+    assert.equal(h.run(["__blacksand-stop-stale-server"]).status, 0);
     await sleep(100);
     assert.equal(alive(other.pid), true, "left alone");
     assert.equal(fs.existsSync(record), false, "the record no longer names a server");
@@ -274,9 +280,9 @@ test("a reused pid is never taken for the recorded server", async () => {
 });
 
 test("the launch rule lets a failed stop end the connection instead of reusing the server", () => {
-  const rule = makeRules({ updater: { node: "n", launcher: "l", path: "p" }, build: null }).find((r) => r.id === "ssh/runner-installed-blackout-only");
-  const edit = rule.edits.find((e) => typeof e.replace === "string" && e.replace.includes("__blackout-stop-stale-server"));
-  assert.equal(edit.replace, '  "$RUNNER_FILE" __blackout-stop-stale-server\n  "$RUNNER_FILE" --version >/dev/null\n');
+  const rule = makeRules({ updater: { node: "n", launcher: "l", path: "p" }, build: null }).find((r) => r.id === "ssh/runner-installed-blacksand-only");
+  const edit = rule.edits.find((e) => typeof e.replace === "string" && e.replace.includes("__blacksand-stop-stale-server"));
+  assert.equal(edit.replace, '  "$RUNNER_FILE" __blacksand-stop-stale-server\n  "$RUNNER_FILE" --version >/dev/null\n');
 });
 
 // ----------------------------------------- a reconnect while a server starts --
@@ -288,7 +294,7 @@ function startingHost() {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "t3b-runner-")));
   const home = path.join(dir, "home");
   fs.mkdirSync(home, { mode: 0o700 });
-  const app = path.join(dir, "T3 Blackout.app");
+  const app = path.join(dir, "Blacksand T3.app");
   const asar = path.join(app, "Contents", "Resources", "app.asar");
   const build = (where) => {
     fs.mkdirSync(path.join(where, "apps", "server", "dist"), { recursive: true });
@@ -296,16 +302,16 @@ function startingHost() {
   };
   build(asar);
   fs.mkdirSync(path.join(app, "Contents", "MacOS"), { recursive: true });
-  fs.symlinkSync(process.execPath, path.join(app, "Contents", "MacOS", "T3 Blackout"));
+  fs.symlinkSync(process.execPath, path.join(app, "Contents", "MacOS", "Blacksand T3"));
   const runner = path.join(dir, "run-t3.sh");
   fs.writeFileSync(runner, `#!/bin/sh\nset -eu\n${decodeTemplate(SOURCE)}`, { mode: 0o700 });
   const bin = path.join(dir, "bin");
   fs.mkdirSync(bin);
   fs.writeFileSync(path.join(bin, "mv"), `#!/bin/sh\n${JSON.stringify(MV)} "$@" || exit\ncase "$*" in\n  *ssh-servers*) : >"$HOME/published"; while [ ! -f "$HOME/continue" ]; do sleep 0.05; done ;;\nesac\n`, { mode: 0o700 });
-  const env = { PATH: `${bin}:${process.env.PATH}`, HOME: home, T3BLACKOUT_APP: app, T3BLACKOUT_UPDATE_REQUESTS: path.join(dir, "Shared", "update-requests") };
-  const child = spawn(runner, ["serve", "--host", "127.0.0.1", "--port", "1", "--base-dir", path.join(home, ".t3blackout")], { env, stdio: "ignore" });
-  const record = path.join(home, ".t3blackout", "ssh-servers", String(child.pid));
-  const stopStale = () => spawnSync(runner, ["__blackout-stop-stale-server"], { encoding: "utf8", env, timeout: 30_000 });
+  const env = { PATH: `${bin}:${process.env.PATH}`, HOME: home, BLACKSAND_T3_APP: app, BLACKSAND_T3_UPDATE_REQUESTS: path.join(dir, "Shared", "update-requests") };
+  const child = spawn(runner, ["serve", "--host", "127.0.0.1", "--port", "1", "--base-dir", path.join(home, ".blacksand/t3")], { env, stdio: "ignore" });
+  const record = path.join(home, ".blacksand/t3", "ssh-servers", String(child.pid));
+  const stopStale = () => spawnSync(runner, ["__blacksand-stop-stale-server"], { encoding: "utf8", env, timeout: 30_000 });
   const resume = () => fs.writeFileSync(path.join(home, "continue"), "");
   const newBuild = () => {
     build(`${asar}.next`);

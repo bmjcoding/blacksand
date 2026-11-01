@@ -60,7 +60,7 @@ test("device tools in the inventory are the release's own, not every approval", 
   const tools = deviceToolsInUse(pins, []);
   assert.deepEqual(tools, ["agent-device@0.21.31", "expo-device-hub@0.19.0-canary-20261023-1357114"]);
   const show = (at, file) => (file === "pnpm-lock.yaml" ? UPSTREAM : pins);
-  const { packages } = await alertInventory({ sha: "0".repeat(40), show, resolvedLock: RESOLVED, toolPackages: (tool) => [tool], stage: null, overrides: OVERRIDES, toolOverrides: [], blackout: "b" }, { meta: npmMeta });
+  const { packages } = await alertInventory({ sha: "0".repeat(40), show, resolvedLock: RESOLVED, toolPackages: (tool) => [tool], stage: null, overrides: OVERRIDES, toolOverrides: [], blacksand: "b" }, { meta: npmMeta });
   assert.ok(packages.includes("agent-device@0.21.31") && !packages.includes("agent-device@0.21.25"));
   assert.throws(() => deviceToolsInUse(null), /no longer pins device tools/);
   assert.throws(() => deviceToolsInUse('{"agent-device": "^1.0.0"}'), /no exact version/);

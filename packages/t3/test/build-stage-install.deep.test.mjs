@@ -16,7 +16,7 @@ test("a package replaced under its own name and version through npm: refused by 
   if (!npm) return t.skip("no npm on PATH");
   const stage = fakeStage();
   await stage.install();
-  verifyStageInstalls(stage.stages, stage.env.T3BLACKOUT_STAGE_RECORD);
+  verifyStageInstalls(stage.stages, stage.env.BLACKSAND_T3_STAGE_RECORD);
   // is-number@7.0.0 again, same name and version, other bytes and an install script.
   const pkg = path.join(stage.root, "fixture", "package");
   fs.mkdirSync(pkg, { recursive: true });
@@ -30,10 +30,10 @@ test("a package replaced under its own name and version through npm: refused by 
   // Through the shim (the PATH the packager has): refused before npm runs.
   assert.equal(await quietly(() => main("npm", args, { cwd: stage.app, env: stage.env })), 1);
   assert.equal(fs.existsSync(marker), false);
-  verifyStageInstalls(stage.stages, stage.env.T3BLACKOUT_STAGE_RECORD);
+  verifyStageInstalls(stage.stages, stage.env.BLACKSAND_T3_STAGE_RECORD);
   // By absolute path, past the shims: npm replaces the package's files under the same name and version.
   const real = spawnSync(npm, [...args.slice(0, -1), "--ignore-scripts", tarball], { cwd: stage.app, encoding: "utf8", env: { ...process.env, npm_config_update_notifier: "false" } });
   assert.equal(real.status, 0, real.stderr);
   assert.match(fs.readFileSync(path.join(stage.app, "node_modules", "is-number", "index.js"), "utf8"), /unreviewed replacement/);
-  assert.throws(() => verifyStageInstalls(stage.stages, stage.env.T3BLACKOUT_STAGE_RECORD), /isn't what was installed from its checked lockfile: node_modules\/.*is-number/);
+  assert.throws(() => verifyStageInstalls(stage.stages, stage.env.BLACKSAND_T3_STAGE_RECORD), /isn't what was installed from its checked lockfile: node_modules\/.*is-number/);
 });

@@ -1,4 +1,4 @@
-// The evaluator's gates beyond the strip rules (bin/t3blackout evaluate): new
+// The evaluator's gates beyond the strip rules (bin/t3 evaluate): new
 // dependency versions must have been public for a while, and a new device tool
 // version must be old enough, carry npm provenance when its predecessor did, and
 // reach no network host or analytics library its predecessor didn't.
@@ -25,7 +25,7 @@ export function ageSetting(value, what = "minimum age") {
   return days;
 }
 
-export const MIN_AGE_DAYS = ageSetting(process.env.T3BLACKOUT_MIN_AGE_DAYS ?? 3, "T3BLACKOUT_MIN_AGE_DAYS");
+export const MIN_AGE_DAYS = ageSetting(process.env.BLACKSAND_T3_MIN_AGE_DAYS ?? 3, "BLACKSAND_T3_MIN_AGE_DAYS");
 
 const REGISTRY = "https://registry.npmjs.org";
 const NPM_NAME = /^(?:@[a-z0-9][\w.~-]*\/)?[a-z0-9_][\w.~-]*$/i;

@@ -14,16 +14,16 @@ import * as path from "node:path";
 
 import { reconcileAdvisories } from "../ci/reconcile.mjs";
 import { advisoryReport, evaluateChannel } from "../lib/evaluate.mjs";
-import { blackoutDigest, checkResolvedLock, stageRecord, stagedDependencies } from "../lib/inventory.mjs";
+import { blacksandDigest, checkResolvedLock, stageRecord, stagedDependencies } from "../lib/inventory.mjs";
 import { parseYaml } from "../lib/yaml.mjs";
 import { COMMON, OVERRIDES, RESOLVED, STAGED, STAGE_LOCK, STAGE_SNAPSHOTS, STAGE_SOURCES, UPSTREAM, lockfile, npmMeta, stageLockfile } from "./pipeline-fixtures.mjs";
 
 const sha = (c) => c.repeat(40);
 const PINNED = "v0.1.6-nightly.20261030.3917";
-const BLACKOUT = sha("b");
+const BLACKSAND = sha("b");
 const PIN = { version: 1, channels: { nightly: { ref: PINNED, sha: sha("0"), evaluatedAt: "2026-10-30T00:00:00.000Z", leftOut: [] } }, deviceTools: [] };
 const show = (at, file) => (file === "pnpm-lock.yaml" ? UPSTREAM : (STAGE_SOURCES[file] ?? "{}"));
-const record = (locks, more = {}) => JSON.stringify(stageRecord({ sha: sha("0"), locks, blackout: BLACKOUT, builtAt: "2026-10-30T18:00:00.000Z", ...more }));
+const record = (locks, more = {}) => JSON.stringify(stageRecord({ sha: sha("0"), locks, blacksand: BLACKSAND, builtAt: "2026-10-30T18:00:00.000Z", ...more }));
 const quiet = { log: () => {} };
 const STAGE_ONLY = "@electron-webauthn/types@1.4.0";
 
@@ -53,7 +53,7 @@ function alertIo({ resolved = RESOLVED, stage = record([STAGE_LOCK]), target = S
     toolPackages: (tool) => [tool],
     stageRecord: () => stage,
     npmMeta: meta,
-    blackout: () => BLACKOUT,
+    blacksand: () => BLACKSAND,
     openAdvisories: async (packages) => {
       queried.push(packages);
       return packages.includes(target) ? [{ id: "GHSA-probe", aliases: [], summary: "s", severity: "HIGH", packages: [{ pkg: target, fixed: [] }] }] : [];
@@ -120,22 +120,22 @@ test("stage records are bound to the build code that made them, not reused after
   try {
     fs.mkdirSync(path.join(root, "bin"));
     fs.mkdirSync(path.join(root, "lib", "files"), { recursive: true });
-    fs.writeFileSync(path.join(root, "bin", "t3blackout"), "cli\n");
+    fs.writeFileSync(path.join(root, "bin", "t3"), "cli\n");
     fs.writeFileSync(path.join(root, "lib", "rules.mjs"), "rules\n");
     fs.writeFileSync(path.join(root, "lib", "files", "injected.ts"), "injected\n");
-    const first = blackoutDigest(root);
+    const first = blacksandDigest(root);
     fs.writeFileSync(path.join(root, "lib", ".DS_Store"), "finder\n");
     fs.writeFileSync(path.join(root, "README.md"), "docs\n");
-    assert.equal(blackoutDigest(root), first, "only build code counts");
+    assert.equal(blacksandDigest(root), first, "only build code counts");
     fs.writeFileSync(path.join(root, "lib", "files", "injected.ts"), "injected, changed\n");
-    assert.notEqual(blackoutDigest(root), first, "a changed rule or injected file is other build code");
+    assert.notEqual(blacksandDigest(root), first, "a changed rule or injected file is other build code");
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
-  assert.match(blackoutDigest(), /^[0-9a-f]{64}$/);
+  assert.match(blacksandDigest(), /^[0-9a-f]{64}$/);
   // The alert job's own build code isn't the record's: a gap.
-  const stale = await report({ ...alertIo(), blackout: () => sha("c") });
-  assert.match(stale.gaps[0], /other Blackout build code/);
+  const stale = await report({ ...alertIo(), blacksand: () => sha("c") });
+  assert.match(stale.gaps[0], /other Blacksand build code/);
   assert.ok(!stale.open.length);
 });
 
@@ -161,7 +161,7 @@ function evaluatorIo({ carried = null, resolveLock = () => UPSTREAM, tags = [PIN
         return { skipped: [], stageLocks: [STAGE_LOCK] };
       },
       carriedStage: () => carried,
-      blackout: () => BLACKOUT,
+      blacksand: () => BLACKSAND,
       save: (kind, at, value) => saved.push([kind, at, value]),
       log: () => {},
     },
@@ -179,7 +179,7 @@ test("the evaluate job carries a stage record over only while it checks out; a f
   const next = await evaluateChannel({ channel: "nightly", pin: PIN, build: true }, kept.io);
   assert.deepEqual(kept.builds, []);
   assert.deepEqual(next.stages.get(sha("0")), rebuilt.stages.get(sha("0")));
-  const changed = evaluatorIo({ carried: record([STAGE_LOCK], { blackout: sha("c") }) });
+  const changed = evaluatorIo({ carried: record([STAGE_LOCK], { blacksand: sha("c") }) });
   await evaluateChannel({ channel: "nightly", pin: PIN, build: true }, changed.io);
   assert.deepEqual(changed.builds, [sha("0")]);
 });
@@ -251,5 +251,5 @@ test("the workflow uploads what a failed or timed-out evaluation left, and the a
   assert.equal(download["continue-on-error"], true);
   const advisories = alerts.steps.find((step) => step.name === "Security advisories");
   assert.equal(advisories.if, undefined, "runs whenever the job does");
-  assert.match(advisories.run, /bin\/t3blackout advisories .*security-issues\.mjs advisories/s);
+  assert.match(advisories.run, /bin\/t3 advisories .*security-issues\.mjs advisories/s);
 });

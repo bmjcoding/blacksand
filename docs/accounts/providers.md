@@ -14,7 +14,7 @@ npm folder. Put Homebrew's tools and its own npm folder on its `PATH` in
 
 ```sh
 cat >> ~/.zprofile <<'EOF'
-# T3 Blackout agent account: Homebrew's tools (read-only) and this account's own npm installs.
+# Blacksand T3 agent account: Homebrew's tools (read-only) and this account's own npm installs.
 export PATH="$HOME/.npm-global/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 EOF
 exec zsh -l
@@ -68,9 +68,9 @@ print a version.
   `~/.codex/auth.json`, which works over SSH.
 - **Claude Code:** an SSH session can't unlock the login Keychain (`security` error
   36), where Claude Code normally keeps its login. Run `claude setup-token` and
-  approve it in the browser. Then run `/usr/local/libexec/t3blackout/set-claude-token`
+  approve it in the browser. Then run `/usr/local/libexec/blacksand/set-claude-token`
   and paste the token at its hidden prompt. It's stored as `CLAUDE_CODE_OAUTH_TOKEN`
-  in `~/.t3blackout/server.env` (owner only, no ACL entries). The SSH runner loads
+  in `~/.blacksand/t3/server.env` (owner only, no ACL entries). The SSH runner loads
   that file, and refuses it if anyone else could read or replace it. The helper
   reads the token only from its prompt, never from arguments or the environment.
   Clear the terminal afterwards (⌘K), and don't paste the token anywhere else. Then
@@ -81,7 +81,7 @@ print a version.
   it there, and push from your account:
   `git fetch agent-claude@t3b-host:src/<project> <branch>`.
 
-Check: `ls -le ~/.t3blackout/server.env` shows `-rw-------`, owned by the agent,
+Check: `ls -le ~/.blacksand/t3/server.env` shows `-rw-------`, owned by the agent,
 with no ACL lines.
 
 The Claude token lasts a year. To replace it, run both commands again, then switch

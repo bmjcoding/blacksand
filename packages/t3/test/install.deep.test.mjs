@@ -1,12 +1,12 @@
 // node --test test/: install.sh, sourced for its functions (it runs its main
 // only when run), with stubs in place of sudo, Homebrew, the build account and
-// bin/t3blackout; the CLI's own refusals run in a scratch clone. Upstream's code
+// bin/t3; the CLI's own refusals run in a scratch clone. Upstream's code
 // (pnpm and its pnpmfile, the build, the built server) never runs as you unless
-// you chose that (--unisolated-build, or CI's T3BLACKOUT_UNISOLATED_BUILD=1 in a
+// you chose that (--unisolated-build, or CI's BLACKSAND_T3_UNISOLATED_BUILD=1 in a
 // checkout that isn't an install); the build account's home is closed to every
 // account but it and yours, and what runs as another account starts in /, since
 // the clone it's run from is in your private home; Node and git meet their
-// security floors, in install.sh and before every git T3 Blackout runs; and pnpm
+// security floors, in install.sh and before every git Blacksand T3 runs; and pnpm
 // is the pinned one, laid out from tarballs checked against their digests
 // (lib/pnpm.mjs). Nothing here needs root, the network or a real build account.
 import { spawnSync } from "node:child_process";
@@ -76,17 +76,18 @@ test("host and both roles are refused on Linux before anything runs", () => {
 // --------------------------------------------------------- build isolation --
 
 /**
- * main() with the OS setup, the build account's setup and bin/t3blackout
+ * main() with the OS setup, the build account's setup and bin/t3
  * stubbed: `sudoWorks` is whether `sudo -v` authorizes; every step taken is
- * appended to steps.log, bin/t3blackout's calls with their arguments.
+ * appended to steps.log, bin/t3's calls with their arguments.
  */
 function runMain({ sudoWorks, unisolated = false, noSudo = false }) {
   const cwd = tmp();
   const steps = path.join(cwd, "steps.log");
   fs.mkdirSync(path.join(cwd, "bin"));
-  fs.writeFileSync(path.join(cwd, "bin", "t3blackout"), `#!/bin/sh\necho "t3blackout $*" >>${JSON.stringify(steps)}\n`, { mode: 0o755 });
+  fs.writeFileSync(path.join(cwd, "bin", "t3"), `#!/bin/sh\necho "t3 $*" >>${JSON.stringify(steps)}\n`, { mode: 0o755 });
   const script = `
 step() { echo "$*" >>${JSON.stringify(steps)}; }
+legacy_install() { return 1; } # test/legacy-install.test.mjs covers the refusal
 mac_setup() { step mac_setup; }
 linux_setup() { step linux_setup; }
 ${noSudo ? "have() { [[ \"$1\" != sudo ]] && command -v \"$1\" >/dev/null 2>&1; }" : ""}
@@ -106,7 +107,7 @@ test("a failed sudo for the build account stops the install before any build or 
     assert.equal(result.status, 1, result.stdout + result.stderr);
     assert.doesNotMatch(result.stdout, /FINISHED/);
     assert.match(result.stderr, noSudo ? /sudo isn't installed/ : /sudo didn't authorize you/);
-    assert.match(result.stderr, /only as its build account _t3blackout/);
+    assert.match(result.stderr, /only as its build account _blacksand-build/);
     assert.match(result.stderr, /\.\/install\.sh --unisolated-build/);
     // Nothing that runs upstream code, sets up your own toolchain or saves a config came after.
     assert.deepEqual(steps.filter((s) => !s.startsWith("sudo")), [os.platform() === "darwin" ? "mac_setup" : "linux_setup"]);
@@ -118,8 +119,8 @@ test("with sudo, the build account is set up and the config requires it", () => 
   assert.equal(result.status, 0, result.stderr);
   assert.ok(steps.includes("setup_builder"));
   assert.ok(!steps.includes("setup_own_toolchain"));
-  assert.ok(steps.includes("t3blackout configure --role ui"), steps.join("\n"));
-  assert.ok(steps.indexOf("setup_builder") < steps.indexOf("t3blackout update"));
+  assert.ok(steps.includes("t3 configure --role ui"), steps.join("\n"));
+  assert.ok(steps.indexOf("setup_builder") < steps.indexOf("t3 update"));
   assert.doesNotMatch(result.stderr, /builds as you/);
 });
 
@@ -128,15 +129,15 @@ test("--unisolated-build is the only way to build as you, saved as such, and sai
   assert.equal(result.status, 0, result.stderr);
   assert.ok(steps.includes("setup_own_toolchain"));
   assert.ok(!steps.includes("setup_builder"));
-  const configure = steps.indexOf("t3blackout configure --role ui --unisolated-build");
+  const configure = steps.indexOf("t3 configure --role ui --unisolated-build");
   assert.ok(configure >= 0, steps.join("\n"));
-  assert.ok(configure < steps.indexOf("t3blackout update"), "saved before the build");
+  assert.ok(configure < steps.indexOf("t3 update"), "saved before the build");
   assert.match(result.stderr, /sudo didn't authorize you, so this install builds as you \(--unisolated-build\)/);
   assert.match(result.stderr, /Building as you \(--unisolated-build\)/);
   // Given the flag but with sudo working, it still sets up the build account and doesn't save the flag.
   const isolated = runMain({ sudoWorks: true, unisolated: true });
   assert.ok(isolated.steps.includes("setup_builder"));
-  assert.ok(isolated.steps.includes("t3blackout configure --role ui"));
+  assert.ok(isolated.steps.includes("t3 configure --role ui"));
 });
 
 test("builds may run as you only by an explicit choice: a saved --unisolated-build, or CI's variable in a checkout that isn't an install", () => {
@@ -144,8 +145,8 @@ test("builds may run as you only by an explicit choice: a saved --unisolated-bui
   const state = path.join(dir, "state");
   const file = path.join(state, "install.json");
   const problem = (config, env = {}) => buildAsYouProblem(config, { env, state });
-  // No install here: only with T3BLACKOUT_UNISOLATED_BUILD=1 (CI, development).
-  assert.match(problem(null), /this checkout isn't an install: run \.\/install\.sh, or, in CI or a development checkout, set T3BLACKOUT_UNISOLATED_BUILD=1/);
+  // No install here: only with BLACKSAND_T3_UNISOLATED_BUILD=1 (CI, development).
+  assert.match(problem(null), /this checkout isn't an install: run \.\/install\.sh, or, in CI or a development checkout, set BLACKSAND_T3_UNISOLATED_BUILD=1/);
   assert.equal(problem(null, { [UNISOLATED_ENV]: "1" }), null);
   assert.match(problem(null, { [UNISOLATED_ENV]: "true" }), /isn't an install/, "only 1");
   // An install's choice is saved, and not inherited by a configure without the flag.
@@ -167,7 +168,7 @@ test("builds may run as you only by an explicit choice: a saved --unisolated-bui
     assert.match(problem(null, { [UNISOLATED_ENV]: "1" }), new RegExp(`installed builds \\(state/${name.replace(".", "\\.")}\\) but no state/install\\.json: rerun \\./install\\.sh`), name);
     fs.rmSync(path.join(state, name));
   }
-  fs.writeFileSync(path.join(state, "t3blackout.log"), "");
+  fs.writeFileSync(path.join(state, "blacksand-t3.log"), "");
   assert.equal(problem(null, { [UNISOLATED_ENV]: "1" }), null, "a log is no install");
 });
 
@@ -190,13 +191,13 @@ function clone(extraEnv = {}) {
   fs.mkdirSync(server, { recursive: true });
   fs.writeFileSync(path.join(server, "bin.mjs"), `import { writeFileSync } from "node:fs";\nwriteFileSync(${JSON.stringify(path.join(dir, "server-ran"))}, String(process.getuid()));\n`);
   const env = {
-    PATH: `${tools}:${process.env.PATH}`, HOME: home, T3BLACKOUT_HEADLESS: "1",
-    T3BLACKOUT_APPS: path.join(dir, "Apps"), T3BLACKOUT_UPDATE_REQUESTS: path.join(dir, "requests"),
+    PATH: `${tools}:${process.env.PATH}`, HOME: home, BLACKSAND_T3_HEADLESS: "1",
+    BLACKSAND_T3_APPS: path.join(dir, "Apps"), BLACKSAND_T3_UPDATE_REQUESTS: path.join(dir, "requests"),
     XDG_DATA_HOME: path.join(dir, "data"), XDG_CONFIG_HOME: path.join(dir, "config"),
     HTTPS_PROXY: "http://127.0.0.1:9", https_proxy: "http://127.0.0.1:9", GIT_CONFIG_GLOBAL: "/dev/null",
     ...extraEnv,
   };
-  const run = (args, more = {}) => spawnSync(process.execPath, [path.join(repo, "bin", "t3blackout"), ...args], { cwd: repo, encoding: "utf8", env: { ...env, ...more }, timeout: 60_000 });
+  const run = (args, more = {}) => spawnSync(process.execPath, [path.join(repo, "bin", "t3"), ...args], { cwd: repo, encoding: "utf8", env: { ...env, ...more }, timeout: 60_000 });
   const ran = (what) => fs.existsSync(path.join(dir, `${what}-ran`));
   return { repo, run, ran, state: path.join(repo, "state") };
 }
@@ -223,14 +224,14 @@ test("a checkout with no install.json refuses upstream steps unless CI's variabl
   for (const args of UPSTREAM_STEPS) {
     const refused = c.run(args);
     assert.equal(refused.status, 1, args.join(" "));
-    assert.match(refused.stdout + refused.stderr, /this checkout isn't an install: run \.\/install\.sh, or, in CI or a development checkout, set T3BLACKOUT_UNISOLATED_BUILD=1/, args.join(" "));
+    assert.match(refused.stdout + refused.stderr, /this checkout isn't an install: run \.\/install\.sh, or, in CI or a development checkout, set BLACKSAND_T3_UNISOLATED_BUILD=1/, args.join(" "));
   }
   assert.equal(c.ran("pnpm") || c.ran("server"), false);
   // CI's variable: past the check (the scratch server runs, as you, as CI's would).
-  const ci = { T3BLACKOUT_UNISOLATED_BUILD: "1" };
+  const ci = { BLACKSAND_T3_UNISOLATED_BUILD: "1" };
   c.run(["smoke"], ci);
   assert.equal(c.ran("server"), true, "positive control: the fixture server is what smoke runs");
-  assert.match(c.run(["status"], ci).stdout, /^builds: +as you \(T3BLACKOUT_UNISOLATED_BUILD=1; not an install\)$/m);
+  assert.match(c.run(["status"], ci).stdout, /^builds: +as you \(BLACKSAND_T3_UNISOLATED_BUILD=1; not an install\)$/m);
   // An install whose install.json is gone, even with the variable set.
   const installed = clone(ci);
   fs.mkdirSync(installed.state, { recursive: true });
@@ -252,7 +253,7 @@ test("with --unisolated-build saved, builds may run as you, and status says so",
   assert.match(optedIn.run(["status"]).stdout, /^builds: +as you \(installed with --unisolated-build/m);
 });
 
-test("CI's workflows say T3BLACKOUT_UNISOLATED_BUILD=1 on every step that checks, builds or evaluates", () => {
+test("CI's workflows say BLACKSAND_T3_UNISOLATED_BUILD=1 on every step that checks, builds or evaluates", () => {
   const workflows = path.join(ROOT, "..", "..", ".github", "workflows");
   let steps = 0;
   for (const file of fs.readdirSync(workflows)) {
@@ -260,9 +261,9 @@ test("CI's workflows say T3BLACKOUT_UNISOLATED_BUILD=1 on every step that checks
     // Each step (from "- name:" to the next) that runs one of them, comments aside.
     const code = text.split("\n").filter((line) => !/^\s*#/.test(line)).join("\n");
     for (const step of code.split(/\n(?=\s+- (?:name|uses|run):)/)) {
-      if (!/node bin\/t3blackout (check|evaluate|update|smoke|poll)\b/.test(step)) continue;
+      if (!/node bin\/t3 (check|evaluate|update|smoke|poll)\b/.test(step)) continue;
       steps++;
-      assert.match(step, /\n\s+T3BLACKOUT_UNISOLATED_BUILD: "1"\n/, `${file}: ${step.trim().split("\n")[0]}`);
+      assert.match(step, /\n\s+BLACKSAND_T3_UNISOLATED_BUILD: "1"\n/, `${file}: ${step.trim().split("\n")[0]}`);
     }
   }
   assert.ok(steps >= 3, "ci.yml's check, build.yml's check --build and evaluate.yml's evaluate");
@@ -299,7 +300,7 @@ test("setup_builder stops at the first failing step, before the marker and the c
   assert.equal(result.status, 1, result.stdout + result.stderr);
   assert.match(result.stderr, /couldn't get the pinned pnpm/);
   assert.doesNotMatch(result.stdout, /REACHED/);
-  assert.equal(fs.existsSync(path.join(cwd, "builder", ".t3blackout-builder")), false);
+  assert.equal(fs.existsSync(path.join(cwd, "builder", ".blacksand-builder")), false);
   assert.equal(fs.existsSync(path.join(cwd, "build")), true);
 });
 
@@ -308,7 +309,7 @@ test("the build account's Node must meet the security floor", () => {
   const result = bash(`${BUILDER_STUBS}\nsetup_builder\necho REACHED`, { cwd, env: { HOME: cwd, FAKE_OLD_NODE: "1" } });
   assert.equal(result.status, 1);
   assert.match(result.stderr, /isn't Node 24\+ with the Oct 2026 security fixes/);
-  assert.equal(fs.existsSync(path.join(cwd, "builder", ".t3blackout-builder")), false);
+  assert.equal(fs.existsSync(path.join(cwd, "builder", ".blacksand-builder")), false);
 });
 
 test("a home the build account can read is made private before builds use the account", () => {
@@ -318,7 +319,7 @@ test("a home the build account can read is made private before builds use the ac
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Making .* private/);
   assert.equal(fs.statSync(cwd).mode & 0o777, 0o700);
-  assert.equal(fs.existsSync(path.join(cwd, "builder", ".t3blackout-builder")), true);
+  assert.equal(fs.existsSync(path.join(cwd, "builder", ".blacksand-builder")), true);
   assert.equal(fs.existsSync(path.join(cwd, "build")), false, "old build data cleared only at the end");
 });
 
@@ -348,8 +349,8 @@ setup_builder
 echo REACHED`;
   const result = bash(stubs, { cwd, env: { HOME: cwd } });
   assert.equal(result.status, 1, result.stdout + result.stderr);
-  assert.match(result.stderr, /_t3blackout's git: git 2\.54\.0 is too old/);
-  assert.equal(fs.existsSync(path.join(cwd, "builder", ".t3blackout-builder")), false, "the marker comes only after the checks");
+  assert.match(result.stderr, /_blacksand-build's git: git 2\.54\.0 is too old/);
+  assert.equal(fs.existsSync(path.join(cwd, "builder", ".blacksand-builder")), false, "the marker comes only after the checks");
 });
 
 test("on macOS the build account's home is 700 with one ACL entry letting you through, set again on every run", () => {
@@ -360,16 +361,16 @@ test("on macOS the build account's home is 700 with one ACL entry letting you th
   const result = bash(`uname() { echo Darwin; }\nsudo() { echo "$*" >> ${JSON.stringify(log)}; }\nBUILDER_HOME=${JSON.stringify(home)}\nbuilder_home\necho DONE`, { cwd });
   assert.equal(result.status, 0, result.stderr);
   const me = os.userInfo().username;
-  const group = spawnSync("id", ["-gn", "_t3blackout"], { encoding: "utf8" }).stdout.trim();
+  const group = spawnSync("id", ["-gn", "_blacksand-build"], { encoding: "utf8" }).stdout.trim();
   assert.deepEqual(fs.readFileSync(log, "utf8").trim().split("\n"), [
-    `install -d -o _t3blackout -g ${group} -m 700 ${home}`,
+    `install -d -o _blacksand-build -g ${group} -m 700 ${home}`,
     `chmod -N ${home}`,
     `chmod +a user:${me} allow list,search,readattr,readextattr,readsecurity ${home}`,
   ]);
   // Linux has no agent accounts: there it stays as before.
   fs.rmSync(log);
   assert.equal(bash(`uname() { echo Linux; }\nsudo() { echo "$*" >> ${JSON.stringify(log)}; }\nBUILDER_HOME=${JSON.stringify(home)}\nbuilder_home`, { cwd }).status, 0);
-  assert.match(fs.readFileSync(log, "utf8"), /^install -d -o _t3blackout -g \S* -m 755 /);
+  assert.match(fs.readFileSync(log, "utf8"), /^install -d -o _blacksand-build -g \S* -m 755 /);
 });
 
 test("that ACL entry, as macOS applies it, lets you list and pass through a folder whose mode lets no one in, and no more", { skip: process.platform !== "darwin" && "macOS ACLs" }, () => {
@@ -410,7 +411,7 @@ test("rerunning install.sh closes a build home an older install left 755, ACL en
   fs.chmodSync(home, 0o755);
   fs.writeFileSync(path.join(home, "file"), "builder's\n", { mode: 0o644 });
   assert.equal(spawnSync("/bin/chmod", ["+a", "everyone allow list,search,read", home]).status, 0);
-  assert.equal(builderHomeProblem(fs.statSync(home).mode, "darwin"), `/private/var/t3blackout-build is open to other accounts (mode 755); rerun ./install.sh`);
+  assert.equal(builderHomeProblem(fs.statSync(home).mode, "darwin"), `/private/var/blacksand-build is open to other accounts (mode 755); rerun ./install.sh`);
   // install.sh's own commands, run here (install without -o/-g, which need root).
   const result = bash(`uname() { echo Darwin; }\nsudo() { "$@"; }\ninstall() { local args=(); while (($#)); do case "$1" in -o | -g) shift 2 ;; *) args+=("$1"); shift ;; esac; done; /usr/bin/install "\${args[@]}"; }\nBUILDER_HOME=${JSON.stringify(home)}\nbuilder_home\necho DONE`, { cwd });
   try {
@@ -480,14 +481,14 @@ test("lib/builder.mjs starts every command as the build account in /, wherever t
     `import { builderReachable, runAsBuilder } from ${JSON.stringify(path.join(repo, "lib", "builder.mjs"))};\n` +
       "console.log(`reachable ${builderReachable()}`);\nawait runAsBuilder([\"fetch\"]);\nconsole.log(\"ran\");\n",
   );
-  const result = l.fromPrivateHome(`${JSON.stringify(process.execPath)} ${JSON.stringify(helper)}`, { T3BLACKOUT_GITHUB_TOKEN: "", GITHUB_TOKEN: "", GH_TOKEN: "" });
+  const result = l.fromPrivateHome(`${JSON.stringify(process.execPath)} ${JSON.stringify(helper)}`, { BLACKSAND_T3_GITHUB_TOKEN: "", GITHUB_TOKEN: "", GH_TOKEN: "" });
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.match(result.stdout, /reachable true[\s\S]*ran/);
   const starts = l.starts();
   // builderReachable, the code copied over (syncCode), the run itself.
   assert.ok(starts.length >= 3, JSON.stringify(starts));
   for (const [cwd, args] of starts) assert.equal(cwd, "/", args);
-  assert.ok(starts.some(([, args]) => /bin\/t3blackout fetch --json$/.test(args)), "the build account's run is among them");
+  assert.ok(starts.some(([, args]) => /bin\/t3 fetch --json$/.test(args)), "the build account's run is among them");
 });
 
 test("the smoke-tested server starts in its own folder, so Node's --require preloads don't die on the caller's (EACCES uv_cwd)", () => {
@@ -524,7 +525,7 @@ test("install.sh's as_builder runs from /, so the build account's pnpm and Node 
   assert.equal(starts.length, 2, JSON.stringify(starts));
   for (const [cwd, args] of starts) {
     assert.equal(cwd, "/", args);
-    assert.match(args, /^-n -u _t3blackout -H env HOME=\S+ PATH=\S+ (pnpm --version|true)$/);
+    assert.match(args, /^-n -u _blacksand-build -H env HOME=\S+ PATH=\S+ (pnpm --version|true)$/);
   }
 });
 
@@ -583,7 +584,7 @@ const VERSIONS = [
 test("git needs 2.55.0 or later (every advisory's fix, the last CVE-2024-52005's sideband filtering); Apple's 2.54.0 doesn't pass", () => {
   for (const version of VERSIONS.slice(0, 5)) assert.equal(gitProblem(version), "OK", version);
   for (const version of VERSIONS.slice(5, -1)) {
-    assert.match(gitProblem(version), /^git 2\.\d+\.\d+ is too old: T3 Blackout needs 2\.55\.0 or later, for security fixes \(CVE-2024-52005\)$/, version);
+    assert.match(gitProblem(version), /^git 2\.\d+\.\d+ is too old: Blacksand T3 needs 2\.55\.0 or later, for security fixes \(CVE-2024-52005\)$/, version);
   }
   assert.match(gitProblem("hub version 2.14.2"), /can't read git's version \(hub version 2\.14\.2\)/);
   assert.match(gitProblem("", 127), /no git found/);
@@ -656,7 +657,7 @@ test("if Homebrew can't bring git up to the floor, install.sh stops with a short
   const stuck = macSetup({ brewGit: "2.54.0", upgrades: false });
   assert.equal(stuck.result.status, 1);
   assert.doesNotMatch(stuck.result.stdout, /^PATH=/m);
-  assert.match(stuck.result.stderr, /git 2\.54\.0 is too old: T3 Blackout needs 2\.55\.0 or later, for security fixes \(CVE-2024-52005\) \(git on PATH: .*\/homebrew\/bin\/git\)\. Run: brew install git/);
+  assert.match(stuck.result.stderr, /git 2\.54\.0 is too old: Blacksand T3 needs 2\.55\.0 or later, for security fixes \(CVE-2024-52005\) \(git on PATH: .*\/homebrew\/bin\/git\)\. Run: brew install git/);
 });
 
 test("homebrew_first puts Homebrew's bin first, even when PATH repeats /usr/bin after it", () => {
@@ -672,7 +673,7 @@ test("homebrew_first puts Homebrew's bin first, even when PATH repeats /usr/bin 
   assert.equal(run("/bin:/usr/sbin"), `${bin}:/bin:/usr/sbin`, "no /usr/bin at all");
 });
 
-test("every git T3 Blackout runs is checked first, on whatever PATH the run has (yours, the job's, the build account's)", () => {
+test("every git Blacksand T3 runs is checked first, on whatever PATH the run has (yours, the job's, the build account's)", () => {
   const dir = tmp();
   const repo = path.join(dir, "local.git");
   assert.equal(spawnSync("git", ["init", "--quiet", "--bare", repo]).status, 0);
@@ -688,7 +689,7 @@ test("every git T3 Blackout runs is checked first, on whatever PATH the run has 
   const old = shim("2.54.0 (Apple Git-157)");
   const refused = publicGit(["ls-remote", repo], { url: repo, env: old.env, timeout: 30_000 });
   assert.equal(refused.status, 128);
-  assert.match(gitFailure(refused, 30_000), /^fatal: git 2\.54\.0 is too old: T3 Blackout needs 2\.55\.0 or later, for security fixes \(CVE-2024-52005\); install a newer git \(macOS: brew install git, with Homebrew first on PATH\)$/);
+  assert.match(gitFailure(refused, 30_000), /^fatal: git 2\.54\.0 is too old: Blacksand T3 needs 2\.55\.0 or later, for security fixes \(CVE-2024-52005\); install a newer git \(macOS: brew install git, with Homebrew first on PATH\)$/);
   assert.equal(old.used(), false, "the old git ran nothing");
   const current = shim("2.56.0");
   const ok = publicGit(["ls-remote", repo], { url: repo, env: current.env, timeout: 30_000 });
@@ -798,8 +799,8 @@ test("pnpm_installed goes by the binary's bytes, not what it says: the pinned ve
   assert.doesNotMatch(log(true), /install_pnpm/);
 });
 
-const REAL = process.env.T3BLACKOUT_REAL_PNPM;
-test("real pnpm: the pinned binary counts as installed", { skip: !REAL && "set T3BLACKOUT_REAL_PNPM to the pinned pnpm (<prefix>/lib/node_modules/pnpm/pnpm)" }, () => {
+const REAL = process.env.BLACKSAND_T3_REAL_PNPM;
+test("real pnpm: the pinned binary counts as installed", { skip: !REAL && "set BLACKSAND_T3_REAL_PNPM to the pinned pnpm (<prefix>/lib/node_modules/pnpm/pnpm)" }, () => {
   const prefix = path.resolve(REAL, "..", "..", "..", "..");
   assert.equal(bash(`pnpm_installed ${JSON.stringify(prefix)} && echo YES || echo NO`).stdout.trim(), "YES");
 });

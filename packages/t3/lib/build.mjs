@@ -56,14 +56,14 @@ export function checkoutWork(ref) {
 }
 
 /**
- * What the app's update button runs (BlackoutUpdater.ts): the CLI in your clone
+ * What the app's update button runs (BlacksandUpdater.ts): the CLI in your clone
  * with your node and PATH. The build account gets these from you via env.
  */
 function updaterPaths() {
   return {
-    node: process.env.T3BLACKOUT_APP_NODE ?? stableNodePath(),
-    launcher: process.env.T3BLACKOUT_APP_LAUNCHER ?? LAUNCHER,
-    path: process.env.T3BLACKOUT_APP_PATH ?? process.env.PATH ?? "/usr/bin:/bin",
+    node: process.env.BLACKSAND_T3_APP_NODE ?? stableNodePath(),
+    launcher: process.env.BLACKSAND_T3_APP_LAUNCHER ?? LAUNCHER,
+    path: process.env.BLACKSAND_T3_APP_PATH ?? process.env.PATH ?? "/usr/bin:/bin",
   };
 }
 
@@ -261,7 +261,7 @@ function stopMessage({ strict, hosts, tools, locks = [], pnpm = null }) {
     ...tools.map((pin) => `  - device tool ${pin}`),
     ...locks.map((why) => `  - ${why}`),
     ...(pnpm ? [`  - ${pnpm}`] : []),
-    ...(strict.length ? ["Update lib/rules.mjs for the new upstream code, then rerun; `t3blackout drift` shows what upstream changed."] : []),
+    ...(strict.length ? ["Update lib/rules.mjs for the new upstream code, then rerun; `blacksand t3 drift` shows what upstream changed."] : []),
     ...(hosts.length ? ["Check what talks to each new host; add a strip rule or list it in lib/known-hosts.txt, then rerun."] : []),
     ...(tools.length ? ["Read each new device tool version for network calls (see lib/known-device-tools.txt), list it there, then rerun."] : []),
     ...(pnpm ? [RAISE_PNPM] : []),
@@ -284,7 +284,7 @@ function liquidGlassIconEnv() {
 
 function findLiquidGlassIcon() {
   if (process.platform !== "darwin") return {};
-  const icon = path.join(WORK, "assets", "blackout", "app-icon.icon");
+  const icon = path.join(WORK, "assets", "blacksand", "app-icon.icon");
   if (!fs.existsSync(icon)) return {};
   const actoolMajor = (developerDir) => {
     const env = { ...process.env };
@@ -300,7 +300,7 @@ function findLiquidGlassIcon() {
   for (const developerDir of candidates) {
     if (developerDir === undefined || actoolMajor(developerDir) < 26) continue;
     log(`app icon: Liquid Glass, compiled with ${developerDir ?? "the selected Xcode"}`);
-    return { T3BLACKOUT_MAC_ICON: icon, ...(developerDir ? { DEVELOPER_DIR: developerDir } : {}) };
+    return { BLACKSAND_T3_MAC_ICON: icon, ...(developerDir ? { DEVELOPER_DIR: developerDir } : {}) };
   }
   log("app icon: no Xcode 26+ found, so it stays flat (no Liquid Glass)");
   return {};
@@ -450,8 +450,8 @@ async function packageApp(version, platform, opts, stages) {
   const record = path.join(stages.tmpdir, "stage-installs.jsonl");
   // The packager's pnpm (its shim, and the stage guard's installs) is install.sh's too.
   const env = shimEnv({ dir: path.join(stages.tmpdir, "shims"), env: { ...opts.env, TMPDIR: stages.tmpdir }, stageRoot: stages.tmpdir, verifiedLock, record, real: { pnpm: verifiedPnpm() } });
-  if (!env.T3BLACKOUT_REAL_VP.startsWith(path.join(WORK, "node_modules"))) {
-    throw new Error(`upstream's vite-plus isn't at node_modules/.bin/vp anymore (found ${env.T3BLACKOUT_REAL_VP || "none"}); update lib/build.mjs`);
+  if (!env.BLACKSAND_T3_REAL_VP.startsWith(path.join(WORK, "node_modules"))) {
+    throw new Error(`upstream's vite-plus isn't at node_modules/.bin/vp anymore (found ${env.BLACKSAND_T3_REAL_VP || "none"}); update lib/build.mjs`);
   }
   await runTail(process.execPath, ["scripts/build-desktop-artifact.ts", ...platform.buildArgs(), "--build-version", version], { ...opts, env }, "building the app");
   const { lines, locks } = verifyStageInstalls(stages, record);
@@ -512,7 +512,7 @@ function scanDist() {
   }
   const html = path.join(WORK, "apps", "web", "dist", "index.html");
   if (fs.existsSync(html) && !fs.readFileSync(html, "utf8").includes("Content-Security-Policy")) {
-    throw new Error("built index.html is missing the t3blackout CSP");
+    throw new Error("built index.html is missing the blacksand CSP");
   }
 }
 

@@ -12,16 +12,16 @@ Install the desktop with `packages/t3/install.sh --role both` ([desktop](desktop
 puts the app in `/Applications`, shared with the standby account. Then:
 
 ```sh
-sudo packages/t3/scripts/add-agent-account.sh agent-standby --loopback-only --key ~/.ssh/t3blackout.pub
+sudo packages/t3/scripts/add-agent-account.sh agent-standby --loopback-only --key ~/.ssh/blacksand.pub
 ```
 
 macOS asks you to choose the account's password. The script does everything
 [agent accounts](../accounts/agent-accounts.md#create-an-agent-account) describes.
 `--loopback-only` also:
 
-- installs the LaunchDaemon `dev.t3blackout.sshd`. It runs Apple's `sshd -D -f
-  /etc/ssh/t3blackout/sshd_config` on `127.0.0.1` and `::1` port 2222 only, for
-  members of `t3blackout-agents` only, with keys only and its own host key;
+- installs the LaunchDaemon `dev.blacksand.sshd`. It runs Apple's `sshd -D -f
+  /etc/ssh/blacksand/sshd_config` on `127.0.0.1` and `::1` port 2222 only, for
+  members of `blacksand-agents` only, with keys only and its own host key;
 - checks after starting it that nothing else listens on port 2222;
 - restricts the key to `from="127.0.0.1,::1"`;
 - records that sshd's host key in your `~/.ssh/known_hosts` for `[127.0.0.1]:2222`,
@@ -59,5 +59,5 @@ user `agent-standby`, port `2222`.
   clones, logins and threads, and nothing moves over by itself.
 - It runs the desktop's app. It moves to a new build after the app restarts into it
   and you switch the standby environment off and on.
-- If the standby sshd isn't listening, read `/var/log/dev.t3blackout.sshd.log` and
+- If the standby sshd isn't listening, read `/var/log/dev.blacksand.sshd.log` and
   rerun the account script.

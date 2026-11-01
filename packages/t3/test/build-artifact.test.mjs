@@ -14,7 +14,7 @@ import linux from "../lib/platform/linux.mjs";
 
 test("the collected app is scanned, staged dependencies and sidecars included, for both artifact shapes", () => {
   const out = fs.mkdtempSync(path.join(os.tmpdir(), "t3b-build-artifact-"));
-  const app = path.join(out, "T3 Blackout.app");
+  const app = path.join(out, "Blacksand T3.app");
   const sidecar = path.join(app, "Contents", "Resources", "app.asar.unpacked", "node_modules", "helper");
   fs.mkdirSync(sidecar, { recursive: true });
   fs.writeFileSync(path.join(sidecar, "index.js"), "module.exports = 1;\n");
@@ -49,8 +49,8 @@ test("allowBuilds keeps the desktop build's install scripts and turns every othe
   const out = desktopBuildsOnly(yaml);
   assert.match(out, /^ {2}esbuild: true$/m);
   assert.match(out, /^ {2}"@tsc-rs\/typescript": true$/m);
-  assert.match(out, /^ {2}"react-native-enriched-markdown@file:apps\/mobile\/deps\/x\.tgz": false # t3blackout/m);
-  assert.match(out, /^ {2}new-native-thing: false # t3blackout/m);
+  assert.match(out, /^ {2}"react-native-enriched-markdown@file:apps\/mobile\/deps\/x\.tgz": false # blacksand/m);
+  assert.match(out, /^ {2}new-native-thing: false # blacksand/m);
   assert.match(out, /^ {2}electron: false$/m);
   assert.match(out, /^catalog:\n {2}react: 19\.0\.0$/m);
   assert.throws(() => desktopBuildsOnly("packages: []\n"), /expected one top-level allowBuilds/);

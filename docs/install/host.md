@@ -72,25 +72,25 @@ packages/t3/install.sh --role host
 
 The host role needs an admin account, because the app goes in `/Applications`, where
 agent accounts find it. It also needs the default locations: it stops if
-`T3BLACKOUT_APPS` or `T3BLACKOUT_UPDATE_REQUESTS` point anywhere else. Beyond what
+`BLACKSAND_T3_APPS` or `BLACKSAND_T3_UPDATE_REQUESTS` point anywhere else. Beyond what
 [the desktop install](desktop.md#what-it-does) does, it:
 
-- installs the app to `/Applications/T3 Blackout.app`, without opening it;
-- installs the updater as a LaunchDaemon (`dev.t3blackout.update`). It runs as you
+- installs the app to `/Applications/Blacksand T3.app`, without opening it;
+- installs the updater as a LaunchDaemon (`dev.blacksand.update`). It runs as you
   with nobody logged in, hourly, and whenever a server here asks for an update
-  through `/Users/Shared/t3blackout/update-requests`
+  through `/Users/Shared/blacksand/update-requests`
   ([host updates](../updates/how-updates-arrive.md#hosts)).
 
 Check it:
 
 ```sh
-packages/t3/bin/t3blackout status
+blacksand t3 status
 git --version
 ```
 
 `status` shows `role: host`, `schedule: hourly, and on update requests (LaunchDaemon:
-runs with nobody logged in)`, `builds: as _t3blackout`, `app: /Applications/T3
-Blackout.app`, `signing: Apple Development: …` and the pinned release. Run `git
+runs with nobody logged in)`, `builds: as _blacksand-build`, `app: /Applications/Blacksand
+T3.app`, `signing: Apple Development: …` and the pinned release. Run `git
 --version` in a new Terminal window; it shows 2.55.0 or later.
 
 ## Next

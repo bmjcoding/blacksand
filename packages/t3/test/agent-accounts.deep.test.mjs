@@ -37,7 +37,7 @@ const probes = (name) => bash(`printf '%s\\n' "\${${name}[@]}"`).stdout.trim().s
 
 /**
  * macOS's sshd layout in a scratch folder: its own sshd_config, Include pointed
- * here, its 100-macos.conf, scratch host keys, and `dropin` as 010-t3blackout.conf.
+ * here, its 100-macos.conf, scratch host keys, and `dropin` as 010-blacksand.conf.
  */
 function appleLayout(content) {
   const dir = tmp();
@@ -47,7 +47,7 @@ function appleLayout(content) {
   assert.match(main, new RegExp(`^Include ${dir}/sshd_config\\.d/\\*$`, "m"), "macOS's sshd_config includes sshd_config.d first");
   fs.writeFileSync(path.join(dir, "sshd_config"), `${main}\nHostKey ${dir}/ssh_host_ed25519_key\nHostKey ${dir}/ssh_host_ecdsa_key\nPidFile ${dir}/sshd.pid\n`);
   for (const file of fs.readdirSync("/etc/ssh/sshd_config.d")) fs.copyFileSync(path.join("/etc/ssh/sshd_config.d", file), path.join(dir, "sshd_config.d", file));
-  const dropin = path.join(dir, "sshd_config.d", "010-t3blackout.conf");
+  const dropin = path.join(dir, "sshd_config.d", "010-blacksand.conf");
   fs.writeFileSync(dropin, content);
   return { dir, config: path.join(dir, "sshd_config"), dropin };
 }
@@ -66,7 +66,7 @@ test("agent accounts get root's keys file and loopback-only forwarding; everyone
   const agent = appleLayout(render()).config;
   assert.equal(spawnSync(SSHD, ["-t", "-f", agent]).status, 0);
   const asAgent = Object.fromEntries(effective(agent, me, "127.0.0.1").all);
-  assert.equal(asAgent.authorizedkeysfile, "/etc/ssh/t3blackout/authorized_keys/%u");
+  assert.equal(asAgent.authorizedkeysfile, "/etc/ssh/blacksand/authorized_keys/%u");
   assert.equal(asAgent.allowtcpforwarding, "local");
   assert.equal(asAgent.permitopen, "127.0.0.1:* localhost:* [::1]:*");
   assert.equal(asAgent.authenticationmethods, "publickey");
@@ -103,7 +103,7 @@ test("Apple's sshd refuses agent accounts, you and root from outside Tailscale a
   }
   // From the tailnet, the agent group's settings still apply; macOS's own stay global.
   const fromTailnet = effective(agent.config, me, "100.101.1.1");
-  assert.equal(fromTailnet.get("authorizedkeysfile"), "/etc/ssh/t3blackout/authorized_keys/%u");
+  assert.equal(fromTailnet.get("authorizedkeysfile"), "/etc/ssh/blacksand/authorized_keys/%u");
   assert.equal(fromTailnet.get("permitopen"), "127.0.0.1:* localhost:* [::1]:*");
   assert.equal(fromTailnet.get("usepam"), "yes");
   assert.equal(fromTailnet.get("passwordauthentication"), "no");
@@ -145,7 +145,7 @@ test("the drop-in is installed only if Apple's sshd would refuse and allow as it
   assert.equal(ok.status, 0, ok.stderr);
   assert.match(ok.stdout, /INSTALLED/);
   assert.equal(fs.readFileSync(layout.dropin, "utf8"), render());
-  assert.deepEqual(fs.readdirSync(layout.dir).filter((f) => f.startsWith(".t3blackout")), [], "no temporary left");
+  assert.deepEqual(fs.readdirSync(layout.dir).filter((f) => f.startsWith(".blacksand-dropin")), [], "no temporary left");
   for (const [label, renderer, why] of [
     ["the block as first proposed", render().replace(",*%*\n", "\n"), /would allow .* from fe80::/],
     ["no block (as --allow-lan renders it) without --allow-lan", render({ allowLan: true }), /would allow .* from 192\.168\.1\.50/],
@@ -185,7 +185,7 @@ test("a real login from a scoped link-local address is refused; from loopback it
   spawnSync("ssh-keygen", ["-q", "-t", "ed25519", "-N", "", "-f", path.join(dir, "client")]);
   fs.copyFileSync(path.join(dir, "client.pub"), path.join(keys, me));
   fs.mkdirSync(path.join(dir, "d"));
-  fs.writeFileSync(path.join(dir, "d", "010-t3blackout.conf"), bash(`AGENT_GROUP=${myGroup}\nKEYS_DIR=${keys}\nrender_dropin`).stdout);
+  fs.writeFileSync(path.join(dir, "d", "010-blacksand.conf"), bash(`AGENT_GROUP=${myGroup}\nKEYS_DIR=${keys}\nrender_dropin`).stdout);
   const port = await freePort();
   const config = path.join(dir, "sshd_config");
   fs.writeFileSync(config, [
@@ -264,7 +264,7 @@ test("--allow-from pins logins to the desktop Mac's exact tailnet addresses (and
 function extractOptionParser() {
   const source = fs.readFileSync(ADD_ACCOUNT, "utf8");
   const start = source.indexOf('  NAME="${1:-}"');
-  const end = source.indexOf("  [[ -x \"$APP/Contents/MacOS/T3 Blackout\" ]]");
+  const end = source.indexOf("  [[ -x \"$APP/Contents/MacOS/Blacksand T3\" ]]");
   assert.ok(start > 0 && end > start, "main's option parsing is where this test expects it");
   return `parse_options() {\n${source.slice(start, end)}\n  echo "ALLOW_LAN=$ALLOW_LAN LOOPBACK=$LOOPBACK ALLOW_FROM=$ALLOW_FROM"\n}\nSUDO_USER=admin-test`;
 }
@@ -339,14 +339,14 @@ test("the standby sshd listens on loopback only, for agent accounts, keys only",
   assert.equal(check.status, 0, check.stderr);
   const settings = spawnSync(SSHD, ["-T", "-f", config, "-C", "user=nobody,host=x,addr=127.0.0.1"], { encoding: "utf8" }).stdout.toLowerCase();
   assert.deepEqual(settings.match(/^listenaddress .*$/gm).sort(), ["listenaddress 127.0.0.1:2222", "listenaddress [::1]:2222"]);
-  assert.match(settings, /^allowgroups t3blackout-agents$/m);
+  assert.match(settings, /^allowgroups blacksand-agents$/m);
   assert.match(settings, /^authenticationmethods publickey$/m);
   assert.match(settings, /^passwordauthentication no$/m);
   const plist = path.join(dir, "sshd.plist");
   fs.writeFileSync(plist, bash("render_loopback_plist").stdout);
   assert.equal(spawnSync("plutil", ["-lint", plist]).status, 0);
   const job = JSON.parse(spawnSync("plutil", ["-convert", "json", "-o", "-", plist], { encoding: "utf8" }).stdout);
-  assert.deepEqual(job.ProgramArguments, ["/usr/sbin/sshd", "-D", "-f", "/etc/ssh/t3blackout/sshd_config"]);
+  assert.deepEqual(job.ProgramArguments, ["/usr/sbin/sshd", "-D", "-f", "/etc/ssh/blacksand/sshd_config"]);
 });
 
 test("a missing host key is reported as such, not as a config error", { skip: macSshd }, () => {
@@ -396,7 +396,8 @@ test("an agent home's ACL entries are removed, keeping only macOS's deny delete"
   assert.doesNotMatch(listed, /allow/);
   assert.match(listed, /group:everyone deny delete/);
   assert.equal(fs.statSync(home).mode & 0o777, 0o700);
-  assert.equal(fs.statSync(path.join(home, ".t3blackout")).mode & 0o777, 0o700);
+  assert.equal(fs.statSync(path.join(home, ".blacksand")).mode & 0o777, 0o700);
+  assert.equal(fs.statSync(path.join(home, ".blacksand/t3")).mode & 0o777, 0o700);
 });
 
 test("an ACL that survives, or a home your account can still open, stops provisioning", { skip: !isMac && "macOS ACLs" }, () => {

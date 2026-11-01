@@ -90,7 +90,7 @@ export function host(setup = {}) {
   for (const [name, content] of Object.entries({ ...defaults, ...setup })) if (content !== null) fs.writeFileSync(path.join(s, name), content);
   if (!fs.existsSync(path.join(s, "apple.plist"))) fs.copyFileSync(hasApple ? APPLE : SCRIPT, path.join(s, "apple.plist"));
   fs.mkdirSync(path.join(s, "LaunchDaemons"));
-  for (const job of ["hold", "park"]) fs.writeFileSync(path.join(s, "LaunchDaemons", `dev.t3blackout.screensharing-${job}.plist`), "plist");
+  for (const job of ["hold", "park"]) fs.writeFileSync(path.join(s, "LaunchDaemons", `dev.blacksand.screensharing-${job}.plist`), "plist");
   // macOS's log tool, over the sslog file: screensharingd's check-in lines (granted by default).
   fs.writeFileSync(path.join(s, "logtool"), '#!/bin/sh\ncat "$(dirname "$0")/sslog" 2>/dev/null\n', { mode: 0o755 });
   if (!fs.existsSync(path.join(s, "sslog"))) fs.writeFileSync(path.join(s, "sslog"), CHECKIN(1, 1));
@@ -103,8 +103,8 @@ export function host(setup = {}) {
 S=${JSON.stringify(s)}
 WANTED="$S/wanted" USER_FILE="$S/user" SERVE="$S/serve" FAILING="$S/failing" LOCK="$S/lock" VNC_PASSWORD_FILE="$S/vnc" RM_LAUNCHD="$S/rm"
 APPLE_PLIST="$S/apple.plist" OWN_DIR="$S/support" OWN_PLIST="$S/support/com.apple.screensharing.plist"
-HOLD_PLIST="$S/LaunchDaemons/dev.t3blackout.screensharing-hold.plist" PARK_PLIST="$S/LaunchDaemons/dev.t3blackout.screensharing-park.plist"
-CHECK_PLIST="$S/LaunchDaemons/dev.t3blackout.screen-sharing-check.plist" CHECK="$S/libexec/screen-sharing-check" HELPER_DIR="$S/libexec"
+HOLD_PLIST="$S/LaunchDaemons/dev.blacksand.screensharing-hold.plist" PARK_PLIST="$S/LaunchDaemons/dev.blacksand.screensharing-park.plist"
+CHECK_PLIST="$S/LaunchDaemons/dev.blacksand.screen-sharing-check.plist" CHECK="$S/libexec/screen-sharing-check" HELPER_DIR="$S/libexec"
 LOG_TOOL="$S/logtool"
 pfctl() { echo "pfctl $*" >>"$S/pf"; }
 chown() { :; }
@@ -162,9 +162,9 @@ launchctl() {
             if [[ -f $S/apple_loaded ]]; then printf '\\tpath = /System/Library/LaunchDaemons/com.apple.screensharing.plist\\n'; else printf '\\tpath = %s\\n' "$OWN_PLIST"; fi
           fi
           printf '\\tstate = not running\\n\\tsockets = {\\n\\t\\tpath = (not a plist)\\n\\t}\\n}\\n' ;;
-        dev.t3blackout.screensharing-hold) [[ -f $S/hold_loaded ]] ;;
-        dev.t3blackout.screensharing-park) [[ -f $S/park_loaded ]] ;;
-        dev.t3blackout.screen-sharing-check) [[ -f $S/check_loaded ]] ;;
+        dev.blacksand.screensharing-hold) [[ -f $S/hold_loaded ]] ;;
+        dev.blacksand.screensharing-park) [[ -f $S/park_loaded ]] ;;
+        dev.blacksand.screen-sharing-check) [[ -f $S/check_loaded ]] ;;
         *) return 113 ;;
       esac ;;
     print-disabled) if [[ ! -f $S/apple_on ]]; then echo '	"com.apple.screensharing" => disabled'; fi ;;
@@ -180,12 +180,12 @@ launchctl() {
       if [[ "$(cat "$S/bootout_fail" 2>/dev/null)" == "$label" ]]; then echo "Boot-out failed: 5: Input/output error" >&2; return 5; fi
       case "$label" in
         com.apple.screensharing) rm -f "$S/apple_loaded" "$S/own_loaded" ;;
-        dev.t3blackout.screensharing-hold)
+        dev.blacksand.screensharing-hold)
           rm -f "$S/hold_loaded"
           # Someone waiting for the port takes it the moment it's free.
           if [[ -f $S/squat_on_release ]]; then rm -f "$S/squat_on_release"; : >"$S/squat4"; : >"$S/squat6"; fi ;;
-        dev.t3blackout.screensharing-park) rm -f "$S/park_loaded" ;;
-        dev.t3blackout.screen-sharing-check) rm -f "$S/check_loaded" ;;
+        dev.blacksand.screensharing-park) rm -f "$S/park_loaded" ;;
+        dev.blacksand.screen-sharing-check) rm -f "$S/check_loaded" ;;
       esac
       trace ;;
     bootstrap)

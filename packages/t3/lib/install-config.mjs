@@ -1,10 +1,10 @@
 // What an install resolved: its role (install.sh --role), whether it may build
 // as you (install.sh --unisolated-build) and the locations its environment chose
-// (T3BLACKOUT_HOME, the apps folder, the update request folder, XDG
-// directories). `t3blackout configure` saves them in
+// (BLACKSAND_T3_HOME, the apps folder, the update request folder, XDG
+// directories). `blacksand t3 configure` saves them in
 // state/install.json; every later run, whether scheduled, started by the app
 // or by hand, applies them before anything reads those variables
-// (lib/load-install-config.mjs, imported first by bin/t3blackout), so it builds
+// (lib/load-install-config.mjs, imported first by bin/t3), so it builds
 // into, records and installs the same places the install did.
 //
 // A missing file means no saved config (an install from before configure). A
@@ -19,16 +19,16 @@ import { fileURLToPath } from "node:url";
 import { writeJsonAtomic } from "./atomic-file.mjs";
 
 export const ROLES = ["ui", "host", "both"];
-export const CONFIG_KEYS = ["T3BLACKOUT_HOME", "T3BLACKOUT_APPS", "T3BLACKOUT_UPDATE_REQUESTS", "XDG_DATA_HOME", "XDG_CONFIG_HOME"];
+export const CONFIG_KEYS = ["BLACKSAND_T3_HOME", "BLACKSAND_T3_APPS", "BLACKSAND_T3_UPDATE_REQUESTS", "XDG_DATA_HOME", "XDG_CONFIG_HOME"];
 /**
  * Where a host's agent accounts find the app and reach the updater. Provisioning
- * (scripts/add-agent-account.sh), the SSH runner (lib/files/ssh-runner-blackout.sh)
- * and the servers' update requests (lib/files/blackoutHostUpdate.ts) all use these,
+ * (scripts/add-agent-account.sh), the SSH runner (lib/files/ssh-runner-blacksand.sh)
+ * and the servers' update requests (lib/files/blacksandHostUpdate.ts) all use these,
  * in accounts that never see this file, so the host and both roles can't move them.
  */
 export const HOST_LOCATIONS = {
-  T3BLACKOUT_APPS: "/Applications",
-  T3BLACKOUT_UPDATE_REQUESTS: "/Users/Shared/t3blackout/update-requests",
+  BLACKSAND_T3_APPS: "/Applications",
+  BLACKSAND_T3_UPDATE_REQUESTS: "/Users/Shared/blacksand/update-requests",
 };
 const ROOT = path.dirname(path.dirname(fs.realpathSync(fileURLToPath(import.meta.url))));
 export const INSTALL_CONFIG = path.join(ROOT, "state", "install.json");
@@ -56,13 +56,13 @@ function isWithin(dir, root) {
 
 /**
  * Why `value` can't be location `key`, or null. Each must be absolute (a
- * relative one would move with each run's working folder); T3BLACKOUT_HOME
- * can't be this clone or inside it, where its bin/t3blackout (the CLI shim)
+ * relative one would move with each run's working folder); BLACKSAND_T3_HOME
+ * can't be this clone or inside it, where its bin/t3 (the CLI shim)
  * would be the CLI itself.
  */
 function locationProblem(key, value) {
   if (typeof value !== "string" || !path.isAbsolute(value) || /[\0\n\r]/.test(value)) return `${key}=${value} isn't an absolute path`;
-  if (key === "T3BLACKOUT_HOME" && isWithin(value, ROOT)) return `T3BLACKOUT_HOME=${value} is this clone (${ROOT}) or inside it`;
+  if (key === "BLACKSAND_T3_HOME" && isWithin(value, ROOT)) return `BLACKSAND_T3_HOME=${value} is this clone (${ROOT}) or inside it`;
   return null;
 }
 
@@ -102,7 +102,7 @@ export function hostLocationProblem(role, env) {
 }
 
 /** Set to 1 by CI, or by hand in a development checkout that isn't an install: run upstream's code here, as you. */
-export const UNISOLATED_ENV = "T3BLACKOUT_UNISOLATED_BUILD";
+export const UNISOLATED_ENV = "BLACKSAND_T3_UNISOLATED_BUILD";
 /** What only an install leaves in state/: builds installed or staged, a schedule. */
 export const INSTALL_STATE = ["current.json", "previous.json", "pending.json", "activation.json", "schedule.json"];
 
@@ -126,7 +126,7 @@ export function buildAsYouProblem(config, { env = process.env, state = path.dirn
 
 /** Throws unless `config` is what saveInstallConfig writes: a known role, and each location absent, null or an absolute path. */
 export function validateInstallConfig(config, file = INSTALL_CONFIG) {
-  const bad = (why) => new Error(`${file} is invalid (${why}); rerun ./install.sh, or bin/t3blackout configure --role ui|host|both`);
+  const bad = (why) => new Error(`${file} is invalid (${why}); rerun ./install.sh, or blacksand t3 configure --role ui|host|both`);
   if (!config || typeof config !== "object" || Array.isArray(config)) throw bad("not a JSON object");
   if (!ROLES.includes(config.role)) throw bad(`unknown role ${JSON.stringify(config.role)}`);
   if ("unisolatedBuild" in config && typeof config.unisolatedBuild !== "boolean") throw bad(`unisolatedBuild is ${JSON.stringify(config.unisolatedBuild)}, not true or false`);
@@ -148,13 +148,13 @@ export function readInstallConfig(file = INSTALL_CONFIG) {
     text = fs.readFileSync(file, "utf8");
   } catch (error) {
     if (error.code === "ENOENT") return null;
-    throw new Error(`can't read ${file} (${error.code ?? error.message}); rerun ./install.sh, or bin/t3blackout configure --role ui|host|both`);
+    throw new Error(`can't read ${file} (${error.code ?? error.message}); rerun ./install.sh, or blacksand t3 configure --role ui|host|both`);
   }
   let config;
   try {
     config = JSON.parse(text);
   } catch (error) {
-    throw new Error(`${file} isn't valid JSON (${error.message}); rerun ./install.sh, or bin/t3blackout configure --role ui|host|both`);
+    throw new Error(`${file} isn't valid JSON (${error.message}); rerun ./install.sh, or blacksand t3 configure --role ui|host|both`);
   }
   return validateInstallConfig(config, file);
 }
@@ -186,7 +186,7 @@ export function saveInstallConfig({ role, unisolatedBuild = false, env = startEn
   try {
     previous = readInstallConfig(file);
   } catch (error) {
-    if (!role) throw new Error(`${error.message.replace(/; rerun .*$/, "")}; give the role: bin/t3blackout configure --role ui|host|both`);
+    if (!role) throw new Error(`${error.message.replace(/; rerun .*$/, "")}; give the role: blacksand t3 configure --role ui|host|both`);
   }
   const chosen = role ?? previous?.role ?? "ui";
   if (!ROLES.includes(chosen)) throw new Error(`unknown role ${chosen} (ui, host or both)`);

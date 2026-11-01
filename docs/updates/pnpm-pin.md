@@ -24,4 +24,4 @@ Raise the pin once that pnpm is at least 3 days old:
 
 A pnpm whose bytes don't match the pin is refused the same way; rerunning
 `packages/t3/install.sh` reinstalls it. To check the pinned digests online, run the test suite
-with `T3BLACKOUT_PNPM_DIGESTS_ONLINE=1` ([testing](../security/testing.md)).
+with `BLACKSAND_T3_PNPM_DIGESTS_ONLINE=1` ([testing](../security/testing.md)).

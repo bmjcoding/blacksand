@@ -9,12 +9,12 @@ export function unpinnedProblem(pin, channel, { unpinned = false, soakHours }) {
   if (!pin || pin.channels[channel] || unpinned) return null;
   const pinned = Object.keys(pin.channels);
   return (
-    `the ${channel} channel has no evaluated release in pin.json, so T3 Blackout won't build it; ` +
+    `the ${channel} channel has no evaluated release in pin.json, so Blacksand T3 won't build it; ` +
     `switch the update track to ${pinned.join(" or ") || "a pinned channel"}, or pass --unpinned to build its newest release ${soakHours}h old without the evaluator's gates`
   );
 }
 
-/** What `channel` builds and which gates chose it, for `t3blackout status`. */
+/** What `channel` builds and which gates chose it, for `blacksand t3 status`. */
 export function channelPolicy(pin, channel, { soakHours, minAgeDays }) {
   if (!pin) return `${channel}: no pin.json, so the newest release ${soakHours}h old, without the evaluator's gates`;
   const entry = pin.channels[channel];

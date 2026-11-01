@@ -27,12 +27,12 @@ import { launchdUpdateJob } from "./jobs.mjs";
 /**
  * Where the app installs: /Applications when this account can write it (an admin
  * can), so every account on the Mac runs the same build: the desktop, and the
- * agent accounts SSH starts servers in (lib/files/ssh-runner-blackout.sh looks
- * there first). Otherwise your own ~/Applications. T3BLACKOUT_APPS overrides, for
+ * agent accounts SSH starts servers in (lib/files/ssh-runner-blacksand.sh looks
+ * there first). Otherwise your own ~/Applications. BLACKSAND_T3_APPS overrides, for
  * the ui role only: agent accounts look in /Applications (lib/install-config.mjs).
  */
 function appsDir() {
-  if (process.env.T3BLACKOUT_APPS) return process.env.T3BLACKOUT_APPS;
+  if (process.env.BLACKSAND_T3_APPS) return process.env.BLACKSAND_T3_APPS;
   try {
     fs.accessSync("/Applications", fs.constants.W_OK);
     return "/Applications";
@@ -42,13 +42,13 @@ function appsDir() {
 }
 
 const APPS = appsDir();
-const APP = path.join(APPS, "T3 Blackout.app");
-const APP_STAGED = path.join(APPS, ".T3 Blackout.new.app");
+const APP = path.join(APPS, "Blacksand T3.app");
+const APP_STAGED = path.join(APPS, ".Blacksand T3.new.app");
 // A verified build waiting for the running app to restart.
-const APP_PENDING = path.join(APPS, ".T3 Blackout.pending.app");
-const APP_PREVIOUS = path.join(APPS, ".T3 Blackout.previous.app");
-const APP_OUTGOING = path.join(APPS, ".T3 Blackout.outgoing.app");
-const UPDATE_LABEL = "dev.t3blackout.update";
+const APP_PENDING = path.join(APPS, ".Blacksand T3.pending.app");
+const APP_PREVIOUS = path.join(APPS, ".Blacksand T3.previous.app");
+const APP_OUTGOING = path.join(APPS, ".Blacksand T3.outgoing.app");
+const UPDATE_LABEL = "dev.blacksand.update";
 // The host role's updater: a LaunchDaemon running as you, so it keeps running
 // with nobody logged in (agent accounts' sessions don't keep yours alive).
 const DAEMON_PLIST = `/Library/LaunchDaemons/${UPDATE_LABEL}.plist`;
@@ -57,8 +57,8 @@ const SHARED_DIR = path.dirname(UPDATE_REQUESTS);
 
 const SIGNING_KEYCHAIN = path.join(STATE, "signing.keychain-db");
 const SIGNING_KEYCHAIN_PASS = path.join(STATE, "signing.keychain-pass");
-const SIGNING_CN = "T3 Blackout Local Signing";
-const OP_ITEM = "T3 Blackout code signing";
+const SIGNING_CN = "Blacksand T3 Local Signing";
+const OP_ITEM = "Blacksand T3 code signing";
 // The p12 only ever travels inside 1Password, which is what protects it; this
 // passphrase exists because `security import` rejects passphrase-less p12s.
 const P12_PASSPHRASE = "t3blackout";
@@ -95,7 +95,7 @@ function chainsToApple({ hash }) {
   const signing = pemsIn(SIGNING_KEYCHAIN);
   const leaf = new RegExp(`SHA-1 hash: ${hash}\\n(-----BEGIN CERTIFICATE-----[\\s\\S]+?-----END CERTIFICATE-----)`).exec(signing)?.[1];
   if (!leaf) return false;
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "t3blackout-chain-"));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "blacksand-chain-"));
   try {
     const only = (text) => (text.match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g) ?? []).join("\n") + "\n";
     fs.writeFileSync(path.join(tmp, "leaf.pem"), leaf + "\n");
@@ -133,7 +133,7 @@ function signingIdentity() {
 function sign(appPath) {
   const identity = signingIdentity();
   if (!identity) {
-    log("no signing identity (run `t3blackout signing adopt` or `signing import`); signing ad-hoc, Keychain will re-prompt after this update");
+    log("no signing identity (run `blacksand t3 signing adopt` or `signing import`); signing ad-hoc, Keychain will re-prompt after this update");
     childProcess.spawnSync("codesign", ["--force", "--deep", "--sign", "-", appPath], { stdio: "ignore" });
     return;
   }
@@ -280,18 +280,18 @@ function adoptAppleIdentity(tmp, vaultArgs) {
   fs.writeFileSync(certPem, cert.pem);
   fs.writeFileSync(keyPem, key.pem, { mode: 0o600 });
   fs.writeFileSync(chainPem, findIssuer(certPem, tmp));
-  const p12 = path.join(tmp, "t3blackout-signing.p12");
+  const p12 = path.join(tmp, "blacksand-signing.p12");
   openssl(["pkcs12", "-export", "-inkey", keyPem, "-in", certPem, "-certfile", chainPem, "-name", name, "-out", p12, "-passout", `pass:${P12_PASSPHRASE}`]);
   const exists = childProcess.spawnSync("op", ["item", "get", OP_ITEM, ...vaultArgs], { stdio: "ignore" }).status === 0;
   log(`${exists ? "replacing" : "storing"} "${OP_ITEM}" in 1Password (approve in the 1Password app)`);
-  if (exists) run("op", ["document", "edit", OP_ITEM, p12, "--file-name", "t3blackout-signing.p12", ...vaultArgs]);
-  else run("op", ["document", "create", p12, "--title", OP_ITEM, "--file-name", "t3blackout-signing.p12", ...vaultArgs]);
+  if (exists) run("op", ["document", "edit", OP_ITEM, p12, "--file-name", "blacksand-signing.p12", ...vaultArgs]);
+  else run("op", ["document", "create", p12, "--title", OP_ITEM, "--file-name", "blacksand-signing.p12", ...vaultArgs]);
   return p12;
 }
 
 function createSelfSigned(tmp, vaultArgs) {
   if (childProcess.spawnSync("op", ["item", "get", OP_ITEM, ...vaultArgs], { stdio: "ignore" }).status === 0) {
-    throw new Error(`"${OP_ITEM}" already exists in 1Password; use \`t3blackout signing import\``);
+    throw new Error(`"${OP_ITEM}" already exists in 1Password; use \`blacksand t3 signing import\``);
   }
   const cnf = path.join(tmp, "cert.cnf");
   fs.writeFileSync(
@@ -305,16 +305,16 @@ function createSelfSigned(tmp, vaultArgs) {
   );
   const key = path.join(tmp, "key.pem");
   const cert = path.join(tmp, "cert-init.pem");
-  const p12 = path.join(tmp, "t3blackout-signing.p12");
+  const p12 = path.join(tmp, "blacksand-signing.p12");
   openssl(["req", "-x509", "-newkey", "rsa:3072", "-nodes", "-keyout", key, "-out", cert, "-days", "3650", "-config", cnf]);
   openssl(["pkcs12", "-export", "-inkey", key, "-in", cert, "-out", p12, "-passout", `pass:${P12_PASSPHRASE}`]);
   log(`storing "${OP_ITEM}" in 1Password (approve in the 1Password app)`);
-  run("op", ["document", "create", p12, "--title", OP_ITEM, "--file-name", "t3blackout-signing.p12", ...vaultArgs]);
+  run("op", ["document", "create", p12, "--title", OP_ITEM, "--file-name", "blacksand-signing.p12", ...vaultArgs]);
   return p12;
 }
 
 async function cmdSigning(opts, sub) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "t3blackout-signing-"));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "blacksand-signing-"));
   try {
     if (sub === "status") {
       const identity = signingIdentity();
@@ -329,14 +329,14 @@ async function cmdSigning(opts, sub) {
     } else if (sub === "init") {
       p12 = createSelfSigned(tmp, vaultArgs);
     } else if (sub === "import") {
-      p12 = path.join(tmp, "t3blackout-signing.p12");
+      p12 = path.join(tmp, "blacksand-signing.p12");
       log(`fetching "${OP_ITEM}" from 1Password (approve in the 1Password app)`);
       run("op", ["document", "get", OP_ITEM, "--out-file", p12, ...vaultArgs]);
     } else {
-      throw new Error("usage: t3blackout signing adopt|import|init|status [--vault <name>]");
+      throw new Error("usage: blacksand t3 signing adopt|import|init|status [--vault <name>]");
     }
     installIdentity(p12);
-    console.log("Builds from the next `t3blackout update` on are signed with it.");
+    console.log("Builds from the next `blacksand t3 update` on are signed with it.");
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -353,7 +353,7 @@ function removeAgent(label) {
 
 /** Installs the root-owned daemon plist and (re)starts it; sudo asks for your password unless install.sh just did. */
 function installDaemon(content) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "t3blackout-daemon-"));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "blacksand-daemon-"));
   try {
     const file = path.join(tmp, path.basename(DAEMON_PLIST));
     fs.writeFileSync(file, content);
@@ -429,8 +429,8 @@ export default {
     return {
       tmpdir: stages.tmpdir,
       findArtifact() {
-        const [app] = findPaths([path.join(WORK, "release"), ...stages.ours()], (entry) => entry.isDirectory() && entry.name === "T3 Blackout.app");
-        if (!app) throw new Error("build finished but no 'T3 Blackout.app' was found");
+        const [app] = findPaths([path.join(WORK, "release"), ...stages.ours()], (entry) => entry.isDirectory() && entry.name === "Blacksand T3.app");
+        if (!app) throw new Error("build finished but no 'Blacksand T3.app' was found");
         return app;
       },
       cleanup: stages.cleanup,
@@ -456,7 +456,7 @@ export default {
   afterActivate() {},
 
   launch() {
-    if (!fs.existsSync(APP)) throw new Error(`${APP} is not installed; run \`t3blackout update\` first`);
+    if (!fs.existsSync(APP)) throw new Error(`${APP} is not installed; run \`blacksand t3 update\` first`);
     // `open` hands the app the caller's environment; drop what a shell inside the
     // official T3 Code carries (ELECTRON_RUN_AS_NODE would start it as plain Node).
     const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^(ELECTRON_|T3CODE_)/.test(key)));
@@ -508,13 +508,13 @@ export default {
     return loaded(`gui/${process.getuid()}/${UPDATE_LABEL}`) ? "LaunchAgent" : false;
   },
 
-  /** Servers in agent accounts can't fetch this; they copy what the updater publishes (lib/files/ssh-runner-blackout.sh). */
+  /** Servers in agent accounts can't fetch this; they copy what the updater publishes (lib/files/ssh-runner-blacksand.sh). */
   shareWithAccounts: (name, content) => publishShared(SHARED_DIR, name, content),
 
   requestsDir: UPDATE_REQUESTS,
 
   notify(title, message) {
-    if (process.env.T3BLACKOUT_HEADLESS) return;
+    if (process.env.BLACKSAND_T3_HEADLESS) return;
     childProcess.spawnSync("osascript", [
       "-e",
       `display notification ${JSON.stringify(message)} with title ${JSON.stringify(title)}`,
@@ -523,7 +523,7 @@ export default {
 
   statusLines() {
     const identity = signingIdentity();
-    if (!identity) return ["signing:   ad-hoc (run `t3blackout signing adopt` or `signing import`)"];
+    if (!identity) return ["signing:   ad-hoc (run `blacksand t3 signing adopt` or `signing import`)"];
     const note = APPLE_IDENTITY.test(identity.name) ? "" : " (self-signed: Keychain prompts after each update)";
     return [`signing:   ${identity.name} (${identity.hash.slice(0, 10)})${note}`];
   },

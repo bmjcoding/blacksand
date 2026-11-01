@@ -10,8 +10,8 @@ privacy controls block daemons from those folders.
 
 ```sh
 mkdir -p ~/src && cd ~/src
-git clone https://github.com/bmjcoding/t3blackout.git
-cd t3blackout
+git clone https://github.com/bmjcoding/blacksand.git
+cd blacksand
 ```
 
 That URL is this repository; use your fork's if you run one. Clone in full, never
@@ -29,7 +29,7 @@ those. In the fresh clone only (never a working development clone), run:
 ```sh
 (
   set -euo pipefail
-  read -r "T3B_RECORDED_HEAD?Paste the full recorded t3blackout HEAD: "
+  read -r "T3B_RECORDED_HEAD?Paste the full recorded blacksand HEAD: "
   [[ "$T3B_RECORDED_HEAD" =~ ^[0-9a-f]{40}$ ]]
   test -z "$(git status --porcelain)"
   git switch -C main "$T3B_RECORDED_HEAD"
@@ -77,7 +77,7 @@ To push from a clone over SSH, set a push URL. You can use your SSH host alias i
 place of `github.com`.
 
 ```sh
-git remote set-url --push origin git@github.com:<owner>/t3blackout.git
+git remote set-url --push origin git@github.com:<owner>/blacksand.git
 ```
 
 Don't add `url.*.insteadOf`, `pushInsteadOf`, `http.*`, `credential.*`, proxy or

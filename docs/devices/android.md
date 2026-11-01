@@ -126,4 +126,4 @@ Then turn on **Developer options → USB debugging**. Connect it to the Mac whos
 environment uses it, and accept the computer's key on the phone. `ssh
 agent-claude@localhost 'adb devices'` lists it as `device`; upstream streams physical
 Android devices with scrcpy. Don't use wireless debugging (`adb pair`, `adb tcpip`):
-it opens adb to your local network. This hasn't been tried with T3 Blackout yet.
+it opens adb to your local network. This hasn't been tried with Blacksand T3 yet.

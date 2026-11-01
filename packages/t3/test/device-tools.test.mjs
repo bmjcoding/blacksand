@@ -273,7 +273,7 @@ test("the app installs device tools from the kept closures, with npm ci and no i
   const local = rules.find((rule) => rule.id === "server/device-tools-frozen");
   const ssh = rules.find((rule) => rule.id === "server/device-tools-frozen-ssh");
   const replaced = (rule) => rule.edits.map((edit) => edit.replace).join("\n");
-  assert.match(replaced(local), /BLACKOUT_DEVICE_TOOL_LOCKS[^=]*= \{"agent-device@0\.21\.31"/);
+  assert.match(replaced(local), /BLACKSAND_DEVICE_TOOL_LOCKS[^=]*= \{"agent-device@0\.21\.31"/);
   assert.match(replaced(local), /\["ci", "--ignore-scripts", "--no-fund", "--no-audit"\]/);
   assert.match(replaced(local), new RegExp(`--package=${NPM_FALLBACK}`));
   assert.doesNotMatch(replaced(local), /npm@11"/);

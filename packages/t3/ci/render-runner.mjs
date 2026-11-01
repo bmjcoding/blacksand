@@ -1,10 +1,10 @@
 // CI: the SSH runner as the remote shell receives it, for `sh -n` and
-// ShellCheck. lib/files/ssh-runner-blackout.sh is pasted into a TypeScript
+// ShellCheck. lib/files/ssh-runner-blacksand.sh is pasted into a TypeScript
 // template literal in upstream's packages/ssh/src/tunnel.ts (rule
-// ssh/runner-installed-blackout-only), so its text is template source: `\${`
+// ssh/runner-installed-blacksand-only), so its text is template source: `\${`
 // and `\\n` are escapes, and an unescaped `${` or backtick would break the
 // template. Rendering decodes it the way JavaScript does.
-//   node packages/t3/ci/render-runner.mjs fragment <ssh-runner-blackout.sh> <out>
+//   node packages/t3/ci/render-runner.mjs fragment <ssh-runner-blacksand.sh> <out>
 //   node packages/t3/ci/render-runner.mjs tunnel <stripped tunnel.ts> <out>   (the whole runner)
 
 import * as fs from "node:fs";

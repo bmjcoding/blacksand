@@ -110,8 +110,8 @@ export const readAttempts = (file) =>
 export async function smokeTest() {
   log(`smoke test: booting the built server with the network tripwire (its startup, ${OBSERVE_MS / 1000} s, empty profile)`);
   const entry = path.join(WORK, "apps", "server", "dist", "bin.mjs");
-  if (!fs.existsSync(entry)) throw new Error(`no built server at ${entry}; run \`t3blackout update\``);
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), "t3blackout-smoke-"));
+  if (!fs.existsSync(entry)) throw new Error(`no built server at ${entry}; run \`blacksand t3 update\``);
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "blacksand-smoke-"));
   const tripLog = path.join(home, "tripwire.jsonl");
   // Everything after the folder exists is inside the try, so it's always removed.
   let out = null;
@@ -129,11 +129,11 @@ export async function smokeTest() {
         TMPDIR: os.tmpdir(),
         PATH: "/usr/bin:/bin:/usr/sbin:/sbin",
         NODE_OPTIONS: tripwireOptions(),
-        T3BLACKOUT_TRIPWIRE_LOG: tripLog,
+        BLACKSAND_T3_TRIPWIRE_LOG: tripLog,
       },
       out,
       check: (html) => {
-        if (!html.includes('http-equiv="Content-Security-Policy"')) throw new Error("served index.html is missing the t3blackout CSP");
+        if (!html.includes('http-equiv="Content-Security-Policy"')) throw new Error("served index.html is missing the blacksand CSP");
       },
     });
     attempts = readAttempts(tripLog);

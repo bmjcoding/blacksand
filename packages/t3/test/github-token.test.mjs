@@ -1,5 +1,5 @@
 // node --test test/: the GitHub API token lib/advisories.mjs sends (lib/github-token.mjs).
-// It goes to api.github.com alone; it reaches the Blackout processes that need it
+// It goes to api.github.com alone; it reaches the Blacksand processes that need it
 // (the lock-holding rerun, the build account) as a one-shot 0600 file, never in an
 // environment, and nothing they start inherits it; a file others could read, or
 // another account's, isn't used, and says why.
@@ -48,13 +48,13 @@ const reset = () => {
 };
 
 test("the token goes to api.github.com alone, a redirect is followed only inside it, and no child process inherits it", async () => {
-  process.env.T3BLACKOUT_GITHUB_TOKEN = "test-token-not-a-secret";
+  process.env.BLACKSAND_T3_GITHUB_TOKEN = "test-token-not-a-secret";
   try {
     const moved = "https://api.github.com/repositories/1146193768/security-advisories?state=published&per_page=100";
     const calls = mockFetch((url, init) => (url === REPO_URL ? new Response("", { status: 301, headers: { location: moved } }) : url === moved ? json(REPO_ADVISORIES.body) : recorded(url, init)));
     const scan = await scanAdvisories(["agent-device@0.21.31"], { watch: ["agent-device"], meta });
     assert.equal(scan.advisories.length, 2, "followed the rename");
-    assert.equal(process.env.T3BLACKOUT_GITHUB_TOKEN, undefined, "taken out of the environment");
+    assert.equal(process.env.BLACKSAND_T3_GITHUB_TOKEN, undefined, "taken out of the environment");
     assert.equal(scan.sources[1].authenticated, true);
     for (const call of calls) {
       const github = new URL(call.url).origin === "https://api.github.com";
@@ -68,7 +68,7 @@ test("the token goes to api.github.com alone, a redirect is followed only inside
   }
 });
 
-/** A Blackout child: takes the token as the CLI does at startup, and reports what it and its own child see. */
+/** A Blacksand child: takes the token as the CLI does at startup, and reports what it and its own child see. */
 function childScript(dir) {
   const file = path.join(dir, "child.mjs");
   fs.writeFileSync(
@@ -78,14 +78,14 @@ function childScript(dir) {
       `import * as fs from "node:fs";`,
       `const handed = process.env.${TOKEN_FILE_ENV};`,
       `const { githubToken, githubTokenProblem } = await import(${JSON.stringify(TOKEN_MODULE)});`,
-      `const grandchild = spawnSync(process.execPath, ["-e", "console.log(JSON.stringify(Object.keys(process.env).filter((k) => k.startsWith('T3BLACKOUT_GITHUB'))))"], { encoding: "utf8" });`,
-      `console.log(JSON.stringify({ token: githubToken(), problem: githubTokenProblem(), envAfter: Object.keys(process.env).filter((k) => k.startsWith("T3BLACKOUT_GITHUB")), fileLeft: handed ? fs.existsSync(handed) : null, grandchild: JSON.parse(grandchild.stdout) }));`,
+      `const grandchild = spawnSync(process.execPath, ["-e", "console.log(JSON.stringify(Object.keys(process.env).filter((k) => k.startsWith('BLACKSAND_T3_GITHUB'))))"], { encoding: "utf8" });`,
+      `console.log(JSON.stringify({ token: githubToken(), problem: githubTokenProblem(), envAfter: Object.keys(process.env).filter((k) => k.startsWith("BLACKSAND_T3_GITHUB")), fileLeft: handed ? fs.existsSync(handed) : null, grandchild: JSON.parse(grandchild.stdout) }));`,
     ].join("\n"),
   );
   return file;
 }
 
-test("the token reaches a Blackout child as a one-shot 0600 file, never its environment; what that child starts sees nothing", async () => {
+test("the token reaches a Blacksand child as a one-shot 0600 file, never its environment; what that child starts sees nothing", async () => {
   const dir = scratch();
   try {
     process.env[TOKEN_ENV] = "ghs_handoffTestTokenNotASecret";
@@ -95,7 +95,7 @@ test("the token reaches a Blackout child as a one-shot 0600 file, never its envi
     const file = handoff.env[TOKEN_FILE_ENV];
     assert.equal(fs.statSync(file).mode & 0o777, 0o600);
     assert.equal(fs.statSync(path.dirname(file)).mode & 0o777, 0o700);
-    // As bin/t3blackout's rerunHoldingLock does: the lock on fd 3, the token as a file.
+    // As bin/t3's rerunHoldingLock does: the lock on fd 3, the token as a file.
     const release = await tryLock(path.join(dir, "update.lock"));
     const child = spawnSync(process.execPath, [childScript(dir)], { env: { ...process.env, ...handoff.env }, encoding: "utf8" });
     assert.equal(child.status, 0, child.stderr);
@@ -156,9 +156,9 @@ test("the build account's runs and the CI build get the token too", () => {
   const workflow = fs.readFileSync(new URL("../../../.github/workflows/build.yml", import.meta.url), "utf8");
   const step = /- name: Build the pinned release\n {8}env:\n((?: {10}\S[^\n]*\n)+) {8}run:/.exec(workflow);
   assert.ok(step, "build.yml's build step and its env");
-  assert.match(step[1], /^ {10}T3BLACKOUT_GITHUB_TOKEN: \$\{\{ github\.token \}\}$/m);
+  assert.match(step[1], /^ {10}BLACKSAND_T3_GITHUB_TOKEN: \$\{\{ github\.token \}\}$/m);
   assert.match(workflow, /^permissions:\n {2}contents: read\n/m, "a read-only job token");
-  const bin = fs.readFileSync(fileURLToPath(new URL("../bin/t3blackout", import.meta.url)), "utf8");
+  const bin = fs.readFileSync(fileURLToPath(new URL("../bin/t3", import.meta.url)), "utf8");
   assert.match(bin, /token = githubTokenHandoff\(\);[\s\S]*runHoldingLock\(release, process\.execPath, \[LAUNCHER, \.\.\.process\.argv\.slice\(2\)\], \{ env: \{ \.\.\.process\.env, \.\.\.\(token\?\.env \?\? \{\}\) \} \}\)/);
 });
 

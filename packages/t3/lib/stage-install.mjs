@@ -80,7 +80,7 @@ export function findOnPath(name, pathValue, skip) {
 
 /**
  * Writes the shims into `dir` and returns the env the packager runs with: PATH
- * leading with them, the guard command the rule runs (T3BLACKOUT_STAGE_GUARD),
+ * leading with them, the guard command the rule runs (BLACKSAND_T3_STAGE_GUARD),
  * and where the real tools, the stage folder, the verified lockfile and the
  * install record are. `stageRoot`: the build's private TMPDIR. `real`: tools
  * given by absolute path instead of found on PATH (install.sh's pnpm).
@@ -90,18 +90,18 @@ export function shimEnv({ dir, env, stageRoot, verifiedLock, record, node = proc
   const script = fileURLToPath(import.meta.url);
   const realTools = {};
   for (const tool of SHIMMED) {
-    realTools[`T3BLACKOUT_REAL_${tool.toUpperCase()}`] = real[tool] ?? findOnPath(tool, env.PATH, dir) ?? "";
+    realTools[`BLACKSAND_T3_REAL_${tool.toUpperCase()}`] = real[tool] ?? findOnPath(tool, env.PATH, dir) ?? "";
     fs.writeFileSync(path.join(dir, tool), `#!/bin/sh\nexec ${shellQuote(node)} ${shellQuote(script)} ${tool} "$@"\n`, { mode: 0o755 });
   }
   return {
     ...env,
     ...realTools,
     PATH: `${dir}:${env.PATH ?? ""}`,
-    T3BLACKOUT_STAGE_GUARD: JSON.stringify([node, script, "guard"]),
-    T3BLACKOUT_SHIM_DIR: dir,
-    T3BLACKOUT_STAGE_ROOT: stageRoot,
-    T3BLACKOUT_VERIFIED_LOCK: verifiedLock,
-    T3BLACKOUT_STAGE_RECORD: record,
+    BLACKSAND_T3_STAGE_GUARD: JSON.stringify([node, script, "guard"]),
+    BLACKSAND_T3_SHIM_DIR: dir,
+    BLACKSAND_T3_STAGE_ROOT: stageRoot,
+    BLACKSAND_T3_VERIFIED_LOCK: verifiedLock,
+    BLACKSAND_T3_STAGE_RECORD: record,
   };
 }
 
@@ -138,7 +138,7 @@ export function releaseAgeConfig(verified, minDays = MIN_AGE_DAYS) {
   const exclude = [...byName].sort(([a], [b]) => a.localeCompare(b)).map(([name, versions]) => `  - ${JSON.stringify(`${name}@${versions.join(" || ")}`)}`);
   return [
     "",
-    "# t3blackout (lib/stage-install.mjs): nothing younger than the minimum age but versions already checked.",
+    "# blacksand (lib/stage-install.mjs): nothing younger than the minimum age but versions already checked.",
     `minimumReleaseAge: ${Math.ceil(minDays * 1440)}`,
     "minimumReleaseAgeStrict: true",
     ...(exclude.length ? ["minimumReleaseAgeExclude:", ...exclude] : []),
@@ -256,19 +256,19 @@ export async function guardedInstall(dir, env = process.env, { installer = () =>
   // First, before anything in the stage is touched; again before each run, since
   // each one runs the stage's own code (a .pnpmfile.cjs, say) that could replace it.
   installer();
-  const root = real(env.T3BLACKOUT_STAGE_ROOT ?? "/nonexistent");
+  const root = real(env.BLACKSAND_T3_STAGE_ROOT ?? "/nonexistent");
   if (!inside(root, dir)) throw new Error(`the staged install in ${dir} isn't in the build's private temp folder`);
-  if (readStageRecords(env.T3BLACKOUT_STAGE_RECORD).some((done) => done.dir === real(dir))) throw new Error(`${dir} was already installed once; upstream changed how it stages the app`);
+  if (readStageRecords(env.BLACKSAND_T3_STAGE_RECORD).some((done) => done.dir === real(dir))) throw new Error(`${dir} was already installed once; upstream changed how it stages the app`);
   if (fs.existsSync(path.join(dir, "node_modules")) || fs.existsSync(path.join(dir, "pnpm-lock.yaml"))) throw new Error(`${dir} already has dependencies or a lockfile before its checked install`);
   const yaml = path.join(dir, "pnpm-workspace.yaml");
   const config = fs.existsSync(yaml) ? fs.readFileSync(yaml, "utf8") : "";
   // Settings that would loosen the check: upstream setting them itself means it changed how it stages.
   const loosening = /^(?:minimumReleaseAge\w*|trustLockfile|ignoreScripts|dangerouslyAllowAllBuilds|registry|registries)\s*:/m.exec(config);
   if (loosening) throw new Error(`upstream's staged pnpm-workspace.yaml now sets ${loosening[0].replace(/\s*:$/, "")}; update lib/stage-install.mjs`);
-  const verified = fs.readFileSync(env.T3BLACKOUT_VERIFIED_LOCK, "utf8");
+  const verified = fs.readFileSync(env.BLACKSAND_T3_VERIFIED_LOCK, "utf8");
   fs.writeFileSync(yaml, `${config.replace(/\n*$/, "\n")}${releaseAgeConfig(lockPackages(verified))}`);
   // The pinned pnpm, and whatever it runs, without these shims in the way.
-  const childEnv = { ...env, PATH: (env.PATH ?? "").split(":").filter((p) => path.resolve(p) !== path.resolve(env.T3BLACKOUT_SHIM_DIR)).join(":") };
+  const childEnv = { ...env, PATH: (env.PATH ?? "").split(":").filter((p) => path.resolve(p) !== path.resolve(env.BLACKSAND_T3_SHIM_DIR)).join(":") };
   const step = (args, what) => {
     const result = runReal("pnpm", installer(), args, { cwd: dir, env: childEnv });
     if (result.status !== 0) throw new Error(`${what} failed (${result.status ?? result.signal})`);
@@ -282,8 +282,8 @@ export async function guardedInstall(dir, env = process.env, { installer = () =>
   step(["install", "--prod", "--frozen-lockfile"], "installing the checked staged lockfile");
   if (fs.readFileSync(path.join(dir, "pnpm-lock.yaml"), "utf8") !== lock) throw new Error(`installing ${dir} changed the lockfile it checked`);
   const digest = stageDigest(dir);
-  fs.appendFileSync(env.T3BLACKOUT_STAGE_RECORD, `${JSON.stringify({ dir: real(dir), digest, packages: packages.size, added, lock, files: stageContents(dir) })}\n`);
-  console.log(`t3blackout: staged production install checked: ${packages.size} packages, ${added.length} not in the verified lockfile, all at least ${MIN_AGE_DAYS} days old`);
+  fs.appendFileSync(env.BLACKSAND_T3_STAGE_RECORD, `${JSON.stringify({ dir: real(dir), digest, packages: packages.size, added, lock, files: stageContents(dir) })}\n`);
+  console.log(`blacksand: staged production install checked: ${packages.size} packages, ${added.length} not in the verified lockfile, all at least ${MIN_AGE_DAYS} days old`);
 }
 
 /**
@@ -341,12 +341,12 @@ export async function main(tool, args, { cwd = process.cwd(), env = process.env,
     return 0;
   }
   if (!SHIMMED.includes(tool)) throw new Error(`no shim for ${tool}`);
-  if (classify(tool, args, cwd, env.T3BLACKOUT_STAGE_ROOT ?? "/nonexistent", env) === "refuse") {
-    console.error(`Error: t3blackout refused \`${tool} ${args.join(" ")}\` in the packager's stage: its only install is the checked one (lib/stage-install.mjs). Upstream changed how it stages the app; update lib/stage-install.mjs and the rule desktop/stage-install-guarded.`);
+  if (classify(tool, args, cwd, env.BLACKSAND_T3_STAGE_ROOT ?? "/nonexistent", env) === "refuse") {
+    console.error(`Error: blacksand refused \`${tool} ${args.join(" ")}\` in the packager's stage: its only install is the checked one (lib/stage-install.mjs). Upstream changed how it stages the app; update lib/stage-install.mjs and the rule desktop/stage-install-guarded.`);
     return 1;
   }
   // The packager's environment passes through upstream's code: a pnpm it names runs only if it's install.sh's.
-  const real = tool === "pnpm" ? verifiedPnpm({ file: env.T3BLACKOUT_REAL_PNPM ?? "" }) : env[`T3BLACKOUT_REAL_${tool.toUpperCase()}`];
+  const real = tool === "pnpm" ? verifiedPnpm({ file: env.BLACKSAND_T3_REAL_PNPM ?? "" }) : env[`BLACKSAND_T3_REAL_${tool.toUpperCase()}`];
   const result = runReal(tool, real, args, { env });
   if (result.error) throw result.error;
   if (result.signal) throw Object.assign(new Error(`${tool} was killed by ${result.signal}`), { signal: result.signal });
@@ -359,7 +359,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process
     (code) => process.exit(code),
     (error) => {
       if (error.signal) process.kill(process.pid, error.signal);
-      console.error(`Error: t3blackout: ${error.message}`);
+      console.error(`Error: blacksand: ${error.message}`);
       process.exit(1);
     },
   );

@@ -1,7 +1,7 @@
 // Runs the upstream half of an update (fetch, build, smoke test) as the
 // unprivileged BUILDER_USER, so dependency install and build scripts can't read
 // your home, keys or credentials. install.sh creates the account and a sudo rule,
-// "<you> ALL=(_t3blackout) NOPASSWD: ALL", which only lets you act as the
+// "<you> ALL=(_blacksand-build) NOPASSWD: ALL", which only lets you act as the
 // less-privileged account, never the reverse.
 //
 // The account can't read your clone, so each run gets a fresh copy of bin/, lib/
@@ -75,7 +75,7 @@ export function snapshotArchive({ root = ROOT, sha = null } = {}) {
   const pin = fs.existsSync(pinFile) ? fs.readFileSync(pinFile, "utf8") : null;
   const parsed = pin === null ? null : validatePin(JSON.parse(pin));
   const pinnedBy = (sha && Object.entries(parsed?.channels ?? {}).find(([, entry]) => entry.sha === sha)?.[0]) || null;
-  const extra = fs.mkdtempSync(path.join(os.tmpdir(), "t3blackout-snapshot-"));
+  const extra = fs.mkdtempSync(path.join(os.tmpdir(), "blacksand-snapshot-"));
   try {
     if (pin !== null) fs.writeFileSync(path.join(extra, PIN_FILE), pin);
     fs.writeFileSync(path.join(extra, SNAPSHOT_FILE), `${JSON.stringify({ sha, pin: pin === null ? null : digest(pin), pinnedBy })}\n`);
@@ -110,11 +110,11 @@ function syncCode(sha) {
   if (result.status !== 0) throw new Error(`couldn't copy the code to ${BUILDER_USER}: ${result.stderr}`);
 }
 
-/** What the app's update button runs; the build bakes it into BlackoutUpdater.ts. */
+/** What the app's update button runs; the build bakes it into BlacksandUpdater.ts. */
 const appUpdaterEnv = () => ({
-  T3BLACKOUT_APP_NODE: stableNodePath(),
-  T3BLACKOUT_APP_LAUNCHER: LAUNCHER,
-  T3BLACKOUT_APP_PATH: process.env.PATH ?? "/usr/bin:/bin",
+  BLACKSAND_T3_APP_NODE: stableNodePath(),
+  BLACKSAND_T3_APP_LAUNCHER: LAUNCHER,
+  BLACKSAND_T3_APP_PATH: process.env.PATH ?? "/usr/bin:/bin",
 });
 
 /**
@@ -149,7 +149,7 @@ function tokenForBuilder() {
 }
 
 /**
- * Runs `t3blackout <args> --json` as the build account; resolves when it exits
+ * Runs `blacksand <args> --json` as the build account; resolves when it exits
  * cleanly. A `--ref` that is a full commit id (build-artifact) is what the copied
  * code is bound to.
  */
@@ -162,16 +162,16 @@ export function runAsBuilder(args, { onEvent = () => {} } = {}) {
     HOME: BUILDER_HOME,
     TMPDIR: path.join(BUILDER_HOME, "tmp"),
     LANG: process.env.LANG ?? "en_US.UTF-8",
-    T3BLACKOUT_ROLE: "builder",
+    BLACKSAND_T3_ROLE: "builder",
     ...appUpdaterEnv(),
     ...(token?.env ?? {}),
   };
   const command = [
     "sudo", "-n", "-u", BUILDER_USER, "-H",
     "/usr/bin/env", ...Object.entries(env).map(([key, value]) => `${key}=${value}`),
-    builderNode(), path.join(BUILDER_HOME, "code", "bin", "t3blackout"), ...args, "--json",
+    builderNode(), path.join(BUILDER_HOME, "code", "bin", "t3"), ...args, "--json",
   ];
-  const logFile = path.join(STATE, "t3blackout.log");
+  const logFile = path.join(STATE, "blacksand-t3.log");
   return new Promise((resolve, reject) => {
     const child = spawn(command[0], command.slice(1), { stdio: ["ignore", "pipe", "inherit"], cwd: AS_BUILDER_CWD });
     let failure = null;
@@ -179,7 +179,7 @@ export function runAsBuilder(args, { onEvent = () => {} } = {}) {
       const event = parseEvent(line);
       if (!event) {
         console.log(line);
-        if (line.startsWith("[t3blackout ")) fs.appendFileSync(logFile, line.replace("[t3blackout ", "[t3blackout build ") + "\n");
+        if (line.startsWith("[blacksand-t3 ")) fs.appendFileSync(logFile, line.replace("[blacksand-t3 ", "[blacksand-t3 build ") + "\n");
         return;
       }
       if (event.type === "error") failure = event.message;

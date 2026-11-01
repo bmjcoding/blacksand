@@ -6,7 +6,7 @@ Report privately through GitHub: this repository's **Security** tab → **Report
 vulnerability**. Please don't open a public issue, pull request or discussion for
 a vulnerability.
 
-T3 Blackout has one maintainer. You can expect:
+Blacksand T3 has one maintainer. You can expect:
 
 - an acknowledgement within 7 days;
 - an assessment, and a planned fix or an explanation, once the report is
@@ -35,7 +35,7 @@ strip rules and the build's checks.
 
 Out of scope (report these upstream):
 
-- T3 Code itself, where the issue isn't caused by T3 Blackout's changes:
+- T3 Code itself, where the issue isn't caused by Blacksand T3's changes:
   [pingdotgg/t3code](https://github.com/pingdotgg/t3code)
 - the agent CLIs, Tailscale, macOS, Homebrew, npm packages and other third-party
   software

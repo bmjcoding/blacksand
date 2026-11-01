@@ -1,4 +1,4 @@
-// A look at a build before it's installed (`t3blackout preview`). Its server
+// A look at a build before it's installed (`blacksand t3 preview`). Its server
 // boots in the OS sandbox (lib/platform: no network but localhost, no writes
 // outside a scratch folder) with the tripwire loaded, against a copy of your
 // profile: your projects, threads and settings, not your secrets. It opens in a
@@ -99,7 +99,7 @@ async function untilClosed(chrome, signal) {
 export async function preview({ app, version, userdata, sandbox, signal }) {
   const chromeBinary = findChrome();
   if (!chromeBinary) throw new Error("the preview opens in Chrome or Chromium, and neither is installed");
-  const scratch = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "t3blackout-preview-")));
+  const scratch = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "blacksand-preview-")));
   let server = null;
   let chrome = null;
   try {
@@ -119,7 +119,7 @@ export async function preview({ app, version, userdata, sandbox, signal }) {
       wrap,
       preload: jail ? [SHIM] : [],
       env: {
-        ...(jail ? { T3BLACKOUT_PREVIEW_EXEC: JSON.stringify(jail.exec) } : {}),
+        ...(jail ? { BLACKSAND_T3_PREVIEW_EXEC: JSON.stringify(jail.exec) } : {}),
         TMPDIR: path.join(scratch, "tmp"),
         T3CODE_AUTO_BOOTSTRAP_PROJECT_FROM_CWD: "false",
         // Inside the sandbox the agent CLIs can be found, so their cards show as
@@ -133,7 +133,7 @@ export async function preview({ app, version, userdata, sandbox, signal }) {
     });
     await pairWindow(chrome, await windowPage(chrome), server.pairingUrl);
     log(`preview: ${version} is open; close its window to stop it`);
-    // The app's Preview button waits for this (blackoutDriftReport.ts).
+    // The app's Preview button waits for this (blacksandDriftReport.ts).
     emit({ type: "preview-open", version });
     await untilClosed(chrome, signal);
   } finally {

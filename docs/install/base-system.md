@@ -49,5 +49,5 @@ Check later with the verification rows in
 ## Linux
 
 Base hardening isn't covered here. Apply your distribution's own guidance (disk
-encryption, a firewall, automatic security updates, network time). T3 Blackout itself
+encryption, a firewall, automatic security updates, network time). Blacksand T3 itself
 needs only network time, sudo for the installer, and no HTTPS interception.

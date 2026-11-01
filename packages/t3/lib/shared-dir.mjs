@@ -1,4 +1,4 @@
-// The folder a Mac's accounts share with its updater (/Users/Shared/t3blackout):
+// The folder a Mac's accounts share with its updater (/Users/Shared/blacksand):
 // update-requests/, where servers in agent accounts drop a request (mode 1733:
 // any account may add one, only the owner may list or remove them), and the
 // pricing table the updater publishes for those servers. Every other account is

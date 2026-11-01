@@ -3,27 +3,27 @@
 > **Applies to:** every role, macOS and Linux. Host, SSH, phone and Screen Sharing
 > entries are macOS-only.
 
-The log of the last update is `state/t3blackout.log` in the clone (readable only by
+The log of the last update is `state/blacksand-t3.log` in the clone (readable only by
 you). On a host, `state/update.out.log` has the scheduled job's output.
 
 ## When the app won't start
 
 The app's startup error suggests these Terminal commands:
 
-- **Go back a build:** `~/.t3blackout/bin/t3blackout rollback` swaps in the build that
+- **Go back a build:** `blacksand t3 rollback` swaps in the build that
   was installed before this one. When the startup dialog offers it, its **Copy rollback
   command** button copies that line.
 - **Rebuild the release you're on:** quit the app, then run
-  `~/.t3blackout/bin/t3blackout update --force`. Plain `update` builds only when
-  there's a newer pin or a newer T3 Blackout commit. If the app is still running, the
-  build waits; `packages/t3/bin/t3blackout launch` installs it and opens the app.
+  `blacksand t3 update --force`. Plain `update` builds only when
+  there's a newer pin or a newer Blacksand T3 commit. If the app is still running, the
+  build waits; `blacksand t3 launch` installs it and opens the app.
 
 ## When an update fails
 
 You get a desktop notification, and the installed build is untouched. The update
 button offers the release again.
 
-- **A strict rule no longer matches:** upstream changed that code. `packages/t3/bin/t3blackout
+- **A strict rule no longer matches:** upstream changed that code. `blacksand t3
   drift` shows how; update the anchor in `packages/t3/lib/rules.mjs` ([upstream rules](updates/upstream-rules.md#fixing-a-rule)).
   Feature rules never fail an update; they're left out instead.
 - **The smoke test saw outbound traffic:** upstream added a network call. The host is
@@ -33,7 +33,7 @@ button offers the release again.
 - **An unknown host in upstream's source:** look at what talks to it (the error names
   the file and line). Then add a rule, or list it in `packages/t3/lib/known-hosts.txt` with a note.
 - **The typecheck failed outside a feature:** upstream changed an interface a strict
-  file uses, such as the updater interface `packages/t3/lib/files/BlackoutUpdater.ts` implements.
+  file uses, such as the updater interface `packages/t3/lib/files/BlacksandUpdater.ts` implements.
   Update that file to match.
 - **A device tool has no reviewed lockfile, or an unlisted install script:** the error
   says which ([device tools](building/device-tools.md)).
@@ -41,7 +41,7 @@ button offers the release again.
   something changed, removed or added files in the packager's staged install after the
   guard installed it, beyond what packaging is known to add. If upstream changed how it
   packages, look at the files named and update `stageChanges` in
-  `packages/t3/lib/stage-install.mjs`. "t3blackout refused … in the packager's stage" means
+  `packages/t3/lib/stage-install.mjs`. "blacksand refused … in the packager's stage" means
   upstream runs a new package-manager command there.
 - **New stock-T3 wording** (`stock/no-stock-guidance`): add a rule that replaces it,
   before `brand/name` in `packages/t3/lib/rules.mjs`.
@@ -54,10 +54,10 @@ button offers the release again.
   `state/github-token` lifts the limit ([advisory sources](updates/fast-lane.md#advisory-sources)).
 - **A network error fetching a native package's headers or binary** (node-pty's, say,
   `ETIMEDOUT`): rerun; nothing was installed.
-- **"Update not applied: the staged build was made with T3 Blackout …"** (or "staged
+- **"Update not applied: the staged build was made with Blacksand T3 …"** (or "staged
   build not installed" in the log after `launch`): the waiting build came from another
-  T3 Blackout commit than this clone's. The installed build keeps running.
-  `packages/t3/bin/t3blackout update`, or the next hourly run, rebuilds it.
+  Blacksand T3 commit than this clone's. The installed build keeps running.
+  `blacksand t3 update`, or the next hourly run, rebuilds it.
 - **Every git call fails, saying git is missing security fixes or is too old:** the
   `git` on this machine's `PATH` is older than 2.55.0 (Apple's came first, say). On
   macOS, `brew install git`, put Homebrew's `bin` first (the `eval` line in
@@ -74,11 +74,11 @@ button offers the release again.
   update or rollback finishes it, or puts the previous build back, first. If that stops
   with "`state/activation.json` is damaged (…)" or "says its build went in, but nothing
   is installed", the journal is one this install can't trust. Compare the app folders
-  (`T3 Blackout.app`, and the hidden `.T3 Blackout.previous`, `.outgoing`, `.new` and
-  `.pending` copies beside it) with `state/current.json` by hand, so that `T3
-  Blackout.app` is the build that file names. Then remove `state/activation.json`.
+  (`Blacksand T3.app`, and the hidden `.Blacksand T3.previous`, `.outgoing`, `.new` and
+  `.pending` copies beside it) with `state/current.json` by hand, so that `Blacksand
+  T3.app` is the build that file names. Then remove `state/activation.json`.
 - **Every command stops with an error about `state/install.json`:** the file is
-  unreadable or invalid. `packages/t3/bin/t3blackout configure --role ui` (or `host`, `both`)
+  unreadable or invalid. `blacksand t3 configure --role ui` (or `host`, `both`)
   writes a new one.
 - **Every command stops with "… is this clone (…) or inside it" or "… isn't an
   absolute path":** a location variable in the environment can't be used. Unset it, or
@@ -100,7 +100,7 @@ These appear in the log; only "refused" also notifies.
   Remove what it names (`git config --unset-all <key>` in the clone).
 - **"self-update skipped: couldn't fetch (origin isn't a github.com repository URL,
   …)":** origin is an SSH host alias or another non-GitHub URL. Run `git remote set-url
-  origin https://github.com/<owner>/t3blackout.git`, and keep an alias in the push URL
+  origin https://github.com/<owner>/blacksand.git`, and keep an alias in the push URL
   ([cloning](install/clone.md#origin-and-pushing)).
 - **Other "self-update skipped: couldn't …" lines:** github.com, the npm registry,
   OSV.dev or api.github.com wasn't reachable that run.
@@ -120,14 +120,14 @@ These appear in the log; only "refused" also notifies.
   ([prerequisites](getting-started/prerequisites.md#linux)), then rerun it.
 - **`signing init` fails over SSH with "The authorization was denied since no user
   interaction was possible":** run `install.sh` (or `signing init`) in Terminal at the Mac.
-- **"T3 Blackout is not installed on this host":** run `packages/t3/install.sh --role host`
+- **"Blacksand T3 is not installed on this host":** run `packages/t3/install.sh --role host`
   there. The app must be in `/Applications`.
-- **The host doesn't update:** check `packages/t3/bin/t3blackout status` (the schedule line),
-  `sudo launchctl print system/dev.t3blackout.update`, and the two logs. A clone inside
+- **The host doesn't update:** check `blacksand t3 status` (the schedule line),
+  `sudo launchctl print system/dev.blacksand.update`, and the two logs. A clone inside
   `~/Documents`, `~/Desktop` or `~/Downloads` is blocked for the daemon: move it and
   rerun `packages/t3/install.sh --role host`.
-- **"This host has no T3 Blackout update agent":** the host's request folder is
-  missing. Run `packages/t3/bin/t3blackout schedule` as the installing admin there.
+- **"This host has no Blacksand T3 update agent":** the host's request folder is
+  missing. Run `blacksand t3 schedule` as the installing admin there.
 
 ## SSH
 
@@ -135,8 +135,8 @@ These appear in the log; only "refused" also notifies.
   agent-claude@t3b-host` shows which keys were offered. Usually `~/.ssh/config` lacks
   the `IdentityAgent` line or the `Host t3b-host localhost 127.0.0.1 ::1` block, your
   agent is locked, or the account script authorized a different key. Rerun it with
-  `--key ~/.ssh/t3blackout.pub` ([your SSH key](accounts/agent-accounts.md#your-ssh-key)).
-- **`WARNING: UNPROTECTED PRIVATE KEY FILE!` … `t3blackout.pub` … `bad permissions`,
+  `--key ~/.ssh/blacksand.pub` ([your SSH key](accounts/agent-accounts.md#your-ssh-key)).
+- **`WARNING: UNPROTECTED PRIVATE KEY FILE!` … `blacksand.pub` … `bad permissions`,
   then `Permission denied`:** ssh couldn't reach your agent, so it tried the `.pub`
   file as a private key. Unlock the agent, and check the config.
 - **Logins refused for a while after several failures:** sshd's per-source penalties
@@ -161,16 +161,16 @@ These appear in the log; only "refused" also notifies.
   console and rename the new one.
 - **The host dropped off after weeks:** its key expired. Disable key expiry and
   re-authenticate it ([Tailscale](networking/tailscale.md#the-host-tailscaled-as-a-system-daemon)).
-- **The standby sshd isn't listening:** read `/var/log/dev.t3blackout.sshd.log`, and
+- **The standby sshd isn't listening:** read `/var/log/dev.blacksand.sshd.log`, and
   rerun its account script.
 
 ## Agent accounts and providers
 
-- **"T3 Blackout sets up no background service, so remove this one with `t3 service
+- **"Blacksand T3 sets up no background service, so remove this one with `t3 service
   uninstall`":** an upstream `t3` background service is still installed in that
   account. Do what it says, as that account.
 - **"…server.env must belong to you and be readable only by you":** run
-  `/usr/local/libexec/t3blackout/set-claude-token` again as that account.
+  `/usr/local/libexec/blacksand/set-claude-token` again as that account.
 - **Claude says it isn't logged in over SSH:** there's no token in `server.env`. A
   Keychain login doesn't work over SSH ([providers](accounts/providers.md#sign-in)).
 - **A provider shows as not installed:** its CLI isn't on the login shell's `PATH`.
@@ -182,16 +182,16 @@ These appear in the log; only "refused" also notifies.
 - **Settings won't update a provider, "…installed with bun/yarn/Volta/Vite+, which
   can't hold its dependencies to the 3-day minimum release age":** reinstall that CLI
   with npm.
-- **An ACP Registry agent "isn't supported in T3 Blackout":** it ships only a prebuilt
-  binary. T3 Blackout installs agents only from npm or PyPI packages (`npx`, `uvx`;
+- **An ACP Registry agent "isn't supported in Blacksand T3":** it ships only a prebuilt
+  binary. Blacksand T3 installs agents only from npm or PyPI packages (`npx`, `uvx`;
   `brew install uv` for the latter).
 - **The desktop says the account's server is still starting:** the phone service's
   server is starting or restarting after an update. Wait a minute and reconnect; its
-  log is in that account's `~/.t3blackout/phone/`.
-- **"T3 Blackout server … still runs a build this host has replaced and did not stop;
+  log is in that account's `~/.blacksand/t3/phone/`.
+- **"Blacksand T3 server … still runs a build this host has replaced and did not stop;
   stop it (kill -9 …) and connect again":** a server from the old build didn't stop
   when the connection tried (SIGTERM, then SIGKILL after 5 seconds). Do what it says,
-  as that agent account, then connect again. Each account keeps one record per server in `~/.t3blackout/ssh-servers/`
+  as that agent account, then connect again. Each account keeps one record per server in `~/.blacksand/t3/ssh-servers/`
   (its pid, start time, build and command line), which is how a connection finds it.
 - **Pairing fails with an HTTP 500 right after a host update:** an old server is still
   running. Switch the environment off and on.

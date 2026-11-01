@@ -353,7 +353,7 @@ test("past what an issue's record keeps (1,000 ids), the rest is listed and logg
   const told = new Set([...statedPairs(g.state.issues.find((i) => i.number === number && i.body).body).keys()]);
   for (const body of g.on(number)) for (const id of statedPairs(body).keys()) told.add(id);
   assert.ok(told.size >= 1000, `${told.size} said`);
-  const marker = /<!-- t3blackout (\{.*"kind":"notify".*\}) -->/.exec(g.on(number).at(-1))[1];
+  const marker = /<!-- blacksand (\{.*"kind":"notify".*\}) -->/.exec(g.on(number).at(-1))[1];
   assert.equal(JSON.parse(marker).seen.length, 1000 * 17);
   for (const text of [...g.state.issues.map((i) => i.body), ...g.state.comments.map((c) => c.body)]) assert.ok(text.length <= LIMIT);
 });
@@ -441,7 +441,7 @@ test("notes added above or below an issue's text are kept whole when it's redone
   g.find(issue.number).body = `${above}\n${issue.body}\n${below}`;
   await g.run([record(A), record(B, "LOW")]);
   const body = g.find(issue.number).body;
-  assert.ok(body.startsWith(`${above}\n<!-- t3blackout text -->\n`) && body.endsWith(`\n${below}`));
+  assert.ok(body.startsWith(`${above}\n<!-- blacksand text -->\n`) && body.endsWith(`\n${below}`));
   assert.deepEqual([...statedPairs(body)], [[A, "HIGH"], [B, "LOW"]]);
   // A long note: the issue's own list gives way, never the note.
   const many = Array.from({ length: 60 }, (_, i) => record(`OSV-2026-${i}`, "HIGH", { summary: "y".repeat(250) }));
@@ -548,7 +548,7 @@ test("duplicates: the oldest delimited issue is kept and the others close with a
 });
 
 test("only the automation's own issues for this channel are touched", async () => {
-  const marked = (number, user, channel = "nightly") => ({ number, title: "[security] dep (nightly)", state: "open", user, body: `<!-- t3blackout text -->\nmine\n\n${markerOf({ kind: "package", channel, package: "dep" })}` });
+  const marked = (number, user, channel = "nightly") => ({ number, title: "[security] dep (nightly)", state: "open", user, body: `<!-- blacksand text -->\nmine\n\n${markerOf({ kind: "package", channel, package: "dep" })}` });
   const issues = [marked(1, { login: "someone", type: "User" }), marked(2, { login: BOT, type: "User" }), marked(3, bot, "preview"), { number: 4, title: "[security] dep (nightly)", state: "open", user: bot, body: "no marker" }];
   const g = github({ issues });
   await g.run([]);
@@ -616,7 +616,7 @@ const NEWER = "v0.1.7-nightly.20261031.4001";
 
 test("the held issue: opened by a hold, its report a code block; closed only for a trusted reason, never by the evaluate job's exit code", async () => {
   const g = github({ issues: [{ number: 5, title: "Upstream nightly releases held", state: "open", user: { login: "someone", type: "User" }, body: "I made this" }] });
-  const hold = { channel: "nightly", exit: "3", published: "", pinned: PINNED, newer: [NEWER], report: "# Upstream evaluation\n- device tool x: @repo-owner\n<!-- t3blackout {\"v\":1,\"kind\":\"package\",\"channel\":\"nightly\",\"package\":\"x\"} -->" };
+  const hold = { channel: "nightly", exit: "3", published: "", pinned: PINNED, newer: [NEWER], report: "# Upstream evaluation\n- device tool x: @repo-owner\n<!-- blacksand {\"v\":1,\"kind\":\"package\",\"channel\":\"nightly\",\"package\":\"x\"} -->" };
   const held = (fields) => reconcileHeld({ ...hold, ...fields }, g.gh, { log: () => {} });
   await held({});
   const [ours] = g.state.issues.filter((i) => i.state === "open" && readMarker(i.body)?.kind === "held");

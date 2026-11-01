@@ -1,7 +1,7 @@
 // node --test test/: device tools install with scripts off; the native files a package's
 // install script would have fetched come from lib/native-assets.json instead: a reviewed
 // archive, its SHA-256 and each listed file's. The app's installer (lib/files/
-// blackoutNativeAssets.ts) is exercised for real (node -e, as DeviceToolchain.ts runs it)
+// blacksandNativeAssets.ts) is exercised for real (node -e, as DeviceToolchain.ts runs it)
 // against a local HTTP server, and keeps every write inside the install folder on its own:
 // whatever package path the lock gives and whatever file path the manifest lists, it writes
 // only to a plain node_modules package path, through real folders, never through a link.
@@ -16,7 +16,7 @@ import assert from "node:assert/strict";
 
 import { approvedToolLock } from "../lib/device-tools.mjs";
 import { nativeAssetsFor, readNativeAssets, validateNativeAssets } from "../lib/native-assets.mjs";
-import { BLACKOUT_NATIVE_ASSETS_SCRIPT, BLACKOUT_NATIVE_ASSETS_SOURCE } from "../lib/files/blackoutNativeAssets.ts";
+import { BLACKSAND_NATIVE_ASSETS_SCRIPT, BLACKSAND_NATIVE_ASSETS_SOURCE } from "../lib/files/blacksandNativeAssets.ts";
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const scratch = (name) => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), `t3b-native-${name}-`)));
@@ -112,7 +112,7 @@ function node(args) {
 }
 
 /** Runs the app's installer (node -e, as DeviceToolchain.ts does) on `dir`. */
-const install = (dir, assets, needs) => node(["-e", BLACKOUT_NATIVE_ASSETS_SCRIPT, dir, JSON.stringify(assets), JSON.stringify(needs)]);
+const install = (dir, assets, needs) => node(["-e", BLACKSAND_NATIVE_ASSETS_SCRIPT, dir, JSON.stringify(assets), JSON.stringify(needs)]);
 
 /** Installs native@1.0.0 at lock path `where` from `url`, its archive `archive` and listed `files`. */
 const installAt = (dir, where, url, archive, files = { "build/Release/x.node": sha256(BINARY) }) =>
@@ -180,7 +180,7 @@ test("the SSH device host script embeds the same installer as a plain function",
     const needs = [{ path: "node_modules/native", package: "native@1.0.0" }];
     const assets = [{ ...needs[0], platform, arch: process.arch, url: server.url, sha256: sha256(archive), files: { "build/Release/x.node": sha256(BINARY) } }];
     // As sshDeviceScript.ts puts it into the remote script's text.
-    const script = `const installNativeAssets = ${BLACKOUT_NATIVE_ASSETS_SOURCE};\n(async () => { await installNativeAssets(${JSON.stringify(dir)}, ${JSON.stringify(assets)}, ${JSON.stringify(needs)}); })().catch((error) => { console.error(error.message); process.exitCode = 1; });`;
+    const script = `const installNativeAssets = ${BLACKSAND_NATIVE_ASSETS_SOURCE};\n(async () => { await installNativeAssets(${JSON.stringify(dir)}, ${JSON.stringify(assets)}, ${JSON.stringify(needs)}); })().catch((error) => { console.error(error.message); process.exitCode = 1; });`;
     const run = await node(["-e", script]);
     assert.equal(run.status, 0, run.stderr);
     assert.deepEqual(fs.readFileSync(path.join(dir, "node_modules/native/build/Release/x.node")), BINARY);

@@ -14,7 +14,7 @@ import { systemdUpdateUnits } from "./jobs.mjs";
 
 const DATA = process.env.XDG_DATA_HOME ?? path.join(os.homedir(), ".local", "share");
 const CONFIG = process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), ".config");
-const INSTALL_DIR = path.join(DATA, "t3blackout");
+const INSTALL_DIR = path.join(DATA, "blacksand", "t3");
 const APP_DIR = path.join(INSTALL_DIR, "app");
 const APP_STAGED = path.join(INSTALL_DIR, "app.new");
 // A verified build waiting for the running app to restart.
@@ -25,10 +25,10 @@ const ICON = path.join(INSTALL_DIR, "icon.png");
 // electron-builder's linux executableName upstream; Ubuntu's AppArmor profile
 // (install.sh) is keyed to this path.
 const EXECUTABLE = path.join(APP_DIR, "t3code");
-const BUNDLED_ICON = "t3blackout-icon.png";
-const DESKTOP_ENTRY = path.join(DATA, "applications", "t3blackout.desktop");
+const BUNDLED_ICON = "blacksand-icon.png";
+const DESKTOP_ENTRY = path.join(DATA, "applications", "blacksand-t3.desktop");
 const UNIT_DIR = path.join(CONFIG, "systemd", "user");
-const UNIT = "t3blackout-update";
+const UNIT = "blacksand-update";
 
 function writeDesktopEntry() {
   const bundledIcon = path.join(APP_DIR, BUNDLED_ICON);
@@ -39,7 +39,7 @@ function writeDesktopEntry() {
     [
       "[Desktop Entry]",
       "Type=Application",
-      "Name=T3 Blackout",
+      "Name=Blacksand T3",
       "Comment=T3 Code with telemetry stripped",
       `Exec="${EXECUTABLE}" %U`,
       `Icon=${ICON}`,
@@ -131,7 +131,7 @@ export default {
   },
 
   launch() {
-    if (!fs.existsSync(EXECUTABLE)) throw new Error(`${APP_DIR} is not installed; run \`t3blackout update\` first`);
+    if (!fs.existsSync(EXECUTABLE)) throw new Error(`${APP_DIR} is not installed; run \`blacksand t3 update\` first`);
     const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^(ELECTRON_|T3CODE_)/.test(key)));
     childProcess.spawn(EXECUTABLE, [], { detached: true, stdio: "ignore", env }).unref();
   },
@@ -144,7 +144,7 @@ export default {
   schedule(hour, weekday = null, { role = "ui" } = {}) {
     if (role !== "ui") throw new Error(`the ${role} role is macOS only; on Linux, install with --role ui`);
     if (!commandExists("systemctl") || systemctl("show-environment").status !== 0) {
-      throw new Error("no systemd user session; run `t3blackout update` from cron or by hand instead");
+      throw new Error("no systemd user session; run `blacksand t3 update` from cron or by hand instead");
     }
     fs.mkdirSync(UNIT_DIR, { recursive: true });
     const units = systemdUpdateUnits({ node: stableNodePath(), launcher: LAUNCHER, pathEnv: process.env.PATH ?? "/usr/bin:/bin", hour, weekday });

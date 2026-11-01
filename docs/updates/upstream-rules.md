@@ -38,7 +38,7 @@ its own name, bundle ID and data directory, plus its look. The look is the Redac
 app icon, and touches that follow whichever theme you pick: the T3 BLACKOUT wordmark,
 redaction bars in place of the nightly starfield, a ringed send button, button glow, a
 version stamp and accent text selection. Each has its own switch in **Settings →
-Appearance → Interface**. There are no Blackout themes; use upstream's, or add a
+Appearance → Interface**. There are no Blacksand themes; use upstream's, or add a
 custom theme to change the accent.
 
 ## The build report
@@ -55,16 +55,16 @@ For each feature left out, the report lists the upstream commits and pull reques
 that touched its code, and the diff with the lines the rule hooked into highlighted. It
 also shows where those lines live now, if upstream moved them. A strict failure gets
 its own report: which strict rules stopped the update, and how to get updates going
-again. Open it from the version stamp's hover card, or with `packages/t3/bin/t3blackout drift`.
+again. Open it from the version stamp's hover card, or with `blacksand t3 drift`.
 Beside it are the report's data and screenshots as files (`<version>.json`,
-`<version>/`), which `packages/t3/bin/t3blackout review` gathers for an agent to read.
+`<version>/`), which `blacksand t3 review` gathers for an agent to read.
 
 ## Fixing a rule
 
-1. `packages/t3/bin/t3blackout drift` shows what upstream changed.
-2. Update the anchor in `packages/t3/lib/rules.mjs`. `packages/t3/bin/t3blackout check` dry-runs the rules
+1. `blacksand t3 drift` shows what upstream changed.
+2. Update the anchor in `packages/t3/lib/rules.mjs`. `blacksand t3 check` dry-runs the rules
    against the pinned release (`--ref` for any), so you can iterate quickly.
-   `packages/t3/bin/t3blackout check --build` also builds, scans and smoke-tests it, without
+   `blacksand t3 check --build` also builds, scans and smoke-tests it, without
    installing.
 3. Commit it, signed. The rules are a repo file, so a change needs the owner's
    signature to reach any machine.

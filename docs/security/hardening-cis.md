@@ -29,7 +29,7 @@ CIS-based tool such as the
 | Set time automatically | Ensure Set Time and Date Automatically Is Enabled | Meets | Meets; self-update also checks the clock against the npm registry's |
 | FileVault rules out automatic login | Ensure Automatic Login Is Disabled | Meets | Meets |
 
-Checked means the setup tells you to check it, not that T3 Blackout changes it.
+Checked means the setup tells you to check it, not that Blacksand T3 changes it.
 
 ## Beyond the benchmark
 
@@ -48,5 +48,5 @@ setup and limit what the host's untrusted accounts can do:
 
 The rest of the benchmark is left to you. That includes the screen saver inactivity
 interval, password hints, the guest account, sudo's timeout, Siri and analytics
-sharing, the login window, and Time Machine encryption. None of them conflicts with T3
-Blackout.
+sharing, the login window, and Time Machine encryption. None of them conflicts with Blacksand
+T3.

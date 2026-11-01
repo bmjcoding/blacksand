@@ -1,8 +1,8 @@
 # Privacy
 
-> **Applies to:** the T3 Blackout app and its servers, macOS and Linux.
+> **Applies to:** the Blacksand T3 app and its servers, macOS and Linux.
 
-This page lists what T3 Blackout removes, what still leaves the machine and why, how
+This page lists what Blacksand T3 removes, what still leaves the machine and why, how
 each part is enforced, and how you can check it yourself.
 
 ## What is removed
@@ -17,11 +17,11 @@ The [strip rules](../updates/upstream-rules.md) remove, from every build:
 | the UI's 5-minute npm poll for new `t3` releases, and the server-side lookup that replaced it | `web/no-npm-release-poll`, `server/no-npm-release-lookup` |
 | Google favicon lookups | `shared/no-google-favicons` |
 | the GitHub star check (asking GitHub, with the server's account token, whether that account starred upstream, then asking for a star) | `web/no-github-star-check` |
-| the Electron auto-updater, and upstream's stock app and server downloads | `desktop/updater-*`, `desktop/no-publish-feed`, `server/no-stock-runtime*`, `ssh/runner-installed-blackout-only` |
+| the Electron auto-updater, and upstream's stock app and server downloads | `desktop/updater-*`, `desktop/no-publish-feed`, `server/no-stock-runtime*`, `ssh/runner-installed-blacksand-only` |
 | upstream's background service (`t3 up`, `t3 status`); a stock service's hidden launcher refuses to start | `server/no-t3-up*`, `server/no-stock-service-launcher`, `server/no-stock-service-install` |
 | text that sends you to stock T3 (`npx t3 …`, t3.codes downloads, upstream's release pages) | the `web/no-stock-*` and `server/no-stock-commands-*` rules; `stock/no-stock-guidance` fails the build on any left |
 
-The app also gets its own name, bundle ID and data directory (`~/.t3blackout`), and
+The app also gets its own name, bundle ID and data directory (`~/.blacksand/t3`), and
 the welcome screen and **Settings → About** say it collects no usage data.
 
 ## The agent CLIs
@@ -44,7 +44,7 @@ A server started without the desktop app (on an SSH host) gets the same switches
 
 **Content-Security-Policy.** The UI can only talk to loopback, so remote images, CDN
 icons and anything upstream adds to the page fail into their existing fallbacks. One
-policy (`packages/t3/lib/files/t3blackoutCsp.ts`) is applied by the page itself, by the server's
+policy (`packages/t3/lib/files/blacksandCsp.ts`) is applied by the page itself, by the server's
 static responses and by the desktop's app protocol. Files the server serves from your
 projects get the same policy. Agent-written HTML, MCP apps, SVGs and downloads keep
 upstream's sandbox policy, plus a second one with the same loopback-only reach (their
@@ -105,7 +105,7 @@ A CSP doesn't cover WebRTC, so the boot environment closes that route too.
   as current as the pin.
 - **Cost estimates keep working.** `update` downloads LiteLLM's pricing table, pinned
   to a commit, and seeds the app's cache. On a Mac with agent accounts, it also
-  publishes the table in `/Users/Shared/t3blackout` for them. The app never fetches it.
+  publishes the table in `/Users/Shared/blacksand` for them. The app never fetches it.
 - **Updates take a few minutes.** Each one is a local build, not a download.
 
 ## How it's enforced
@@ -125,15 +125,15 @@ Every build, on every machine, runs these before installing
 Tests: `packages/t3/test/strip-rules.test.mjs`, `packages/t3/test/build-strip-engine.test.mjs`,
 `packages/t3/test/build-tripwire.test.mjs`, `packages/t3/test/build-tripwire-exec.test.mjs`,
 `packages/t3/test/app-webrtc.test.mjs`, `packages/t3/test/app-stock-guidance.test.mjs`,
-`packages/t3/test/privacy-text.test.mjs`, and `packages/t3/test/stripped/blackout*Csp.test.ts` (run inside the
+`packages/t3/test/privacy-text.test.mjs`, and `packages/t3/test/stripped/blacksand*Csp.test.ts` (run inside the
 stripped checkout).
 
 ## Check it yourself
 
-- **The rules against a release:** `packages/t3/bin/t3blackout check` applies them to the pinned
-  release without building; `packages/t3/bin/t3blackout check --build` also builds, scans and runs
+- **The rules against a release:** `blacksand t3 check` applies them to the pinned
+  release without building; `blacksand t3 check --build` also builds, scans and runs
   the smoke test, without installing.
-- **The smoke test on your last build:** `packages/t3/bin/t3blackout smoke`.
+- **The smoke test on your last build:** `blacksand t3 smoke`.
 - **Watch the running app.** Use a per-process firewall or monitor (Little Snitch,
   LuLu, or `nettop -p <pid>` on macOS; `ss -tpn` on Linux). Then compare what the app
   and its servers connect to with the table above. Expect your providers, plus

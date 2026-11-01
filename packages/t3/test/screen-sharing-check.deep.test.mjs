@@ -27,7 +27,8 @@ test("nothing in it touches pf, sshd or a firewall; it's ShellCheck-clean and ch
   const lint = spawnSync("shellcheck", ["-S", "warning", "-x", SCRIPT], { encoding: "utf8", cwd: path.dirname(path.dirname(SCRIPT)) });
   if (lint.error?.code !== "ENOENT") assert.equal(lint.status, 0, lint.stdout);
   for (const args of [[], ["--off"], ["--on"], ["--uninstall"], ["check"], ["--status"]]) {
-    const out = spawnSync("bash", [SCRIPT, ...args], { encoding: "utf8" });
+    // As on a machine without a legacy install (test/legacy-install.test.mjs covers that refusal).
+    const out = sourced(`legacy_install() { return 1; }\nmain ${args.join(" ")}`);
     assert.equal(out.status, 1);
     assert.match(out.stderr, isMac ? /run with sudo/ : /macOS only/);
   }
@@ -48,7 +49,7 @@ test("its plist is Apple's, under Apple's label, with one dual-stack loopback so
   assert.equal(own.Disabled, undefined);
   for (const key of Object.keys(apple)) if (!["Sockets", "Disabled"].includes(key)) assert.deepEqual(own[key], apple[key], key);
   assert.equal(sourced(`OWN_PLIST=${JSON.stringify(out)}\nscreensharingd_path`).stdout.trim(), apple.ProgramArguments[0], "the file whose process may hold its port");
-  assert.equal(sourced('echo "$OWN_PLIST"').stdout.trim(), "/Library/Application Support/t3blackout/com.apple.screensharing.plist", "outside LaunchDaemons");
+  assert.equal(sourced('echo "$OWN_PLIST"').stdout.trim(), "/Library/Application Support/blacksand/com.apple.screensharing.plist", "outside LaunchDaemons");
 });
 
 test("a changed Apple plist still gives a loopback-only socket; one that can't be confirmed is refused", mac, () => {
@@ -73,18 +74,18 @@ test("a changed Apple plist still gives a loopback-only socket; one that can't b
 
 test("the hold and parking jobs only hold a port, from boot; the check runs the root-owned copy at boot and every minute", mac, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "t3b-ss-jobs-"));
-  for (const [label, port] of [["dev.t3blackout.screensharing-hold", "15900"], ["dev.t3blackout.screensharing-park", "15901"]]) {
+  for (const [label, port] of [["dev.blacksand.screensharing-hold", "15900"], ["dev.blacksand.screensharing-park", "15901"]]) {
     const file = path.join(dir, `${label}.plist`);
     fs.writeFileSync(file, sourced(`render_hold_plist ${label} ${port}`).stdout);
     assert.equal(spawnSync("plutil", ["-lint", "-s", file]).status, 0);
     assert.deepEqual(toJson(file), { Label: label, Program: "/usr/bin/true", UserName: "nobody", inetdCompatibility: { Wait: false }, Sockets: { Listener: { SockNodeName: "localhost", SockServiceName: port } } });
   }
-  assert.equal(sourced('echo "$HOLD_PLIST $PARK_PLIST"').stdout.trim(), "/Library/LaunchDaemons/dev.t3blackout.screensharing-hold.plist /Library/LaunchDaemons/dev.t3blackout.screensharing-park.plist");
+  assert.equal(sourced('echo "$HOLD_PLIST $PARK_PLIST"').stdout.trim(), "/Library/LaunchDaemons/dev.blacksand.screensharing-hold.plist /Library/LaunchDaemons/dev.blacksand.screensharing-park.plist");
   const file = path.join(dir, "check.plist");
   fs.writeFileSync(file, sourced("render_check_plist").stdout);
   const job = toJson(file);
-  assert.equal(job.Label, "dev.t3blackout.screen-sharing-check");
-  assert.deepEqual(job.ProgramArguments, ["/bin/bash", "/usr/local/libexec/t3blackout/screen-sharing-check", "check"]);
+  assert.equal(job.Label, "dev.blacksand.screen-sharing-check");
+  assert.deepEqual(job.ProgramArguments, ["/bin/bash", "/usr/local/libexec/blacksand/screen-sharing-check", "check"]);
   assert.equal(job.RunAtLoad, true);
   assert.equal(job.StartInterval, 60);
 });
@@ -167,7 +168,7 @@ test("a sign-in rule broken, or one that can't be read: Screen Sharing off (sess
     [{ vnc: "x" }, /a VNC password is set/],
     [{ rm: "enabled" }, /Remote Management is on/],
     [{ demoted: "" }, /admin is no longer an admin/],
-    [{ agents: "admin" }, /admin is in t3blackout-agents/],
+    [{ agents: "admin" }, /admin is in blacksand-agents/],
     [{ dscl_fail: "" }, /Screen Sharing allows every account|can't be read/],
     [{ dseditgroup_fail: "" }, /admin is no longer an admin/],
     [{ pgrep_fail: "" }, /Remote Management is on/],
@@ -192,7 +193,7 @@ test("a sign-in rule broken, or one that can't be read: Screen Sharing off (sess
   assert.match(back.stdout, /checks pass again; Screen Sharing is on/);
   // Only the agent-group check failing counts as an agent account.
   const agent = host().run(`dseditgroup() { if [[ $5 == admin ]]; then return 0; fi; return 1; }\nif why="$(access_problem)"; then echo "PROBLEM $why"; fi`);
-  assert.match(agent.stdout, /PROBLEM admin is in t3blackout-agents \(or that can't be checked\)/);
+  assert.match(agent.stdout, /PROBLEM admin is in blacksand-agents \(or that can't be checked\)/);
 });
 
 test("not wanted (--off): it stays unloaded check after check, never bootstrapped", mac, () => {
@@ -329,7 +330,7 @@ test("off, then someone takes Screen Sharing's port: the forward stays parked, a
     h.drop("hold_loaded");
     h.put("squat4");
     h.put("squat6");
-    assert.match(h.run().stdout, /dev\.t3blackout\.screensharing-hold is loaded, but TCP 15900 is held on 127\.0\.0\.1:15900 by screensharingd \(pid 4242, uid 501\)/, how);
+    assert.match(h.run().stdout, /dev\.blacksand\.screensharing-hold is loaded, but TCP 15900 is held on 127\.0\.0\.1:15900 by screensharingd \(pid 4242, uid 501\)/, how);
     assert.equal(h.run("reaches").stdout.trim(), "15901 park", how);
   }
 });
@@ -389,7 +390,7 @@ test("another Serve handler mentioning either port is never moved past; a parkin
   const park = host({ own_loaded: "", ts_listen: "", squat_park: "" });
   const parked = park.run();
   assert.ok(parked.failed);
-  assert.match(parked.stdout, /dev\.t3blackout\.screensharing-park is loaded, but TCP 15901 is held on 127\.0\.0\.1:15901 by nc \(pid 4243, uid 501\)/);
+  assert.match(parked.stdout, /dev\.blacksand\.screensharing-park is loaded, but TCP 15901 is held on 127\.0\.0\.1:15901 by nc \(pid 4243, uid 501\)/);
   assert.equal(park.read("mapping"), "free\n");
   assert.equal(park.has("own_loaded"), false);
   park.neverForeign();
@@ -485,7 +486,7 @@ test("with the real Serve parser: only this setup's own live forward is parked, 
     assert.match(refused.stdout, /STATUS=1/, label);
     assert.match(refused.stdout, /Tailscale Serve isn't parked: .*left as it is \(tailscale serve status\), so no port changes hands/, `${label}\n${refused.stdout}`);
     assert.ok(h.has("hold_loaded"), `${label}: the hold job kept`);
-    assert.doesNotMatch(h.read("calls"), /bootout system\/dev\.t3blackout\.screensharing-hold/, label);
+    assert.doesNotMatch(h.read("calls"), /bootout system\/dev\.blacksand\.screensharing-hold/, label);
     assert.equal(untouched.posts.length, 0, `${label}: nothing written`);
   }
 });
@@ -497,13 +498,13 @@ ${WRAP_LAUNCHCTL}
 launchctl() {
   local rc=0
   model_launchctl "$@" || rc=$?
-  if [[ $1 == bootout && $2 == system/dev.t3blackout.screensharing-hold ]]; then rm -f "$S/ts_absent"; trace; fi
+  if [[ $1 == bootout && $2 == system/dev.blacksand.screensharing-hold ]]; then rm -f "$S/ts_absent"; trace; fi
   return "$rc"
 }
 run_check periodic || echo STATUS=$?`);
   assert.match(out.stdout, /STATUS=1/);
   assert.match(out.stdout, /tailscaled isn't running, so the forward it keeps \(and restores when it starts\) can't be checked/);
-  assert.doesNotMatch(h.read("calls"), /bootout system\/dev\.t3blackout\.screensharing-hold/, "the hold job never let go");
+  assert.doesNotMatch(h.read("calls"), /bootout system\/dev\.blacksand\.screensharing-hold/, "the hold job never let go");
   assert.equal(api.posts.length, 0);
   for (const fault of [
     `jxa() { if [[ $1 == inventory ]]; then /usr/bin/osascript -l JavaScript - "$@" <<<"$JXA_SERVE" & local parser=$!; kill -KILL "$parser" 2>/dev/null || true; wait "$parser"; return; fi; /usr/bin/osascript -l JavaScript - "$@" <<<"$JXA_SERVE"; }`,

@@ -12,7 +12,7 @@
 // would let any account hold updates back.
 //
 // A holder can hand its lock to a child that carries on under it (the
-// self-update rerun, bin/t3blackout): the child gets the locked descriptor
+// self-update rerun, bin/t3): the child gets the locked descriptor
 // itself (runHoldingLock) and adopts it (adoptLock). The lock belongs to the
 // open file they then share, and the parent closes its copy once the child has
 // started, so the lock is the child's alone: it holds however the parent ends,
@@ -30,7 +30,7 @@ const O_EXLOCK = 0x20;
 const FLOCK = ["/usr/bin/flock", "/bin/flock"];
 /** The descriptor a handed lock arrives on in the child, and the variable that says so. */
 export const HANDED_FD = 3;
-export const HANDED_ENV = "T3BLACKOUT_LOCK_FD";
+export const HANDED_ENV = "BLACKSAND_T3_LOCK_FD";
 
 /**
  * Linux: flock(1) with `options` on this process's descriptor `fd`, handed to

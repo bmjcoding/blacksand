@@ -14,7 +14,7 @@ installs another machine's build.
 
 ## Desktop
 
-This is the T3 Blackout app. Its Local environment runs agents in your own account.
+This is the Blacksand T3 app. Its Local environment runs agents in your own account.
 It can also reach agent accounts on other machines as SSH environments, which is
 upstream's remote-environment feature. → [Install the desktop](../install/desktop.md)
 

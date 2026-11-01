@@ -239,8 +239,8 @@ function cli() {
   fs.mkdirSync(home, { mode: 0o700 });
   const state = path.join(repo, "state");
   fs.mkdirSync(state, { mode: 0o700 });
-  const env = { PATH: process.env.PATH, HOME: home, T3BLACKOUT_HOME: path.join(home, ".t3blackout"), T3BLACKOUT_APPS: path.join(dir, "Apps"), T3BLACKOUT_UPDATE_REQUESTS: path.join(dir, "Shared", "requests"), XDG_DATA_HOME: path.join(dir, "data"), XDG_CONFIG_HOME: path.join(dir, "config"), T3BLACKOUT_HEADLESS: "1" };
-  return { dir, repo, state, env, bin: path.join(repo, "bin", "t3blackout"), lock: path.join(state, "update.lock") };
+  const env = { PATH: process.env.PATH, HOME: home, BLACKSAND_T3_HOME: path.join(home, ".blacksand/t3"), BLACKSAND_T3_APPS: path.join(dir, "Apps"), BLACKSAND_T3_UPDATE_REQUESTS: path.join(dir, "Shared", "requests"), XDG_DATA_HOME: path.join(dir, "data"), XDG_CONFIG_HOME: path.join(dir, "config"), BLACKSAND_T3_HEADLESS: "1" };
+  return { dir, repo, state, env, bin: path.join(repo, "bin", "t3"), lock: path.join(state, "update.lock") };
 }
 
 test("the CLI runs under a lock handed to it, and refuses one that isn't", async () => {
@@ -252,14 +252,14 @@ test("the CLI runs under a lock handed to it, and refuses one that isn't", async
   const [code] = await once(handed, "exit");
   assert.equal(code, 1);
   assert.match(output, /no previous build to roll back to/, "it got past the lock");
-  assert.doesNotMatch(output, /another t3blackout update is running/);
+  assert.doesNotMatch(output, /another blacksand t3 update is running/);
   assert.equal(await free(c.lock), true, "and released it");
   // The variable without the descriptor, while someone holds the lock: refused.
   const held = await tryLock(c.lock);
   try {
     const stale = spawnSync(process.execPath, [c.bin, "rollback"], { encoding: "utf8", env: { ...c.env, [HANDED_ENV]: "3" } });
     assert.equal(stale.status, 1);
-    assert.match(stale.stdout, /another t3blackout update is running/);
+    assert.match(stale.stdout, /another blacksand t3 update is running/);
   } finally {
     await held();
   }
@@ -283,7 +283,7 @@ test("killing the run that self-updated doesn't free the lock while the rerun CL
     assert.equal(alive(rerun), true, "the rerun CLI is still working");
     const competing = spawnSync(process.execPath, [c.bin, "rollback"], { encoding: "utf8", env: c.env, timeout: 30_000 });
     assert.equal(competing.status, 1);
-    assert.match(competing.stdout, new RegExp(`another t3blackout update is running \\(pid ${rerun}\\)`));
+    assert.match(competing.stdout, new RegExp(`another blacksand t3 update is running \\(pid ${rerun}\\)`));
     // Let it finish: it refuses the FIFO as a record, and releases the lock as it exits.
     fs.writeFileSync(fifo, "{}");
     await until(() => !alive(rerun), "the rerun to finish");

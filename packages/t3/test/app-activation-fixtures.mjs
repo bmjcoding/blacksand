@@ -18,11 +18,11 @@ export function world() {
   fs.mkdirSync(apps);
   fs.mkdirSync(state);
   const slots = {
-    installed: path.join(apps, "T3 Blackout.app"),
-    previous: path.join(apps, ".T3 Blackout.previous.app"),
-    outgoing: path.join(apps, ".T3 Blackout.outgoing.app"),
+    installed: path.join(apps, "Blacksand T3.app"),
+    previous: path.join(apps, ".Blacksand T3.previous.app"),
+    outgoing: path.join(apps, ".Blacksand T3.outgoing.app"),
   };
-  const staged = path.join(apps, ".T3 Blackout.new.app");
+  const staged = path.join(apps, ".Blacksand T3.new.app");
   const make = (where, v) => {
     fs.mkdirSync(where);
     fs.writeFileSync(path.join(where, "version"), v);

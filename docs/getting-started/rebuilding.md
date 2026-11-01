@@ -2,12 +2,16 @@
 
 > **Applies to:** every role, macOS and Linux. Skip this for a first install.
 
+Moving from a legacy T3 Blackout install means rebuilding the machine: Blacksand
+doesn't upgrade one in place, and its installer and setup scripts refuse to run
+while one is present ([at the cutover](../security/keys-and-incidents.md#at-the-cutover)).
+
 - **Your way back into your password manager.** Before wiping, check that you can
   sign in to it without this machine: from another signed-in device, or with its
   recovery kit and account password. Know where the second factors and recovery
   codes are for GitHub, your Apple Account and your Tailscale sign-in provider.
 - **Back up what isn't pushed anywhere.** Each server keeps its threads in its own
-  account's `~/.t3blackout`, tied to that server's identity
+  account's `~/.blacksand/t3`, tied to that server's identity
   (`userdata/environment-id`). Back up every account whose history you want: your own
   account for the desktop's Local environment, and each agent account for its SSH
   environment. Do it with the app quit and the agent servers stopped (switch their
@@ -19,9 +23,9 @@
   scripts from, and your commit-signing key's fingerprint. A fresh clone of a `main`
   that has moved runs whatever is there; [cloning](../install/clone.md) puts the new
   clone at exactly the recorded commit.
-- **The signing certificate (macOS).** If `packages/t3/bin/t3blackout status` shows `signing:`
+- **The signing certificate (macOS).** If `blacksand t3 status` shows `signing:`
   with `(self-signed: …)` or `ad-hoc`, create the Apple Development certificate now
-  and run `packages/t3/bin/t3blackout signing adopt --vault Personal`
+  and run `blacksand t3 signing adopt --vault Personal`
   ([signing](../install/signing-macos.md)). The rebuilt machines then import it.
 - **Tailnet Lock.** If it's on and this machine is a signing node, hold a
   disablement secret somewhere that isn't on these machines. Or keep another signing

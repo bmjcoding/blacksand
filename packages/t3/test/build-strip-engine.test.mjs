@@ -32,11 +32,11 @@ test("rules replace, write, transform and rebrand inside the checkout", () => {
       { id: "r", file: "src/a.ts", edits: [{ find: "const name", replace: "const title" }] },
       { id: "w", kind: "write", file: "src/new/b.ts", content: "export {};\n" },
       { id: "t", kind: "transform", file: "src/a.ts", transform: (text) => text.replace("title", "label") },
-      { id: "b", kind: "rebrand", roots: ["src"], include: /\.ts$/, find: "T3 Code", replace: "T3 Blackout", minCount: 1 },
+      { id: "b", kind: "rebrand", roots: ["src"], include: /\.ts$/, find: "T3 Code", replace: "Blacksand T3", minCount: 1 },
     ]),
   );
   assert.deepEqual(failures, []);
-  assert.equal(fs.readFileSync(path.join(root, "src", "a.ts"), "utf8"), "const label = 'T3 Blackout';\n");
+  assert.equal(fs.readFileSync(path.join(root, "src", "a.ts"), "utf8"), "const label = 'Blacksand T3';\n");
   assert.equal(fs.readFileSync(path.join(root, "src", "new", "b.ts"), "utf8"), "export {};\n");
 });
 
@@ -76,10 +76,10 @@ test("a symlink in the checkout never redirects a rule's write", () => {
   fs.mkdirSync(path.join(root, "web"));
   fs.writeFileSync(path.join(root, "web", "real.ts"), "T3 Code");
   fs.symlinkSync(path.join(outside, "brand.ts"), path.join(root, "web", "link.ts"));
-  quiet(() => applyRules(root, [{ id: "b", kind: "rebrand", roots: ["web"], include: /\.ts$/, find: "T3 Code", replace: "T3 Blackout", minCount: 1 }]));
+  quiet(() => applyRules(root, [{ id: "b", kind: "rebrand", roots: ["web"], include: /\.ts$/, find: "T3 Code", replace: "Blacksand T3", minCount: 1 }]));
   assert.equal(fs.readFileSync(victim, "utf8"), "keep me");
   assert.equal(fs.readFileSync(path.join(outside, "brand.ts"), "utf8"), "T3 Code");
-  assert.equal(fs.readFileSync(path.join(root, "web", "real.ts"), "utf8"), "T3 Blackout");
+  assert.equal(fs.readFileSync(path.join(root, "web", "real.ts"), "utf8"), "Blacksand T3");
 });
 
 test("hosts are read the way a URL parser reads them", () => {

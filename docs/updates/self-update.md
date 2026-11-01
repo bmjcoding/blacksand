@@ -62,7 +62,7 @@ outright. Self-update stays refused until that commit is no longer on `main`.
 
 ## Held, skipped, refused
 
-- **Held:** a dependency is too young, or the clock is ahead. `state/t3blackout.log`
+- **Held:** a dependency is too young, or the clock is ahead. `state/blacksand-t3.log`
   says "self-update held" and names it. There's no notification. The update continues
   on the pin this clone already has, and the next run tries again. Nothing later on
   `main`, owner commits included, is taken until it has aged, unless the owner
@@ -160,7 +160,7 @@ rule as self-update.
   run that brings an evaluator pin, until the owner signs a commit that rewrites
   `pin.json`.
 - **The update lock's handoff** to the rerun after a self-update is on fd 3, named by
-  `T3BLACKOUT_LOCK_FD`. On macOS, the rerun can check only that the descriptor it's
+  `BLACKSAND_T3_LOCK_FD`. On macOS, the rerun can check only that the descriptor it's
   handed is the lock file and that the lock is held, not that this descriptor holds
   it; only a process of yours could forge that. On Linux, if the rerun crashes, a
   process it started that inherited the descriptor holds the lock until it exits.

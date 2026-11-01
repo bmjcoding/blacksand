@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Lets your phone reach one agent account's T3 Blackout server over Tailscale,
+# Lets your phone reach one agent account's Blacksand T3 server over Tailscale,
 # with no relay (docs/remote-access/phone.md). Run on the always-on host, with sudo,
 # from the admin account, after scripts/add-agent-account.sh made the account:
 #
@@ -9,7 +9,7 @@
 #   scripts/add-phone-service.sh --print-policy [--https-port 443]  # the Tailscale grant (no sudo)
 #
 # What it sets up:
-#   - A launchd job, dev.t3blackout.phone.<account>, that runs the account's
+#   - A launchd job, dev.blacksand.phone.<account>, that runs the account's
 #     server at boot, logged in or not, as that account, on 127.0.0.1:<port>
 #     only (scripts/phone-server.sh, installed root-owned). The desktop's SSH
 #     connection to the account finds that server and shares it: the same threads
@@ -38,14 +38,14 @@
 
 set -euo pipefail
 
-APP="/Applications/T3 Blackout.app"
-ELECTRON="$APP/Contents/MacOS/T3 Blackout"
+APP="/Applications/Blacksand T3.app"
+ELECTRON="$APP/Contents/MacOS/Blacksand T3"
 ASAR="$APP/Contents/Resources/app.asar"
 SERVER="$ASAR/apps/server/dist/bin.mjs"
-AGENT_GROUP=t3blackout-agents
-HELPER_DIR=/usr/local/libexec/t3blackout
+AGENT_GROUP=blacksand-agents
+HELPER_DIR=/usr/local/libexec/blacksand
 WRAPPER=$HELPER_DIR/phone-server
-LABEL_PREFIX=dev.t3blackout.phone
+LABEL_PREFIX=dev.blacksand.phone
 PLIST_DIR=/Library/LaunchDaemons
 FIRST_PORT=4773
 # Where the desktop's SSH connections pick a port (upstream's DEFAULT_REMOTE_PORT
@@ -87,7 +87,7 @@ print_policy() {
   deny+=("\"$DESKTOP_TAG:22\"" "\"$DESKTOP_TAG:$port\"")
   cat <<EOF
 {
-  // T3 Blackout phone access (scripts/add-phone-service.sh): tag the phone
+  // Blacksand T3 phone access (scripts/add-phone-service.sh): tag the phone
   // $PHONE_TAG in the admin console (Machines → … → Edit ACL tags).
   "tagOwners": {
     "$PHONE_TAG": ["autogroup:admin"]
@@ -292,7 +292,7 @@ listener_on() {
   { lsof -nP -iTCP:"$1" -sTCP:LISTEN -F Ln 2>/dev/null || true; } | awk '/^L/ {user = substr($0, 2)} /^n/ {print user, substr($0, 2)}' | sort -u
 }
 
-# A server this account runs holds its ~/.t3blackout; the job's couldn't start
+# A server this account runs holds its ~/.blacksand/t3; the job's couldn't start
 # beside it. Its desktop connection reconnects to the job's.
 stop_ssh_servers() {
   local pids pid i stopped=0
@@ -338,7 +338,7 @@ verify_listener() {
     [[ -n "$listeners" ]] && break
     [[ $i == 90 ]] || sleep 1
   done
-  [[ -n "$listeners" ]] || die "nothing listens on port $PORT after 90 s; see $HOME_DIR/.t3blackout/phone/server.log (sudo -u $NAME tail -n 50 …)"
+  [[ -n "$listeners" ]] || die "nothing listens on port $PORT after 90 s; see $HOME_DIR/.blacksand/t3/phone/server.log (sudo -u $NAME tail -n 50 …)"
   while IFS= read -r line; do
     [[ "$line" == "$NAME 127.0.0.1:$PORT" ]] ||
       die "port $PORT has a listener that isn't $NAME's on 127.0.0.1 only ($line); stop the job: sudo launchctl bootout system/$(label_of "$NAME")"
@@ -361,8 +361,8 @@ pair() {
   # As the account, with nothing of yours in its environment. The code goes to
   # this terminal only: not to a file, a log or a command line.
   as_user "$NAME" /usr/bin/env -i HOME="$HOME_DIR" USER="$NAME" LOGNAME="$NAME" PATH=/usr/bin:/bin:/usr/sbin:/sbin \
-    ELECTRON_RUN_AS_NODE=1 T3CODE_HOME="$HOME_DIR/.t3blackout" \
-    "$ELECTRON" "$SERVER" auth pairing create --base-dir "$HOME_DIR/.t3blackout" --ttl "$TTL" --label phone --base-url "$url"
+    ELECTRON_RUN_AS_NODE=1 T3CODE_HOME="$HOME_DIR/.blacksand/t3" \
+    "$ELECTRON" "$SERVER" auth pairing create --base-dir "$HOME_DIR/.blacksand/t3" --ttl "$TTL" --label phone --base-url "$url"
   cat <<EOF
 
 Sessions it creates: Settings → Sharing & access → Authorized clients (in the
@@ -446,6 +446,7 @@ main() {
     return 0
   fi
 
+  refuse_legacy_install
   [[ "$(uname -s)" == Darwin ]] || die "macOS only"
   [[ $EUID -eq 0 ]] || die "run with sudo: sudo $0 $*"
   [[ -n "${SUDO_USER:-}" && "$SUDO_USER" != root ]] || die "run with sudo from your admin account, not as root"

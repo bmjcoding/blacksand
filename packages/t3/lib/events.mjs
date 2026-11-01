@@ -1,8 +1,8 @@
-// The app and the build account run t3blackout with --json and read
-// `t3blackout:event {...}` lines from stdout; everything else is build output.
+// The app and the build account run blacksand with --json and read
+// `blacksand:event {...}` lines from stdout; everything else is build output.
 // The app only redraws progress on 10% steps, so each step should cross one.
 
-export const EVENT_PREFIX = "t3blackout:event ";
+export const EVENT_PREFIX = "blacksand:event ";
 
 let enabled = false;
 

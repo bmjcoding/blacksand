@@ -14,12 +14,12 @@ const isMac = process.platform === "darwin";
 
 const job = (extra = {}) =>
   launchdUpdateJob({
-    label: "dev.t3blackout.update",
+    label: "dev.blacksand.update",
     node: "/opt/R&D <tools>/bin/node",
-    launcher: "/Users/me/R&D's \"clone\"/bin/t3blackout",
+    launcher: "/Users/me/R&D's \"clone\"/bin/t3",
     pathEnv: "/opt/R&D <tools>/bin:/usr/bin:/bin",
     state: "/Users/me/R&D/state",
-    requests: "/Users/Shared/t3blackout/update-requests",
+    requests: "/Users/Shared/blacksand/update-requests",
     hour: 4,
     weekday: "hourly",
     ...extra,
@@ -36,10 +36,10 @@ function parsePlist(text) {
 
 test("the launchd job keeps paths with XML characters intact", { skip: !isMac && "plutil is macOS's" }, () => {
   const parsed = parsePlist(job());
-  assert.deepEqual(parsed.ProgramArguments, ["/opt/R&D <tools>/bin/node", "/Users/me/R&D's \"clone\"/bin/t3blackout", "update"]);
+  assert.deepEqual(parsed.ProgramArguments, ["/opt/R&D <tools>/bin/node", "/Users/me/R&D's \"clone\"/bin/t3", "update"]);
   assert.equal(parsed.EnvironmentVariables.PATH, "/opt/R&D <tools>/bin:/usr/bin:/bin");
   assert.equal(parsed.StartInterval, 3600);
-  assert.deepEqual(parsed.WatchPaths, ["/Users/Shared/t3blackout/update-requests"]);
+  assert.deepEqual(parsed.WatchPaths, ["/Users/Shared/blacksand/update-requests"]);
   assert.equal(parsed.StandardOutPath, "/Users/me/R&D/state/update.out.log");
   assert.equal(parsed.UserName, undefined);
 });
@@ -50,7 +50,7 @@ test("the host role's job is a daemon that runs as you, with no login", { skip: 
   assert.equal(parsed.InitGroups, true);
   assert.deepEqual(parsed.StartCalendarInterval, { Weekday: 1, Hour: 6, Minute: 0 });
   assert.equal(parsed.EnvironmentVariables.HOME, "/Users/me");
-  assert.equal(parsed.EnvironmentVariables.T3BLACKOUT_HEADLESS, "1");
+  assert.equal(parsed.EnvironmentVariables.BLACKSAND_T3_HEADLESS, "1");
   assert.equal(parsed.ProcessType, "Background");
   assert.deepEqual(parsePlist(job({ weekday: null, hour: 0 })).StartCalendarInterval, { Hour: 0, Minute: 0 });
 });
@@ -59,9 +59,9 @@ test("systemd units quote paths and escape specifiers and variables", () => {
   assert.equal(systemdArg('/home/me/R&D 100%/"x"/$HOME\\bin'), '"/home/me/R&D 100%%/\\"x\\"/$$HOME\\\\bin"');
   assert.equal(systemdEnv("PATH", "/a b/%h:/c"), '"PATH=/a b/%%h:/c"');
   assert.throws(() => systemdArg("/a\nb"), /line break/);
-  const { service, timer } = systemdUpdateUnits({ node: "/home/me/my node/bin/node", launcher: "/home/me/t3b 100%/bin/t3blackout", pathEnv: "/usr/bin:/bin", hour: 6, weekday: 1 });
+  const { service, timer } = systemdUpdateUnits({ node: "/home/me/my node/bin/node", launcher: "/home/me/t3b 100%/bin/t3", pathEnv: "/usr/bin:/bin", hour: 6, weekday: 1 });
   assert.match(service, /^Environment="PATH=\/usr\/bin:\/bin"$/m);
-  assert.match(service, /^ExecStart="\/home\/me\/my node\/bin\/node" "\/home\/me\/t3b 100%%\/bin\/t3blackout" update$/m);
+  assert.match(service, /^ExecStart="\/home\/me\/my node\/bin\/node" "\/home\/me\/t3b 100%%\/bin\/t3" update$/m);
   assert.match(timer, /^OnCalendar=Mon \*-\*-\* 06:00:00$/m);
   assert.match(systemdUpdateUnits({ node: "n", launcher: "l", pathEnv: "p", hour: 4, weekday: "hourly" }).timer, /^OnCalendar=hourly$/m);
 });
@@ -70,7 +70,7 @@ test("the CLI shim runs exactly the clone's path, whatever is in it", () => {
   const dir = tmp();
   const clone = path.join(dir, "$HOME it's `x`");
   fs.mkdirSync(path.join(clone, "bin"), { recursive: true });
-  const launcher = path.join(clone, "bin", "t3blackout");
+  const launcher = path.join(clone, "bin", "t3");
   fs.writeFileSync(launcher, "console.log(JSON.stringify(process.argv.slice(2)))\n");
   const shim = path.join(dir, "shim");
   fs.writeFileSync(shim, cliShim({ node: process.execPath, launcher }), { mode: 0o755 });
@@ -89,11 +89,11 @@ test("schedules take whole hours and known days only", () => {
 });
 
 test("$ sequences in paths and PATH survive into the units", () => {
-  const launcher = "/opt/${HOME}/$&/t3blackout";
+  const launcher = "/opt/${HOME}/$&/blacksand";
   const pathEnv = "/usr/bin:/odd/$&/$1/$$:/bin";
   const { service } = systemdUpdateUnits({ node: "/usr/bin/node", launcher, pathEnv, hour: 4, weekday: "hourly" });
   assert.ok(service.includes(systemdArg(launcher)), service);
-  assert.ok(service.includes('"/opt/$${HOME}/$$&/t3blackout"'), "ExecStart keeps the doubled $");
+  assert.ok(service.includes('"/opt/$${HOME}/$$&/blacksand"'), "ExecStart keeps the doubled $");
   assert.ok(service.includes(systemdEnv("PATH", pathEnv)), service);
   assert.doesNotMatch(service, /__PATH_ASSIGNMENT__|__LAUNCHER__|__NODE__/);
 });

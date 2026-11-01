@@ -25,7 +25,7 @@ function fakeFetch(routes) {
 const client = (fetch, opts = {}) => githubClient({ token: "t", repo: "o/r", fetch, sleep: async () => {}, ...opts });
 
 test("every page is read, so nothing past 300 issues is missed", async () => {
-  const issues = Array.from({ length: 301 }, (_, i) => ({ number: i + 1, title: `[security] p${i} (nightly)`, user: bot, state: "open", body: `<!-- t3blackout text -->\nx\n\n${markerOf({ kind: "package", channel: "nightly", package: `p${i}` })}` }));
+  const issues = Array.from({ length: 301 }, (_, i) => ({ number: i + 1, title: `[security] p${i} (nightly)`, user: bot, state: "open", body: `<!-- blacksand text -->\nx\n\n${markerOf({ kind: "package", channel: "nightly", package: `p${i}` })}` }));
   let created = 0;
   const gh = client(
     fakeFetch((method, url) => {

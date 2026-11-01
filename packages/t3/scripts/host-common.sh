@@ -1,8 +1,9 @@
 # shellcheck shell=bash
-# Shared by T3 Blackout's host setup scripts (scripts/add-phone-service.sh,
-# scripts/enable-screen-sharing.sh and the Screen Sharing check installed from
-# it): sourced, not run, as root (sudo; tailscaled's LocalAPI takes writes from
-# root only). Output, launchd jobs, tag names, and Tailscale.
+# Shared by Blacksand T3's setup scripts (install.sh, scripts/add-agent-account.sh,
+# scripts/add-phone-service.sh, scripts/enable-screen-sharing.sh and the Screen
+# Sharing check installed from it): sourced, not run; all but install.sh as root
+# (sudo; tailscaled's LocalAPI takes writes from root only). Output, the legacy
+# install refusal, launchd jobs, tag names, and Tailscale.
 #
 # Tailscale is asked through tailscaled's LocalAPI directly, never through the
 # tailscale command, and every request has a deadline: a daemon that accepts and
@@ -23,6 +24,40 @@ check_tags() {
   for tag in "$@"; do [[ $tag =~ ^tag:[A-Za-z0-9-]+$ ]] || die "$tag isn't a tag name (tag:letters-digits-dashes)"; done
 }
 
+# ----------------------------------------------------------- legacy install --
+
+# Blacksand installs on a rebuilt machine, never beside a legacy T3 Blackout
+# install: the two would share sshd's port 2222, Remote Login's access list, the
+# agent accounts' servers and Screen Sharing's Serve mapping. Each setup script
+# calls this before it changes anything. It only looks.
+LEGACY_MARKERS=(/private/var/t3blackout-build/.t3blackout-builder /var/lib/t3blackout-build/.t3blackout-builder)
+LEGACY_JOB_DIRS=(/Library/LaunchDaemons /Library/LaunchAgents)
+LEGACY_GROUP=t3blackout-agents
+
+# What shows a legacy install is here (status 0), or status 1.
+legacy_install() {
+  local path
+  for path in "${LEGACY_MARKERS[@]}"; do
+    if [[ -e $path || -L $path ]]; then echo "$path"; return 0; fi
+  done
+  for path in "${LEGACY_JOB_DIRS[@]}"; do
+    if compgen -G "$path/dev.t3blackout.*" >/dev/null; then echo "$path/dev.t3blackout.*"; return 0; fi
+  done
+  if [[ "$(uname -s)" == Darwin ]]; then
+    dscl . -read "/Groups/$LEGACY_GROUP" >/dev/null 2>&1 || return 1
+  else
+    getent group "$LEGACY_GROUP" >/dev/null 2>&1 || return 1
+  fi
+  echo "the group $LEGACY_GROUP"
+}
+
+refuse_legacy_install() {
+  local found
+  if found="$(legacy_install)"; then
+    die "this machine has a legacy T3 Blackout install ($found). Blacksand installs on a rebuilt machine, not beside or over one: remove the legacy install first (docs/getting-started/rebuilding.md). Nothing was changed."
+  fi
+}
+
 # ------------------------------------------------------------------ launchd --
 
 # A launchd plist written whole: rendered by "$@", validated, 644 (root's, as
@@ -30,7 +65,7 @@ check_tags() {
 write_plist() {
   local file="$1" tmp
   shift
-  tmp="$(mktemp "${file%/*}/.t3blackout.XXXXXX")"
+  tmp="$(mktemp "${file%/*}/.blacksand-t3.XXXXXX")"
   "$@" >"$tmp"
   plutil -lint -s "$tmp" || { rm -f "$tmp"; die "$file didn't validate"; }
   chmod 644 "$tmp"
@@ -70,8 +105,8 @@ job_load() {
 # ---------------------------------------------------------------- tailscale --
 
 # tailscaled's LocalAPI socket: the open-source daemon's (guide section 2.2).
-TS_SOCKET="${T3BLACKOUT_TAILSCALED_SOCKET:-/var/run/tailscaled.socket}"
-TS_TIMEOUT="${T3BLACKOUT_TAILSCALE_TIMEOUT:-10}"
+TS_SOCKET="${BLACKSAND_T3_TAILSCALED_SOCKET:-/var/run/tailscaled.socket}"
+TS_TIMEOUT="${BLACKSAND_T3_TAILSCALE_TIMEOUT:-10}"
 
 tailscaled_up() { [[ -S $TS_SOCKET ]]; }
 

@@ -1,6 +1,6 @@
 # Builds the pinned releases with this commit's rules, injected files, overrides
 # and build code whenever those or pin.json change: typecheck, package,
-# forbidden-endpoint scan and offline smoke test (bin/t3blackout check --build),
+# forbidden-endpoint scan and offline smoke test (bin/t3 check --build),
 # then the tests in test/stripped/ inside the stripped checkout and a syntax check
 # of the SSH runner as upstream's tunnel.ts renders it. Each pinned channel the
 # change affects is built (ci/build-channels.mjs): a pin-only commit
@@ -126,11 +126,11 @@ jobs:
       # the code it builds could reach the runner's own copy anyway.
       - name: Build the pinned release
         env:
-          T3BLACKOUT_UNISOLATED_BUILD: "1"
-          T3BLACKOUT_GITHUB_TOKEN: ${{ github.token }}
+          BLACKSAND_T3_UNISOLATED_BUILD: "1"
+          BLACKSAND_T3_GITHUB_TOKEN: ${{ github.token }}
         run: |
           sha=$(node -p "require('./pin.json').channels[process.env.CHANNEL].sha")
-          node bin/t3blackout check --ref "$sha" --build
+          node bin/t3 check --ref "$sha" --build
 
       # The *.browser.test.tsx ones run in upstream's Playwright project (headless
       # Chromium, the version upstream's lockfile pins).

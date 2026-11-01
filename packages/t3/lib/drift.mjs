@@ -1,6 +1,6 @@
 // What upstream changed under the features a build left out (lib/features.mjs),
 // as one self-contained HTML page with no scripts. It's written to state/drift/
-// for `t3blackout drift`, and baked into the app, where the version stamp shows
+// for `blacksand t3 drift`, and baked into the app, where the version stamp shows
 // it in a frame.
 
 import * as path from "node:path";
@@ -479,8 +479,8 @@ export function renderDriftReport(drift, looks = null) {
   const intro = strict
     ? "A strict rule (privacy, identity or the updater) no longer matches upstream, so nothing was installed. What upstream changed is below."
     : features.length
-      ? "This build runs upstream's code where these Blackout features used to hook in. Every privacy, identity and updater rule applied as usual."
-      : "Every Blackout feature made it into this build.";
+      ? "This build runs upstream's code where these Blacksand features used to hook in. Every privacy, identity and updater rule applied as usual."
+      : "Every Blacksand feature made it into this build.";
   const strictSection = strict
     ? `<section class="strict"><h2>Stopped the update</h2><p class="why">${strict.rules.length} strict rule${strict.rules.length === 1 ? "" : "s"} no longer match${strict.rules.length === 1 ? "es" : ""}.</p>${renderRules(strict.rules)}${strict.files.map((file) => renderFile(file, drift.repo, drift.sha)).join("")}</section>`
     : "";
@@ -505,12 +505,12 @@ function renderAdvice({ strict, features }) {
   if (strict) {
     return `<footer><h2>What you can do</h2><ul>
 <li><b>Nothing to undo.</b> Your installed build is unchanged and keeps running. Updates stop at this release until the strict rule matches again: privacy, identity and updater rules are never left out of a build.</li>
-<li><b>Fix the strict rule.</b> Point it at upstream's new code (the highlighted lines show where it hooked in) in <code>lib/rules.mjs</code>, check with <code>t3blackout check</code>, and update.</li>
+<li><b>Fix the strict rule.</b> Point it at upstream's new code (the highlighted lines show where it hooked in) in <code>lib/rules.mjs</code>, check with <code>blacksand t3 check</code>, and update.</li>
 ${features.length ? `<li><b>The features above</b> would be left out of that build as upstream stands now; each comes back the same way, by pointing its rule at the new code.</li>\n` : ""}</ul></footer>`;
   }
   if (!features.length) return "";
   return `<footer><h2>What you can do</h2><ul>
 <li><b>Keep upstream's version.</b> Nothing to do: this build already runs it. To stop listing a feature here, remove its rules from <code>lib/rules.mjs</code> and its entry from <code>lib/features.mjs</code>.</li>
-<li><b>Bring Blackout's back.</b> Point the rule at upstream's new code (the highlighted lines show where it hooked in), check with <code>t3blackout check</code>, and update.</li>
+<li><b>Bring Blacksand's back.</b> Point the rule at upstream's new code (the highlighted lines show where it hooked in), check with <code>blacksand t3 check</code>, and update.</li>
 </ul></footer>`;
 }

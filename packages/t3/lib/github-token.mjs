@@ -1,14 +1,14 @@
 // The GitHub API token lib/advisories.mjs sends to api.github.com, and how it
-// reaches the Blackout processes that need it without reaching anything they
+// reaches the Blacksand processes that need it without reaching anything they
 // start. The advisory endpoints are public: any token, even one with no
 // permissions, only raises the rate limit from 60 requests an hour per address.
 //
 // A process takes it, the first one found, when this module loads (before it
 // starts anything) and again on each use:
-//   - T3BLACKOUT_GITHUB_TOKEN_FILE: a one-shot handoff file, deleted once read.
-//     A Blackout process writes one for its rerun and for the build account
+//   - BLACKSAND_T3_GITHUB_TOKEN_FILE: a one-shot handoff file, deleted once read.
+//     A Blacksand process writes one for its rerun and for the build account
 //     (githubTokenHandoff); its environment names the file, never the token;
-//   - T3BLACKOUT_GITHUB_TOKEN: the token itself (CI passes the job's);
+//   - BLACKSAND_T3_GITHUB_TOKEN: the token itself (CI passes the job's);
 //   - state/github-token in this clone: the owner's own, kept (a Mac's way to
 //     set one; create it with mode 0600).
 // Both variables leave this process's environment as soon as they're read, so
@@ -22,7 +22,7 @@
 // with for as long as it runs, which is why a file is the handoff here. Code
 // that can debug a process can read its memory, so a hostile build script in
 // the build account (which runs upstream's build as itself), or in a CI job
-// (which has sudo and the runner's own token), could take it. Give Blackout a
+// (which has sudo and the runner's own token), could take it. Give Blacksand a
 // token that can do nothing else: GitHub's job token in these workflows is
 // read-only, and on a Mac a fine-grained token with no permissions will do.
 
@@ -32,8 +32,8 @@ import * as path from "node:path";
 
 import { STATE } from "./util.mjs";
 
-export const TOKEN_ENV = "T3BLACKOUT_GITHUB_TOKEN";
-export const TOKEN_FILE_ENV = "T3BLACKOUT_GITHUB_TOKEN_FILE";
+export const TOKEN_ENV = "BLACKSAND_T3_GITHUB_TOKEN";
+export const TOKEN_FILE_ENV = "BLACKSAND_T3_GITHUB_TOKEN_FILE";
 /** The owner's own token file on a machine: kept, never deleted. */
 export const OWN_TOKEN_FILE = path.join(STATE, "github-token");
 /** What a GitHub token looks like (ghp_, github_pat_, ghs_ ...); anything else could split the header. */
@@ -162,8 +162,8 @@ export const HANDOFF_WRITER_SCRIPT = [
 ].join("\n");
 
 /**
- * A one-shot handoff of the token to a Blackout process this one is about to
- * start: { env: { T3BLACKOUT_GITHUB_TOKEN_FILE }, remove() }, or null when
+ * A one-shot handoff of the token to a Blacksand process this one is about to
+ * start: { env: { BLACKSAND_T3_GITHUB_TOKEN_FILE }, remove() }, or null when
  * there's no token. The child reads the file and deletes it as it starts;
  * remove() cleans up after a child that never did. `write(token)` -> { file,
  * remove } puts it where the child can read it (the build account's own

@@ -1,25 +1,25 @@
 #!/bin/sh
-# T3 Blackout: one agent account's long-running server, for the phone
+# Blacksand T3: one agent account's long-running server, for the phone
 # (docs/remote-access/phone.md). scripts/add-phone-service.sh installs a root-owned
-# copy as /usr/local/libexec/t3blackout/phone-server and a launchd job that runs
+# copy as /usr/local/libexec/blacksand/phone-server and a launchd job that runs
 # it as the account, at boot, logged in or not:
 #
 #   phone-server <port>
 #
 # It runs the installed app's server the way the desktop's SSH runner does
-# (lib/files/ssh-runner-blackout.sh): 127.0.0.1:<port>, the account's
-# ~/.t3blackout, its server.env. A desktop connecting over SSH finds it there and
+# (lib/files/ssh-runner-blacksand.sh): 127.0.0.1:<port>, the account's
+# ~/.blacksand/t3, its server.env. A desktop connecting over SSH finds it there and
 # shares it, so the phone and the desktop see the same threads. Tailscale Serve
 # (configured by the admin, never this account) is what the phone reaches.
 #
 # It keeps the files the SSH runner reads: a record per server in
-# ~/.t3blackout/ssh-servers/<pid>, which a connection uses to stop a server whose
-# build was replaced, and its own state in ~/.t3blackout/ssh-servers/daemon,
+# ~/.blacksand/t3/ssh-servers/<pid>, which a connection uses to stop a server whose
+# build was replaced, and its own state in ~/.blacksand/t3/ssh-servers/daemon,
 # which a connection waits on instead of starting a second server. When an
 # update replaces the app, it restarts the server on the new build within
 # seconds (a turn in progress stops, as when the app quits).
 #
-# Output goes to ~/.t3blackout/phone/server.log (and server.log.1: about 5 MB
+# Output goes to ~/.blacksand/t3/phone/server.log (and server.log.1: about 5 MB
 # each, rotated as it runs), readable by this account only: the server prints
 # a one-time pairing link there each time it starts.
 
@@ -41,7 +41,7 @@ fi
 
 # Before the log is open, problems go to the system log (log show --predicate 'senderImagePath ENDSWITH "logger"').
 early() {
-  logger -t dev.t3blackout.phone "$(id -un): $*" 2>/dev/null || true
+  logger -t dev.blacksand.phone "$(id -un): $*" 2>/dev/null || true
   echo "phone-server: $*" >&2
   # A setup problem doesn't fix itself: once a minute, not every 10 s.
   sleep 60
@@ -54,20 +54,20 @@ t3b_mine() { [ "$(stat -f '%u' "$1" 2>/dev/null)" = "$(id -u)" ]; }
 # The job sets HOME (/Users/<account>); it must be this account's own folder.
 [ -n "${HOME:-}" ] && [ -d "$HOME" ] && [ ! -L "$HOME" ] && t3b_mine "$HOME" ||
   early "HOME is ${HOME:-unset}, not a folder $T3B_USER owns"
-T3B_HOME="$HOME/.t3blackout"
+T3B_HOME="$HOME/.blacksand/t3"
 T3B_LOGDIR="$T3B_HOME/phone"
 T3B_LOG="$T3B_LOGDIR/server.log"
 T3B_SERVERS="$T3B_HOME/ssh-servers"
-for T3B_DIR in "$T3B_HOME" "$T3B_LOGDIR" "$T3B_SERVERS"; do
+for T3B_DIR in "$HOME/.blacksand" "$T3B_HOME" "$T3B_LOGDIR" "$T3B_SERVERS"; do
   [ ! -L "$T3B_DIR" ] || early "$T3B_DIR is a symlink"
   mkdir -p "$T3B_DIR" && chmod 700 "$T3B_DIR" || early "can't make $T3B_DIR"
 done
 # The log. What this supervisor and its servers print goes through a pipe to a
 # writer that appends it line by line, reopening the file for each, and keeps at
-# most two files of about 5 MB (T3BLACKOUT_PHONE_LOG_MAX bytes): server.log,
+# most two files of about 5 MB (BLACKSAND_T3_PHONE_LOG_MAX bytes): server.log,
 # then server.log.1. So a rotation takes effect at once, however long a server
 # runs, and every file is created under this script's umask 077.
-T3B_LOG_MAX="${T3BLACKOUT_PHONE_LOG_MAX:-5000000}"
+T3B_LOG_MAX="${BLACKSAND_T3_PHONE_LOG_MAX:-5000000}"
 case "$T3B_LOG_MAX" in
   "" | *[!0-9]*) T3B_LOG_MAX=5000000 ;;
 esac
@@ -95,10 +95,10 @@ rm -f "$T3B_PIPE"
 chmod 600 "$T3B_LOG" "$T3B_LOG.1" 2>/dev/null || true
 say() { printf '%s phone-server: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
 
-# Only the app the admin installed; T3BLACKOUT_APP is for the tests (launchd's
+# Only the app the admin installed; BLACKSAND_T3_APP is for the tests (launchd's
 # job sets no such variable, and this account can't edit the job).
-T3B_APP="${T3BLACKOUT_APP:-/Applications/T3 Blackout.app}"
-T3B_ELECTRON="$T3B_APP/Contents/MacOS/T3 Blackout"
+T3B_APP="${BLACKSAND_T3_APP:-/Applications/Blacksand T3.app}"
+T3B_ELECTRON="$T3B_APP/Contents/MacOS/Blacksand T3"
 T3B_ASAR="$T3B_APP/Contents/Resources/app.asar"
 T3B_SERVER="$T3B_ASAR/apps/server/dist/bin.mjs"
 T3B_ENV_FILE="$T3B_HOME/server.env"
@@ -145,7 +145,7 @@ t3b_env_ok() {
 # The pricing table the updater publishes, as the SSH runner copies it: only
 # from the account that installed the app, in a folder no one else can write.
 t3b_copy_rates() {
-  T3B_SHARED_RATES="/Users/Shared/t3blackout/usage-model-rates.json"
+  T3B_SHARED_RATES="/Users/Shared/blacksand/usage-model-rates.json"
   T3B_SHARED_DIR="${T3B_SHARED_RATES%/*}"
   T3B_RATES="$T3B_HOME/userdata/usage-model-rates.json"
   T3B_OWNER="$(stat -f '%u' "$T3B_APP" 2>/dev/null || echo none)"

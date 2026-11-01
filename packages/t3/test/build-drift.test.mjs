@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { emptyDrift, filesInError, regexAnchorText, renderDriftReport } from "../lib/drift.mjs";
 
 test("a type error's relative modules are found, TS2307's quoting and TS2305's", () => {
-  const file = "apps/web/src/components/BlackoutBrand.tsx";
+  const file = "apps/web/src/components/BlacksandBrand.tsx";
   const ts2307 = filesInError({ file, message: "TS2307: Cannot find module '../themePalette' or its corresponding type declarations." });
   assert.ok(ts2307.includes("apps/web/src/themePalette.ts"), ts2307.join(" "));
   const ts2305 = filesInError({ file, message: `TS2305: Module '"../themePalette"' has no exported member 'X'.` });

@@ -7,7 +7,7 @@
 // it needs per platform (URL, SHA-256, and the SHA-256 of each file taken from
 // it) or none, with why. The app downloads the archive for its own platform,
 // checks both hashes and writes only the listed files where the package
-// expects them (lib/files/blackoutNativeAssets.ts). Nothing is ever built from source.
+// expects them (lib/files/blacksandNativeAssets.ts). Nothing is ever built from source.
 
 import * as fs from "node:fs";
 

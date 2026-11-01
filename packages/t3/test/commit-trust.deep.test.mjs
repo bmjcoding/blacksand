@@ -75,17 +75,17 @@ test("self-update records what it verified only on top of a HEAD verified here: 
   assert.equal(recorded(fresh), next);
 });
 
-/** bin/t3blackout's update(), run with what it builds, installs and asks stubbed, a staged build of the pinned release waiting. */
+/** bin/t3's update(), run with what it builds, installs and asks stubbed, a staged build of the pinned release waiting. */
 async function updateBody({ verdict, scheduled, role = "host" }) {
-  const src = fs.readFileSync(new URL("../bin/t3blackout", import.meta.url), "utf8");
+  const src = fs.readFileSync(new URL("../bin/t3", import.meta.url), "utf8");
   const body = src.slice(src.indexOf("async function update(opts)"), src.indexOf("/** Takes the update lock if it's free"));
   const chosen = { ref: NIGHTLY(3917), sha: "a".repeat(40) };
   const seen = { build: 0, install: 0, events: [], process: { exitCode: 0 } };
   const quiet = () => {};
   const context = vm.createContext({
     fetchUpstream: async () => {}, progress: quiet, CURRENT: "", readJson: () => ({}),
-    chooseTarget: async () => ({ ...chosen, held: [] }), versionOf: () => "v", blackoutCommit: () => "b",
-    expectedBuild: () => null, isExpectedBuild: () => true, readPending: () => ({ ...chosen, blackout: "b" }),
+    chooseTarget: async () => ({ ...chosen, held: [] }), versionOf: () => "v", blacksandCommit: () => "b",
+    expectedBuild: () => null, isExpectedBuild: () => true, readPending: () => ({ ...chosen, blacksand: "b" }),
     platform: { isRunning: () => false, notify: quiet, pendingPath: "/scratch/pending", isScheduled: () => scheduled },
     installConfig: role ? { role } : null, pinnedFor: () => chosen, appChannel: () => "nightly", verifyHead: async () => verdict,
     log: quiet, emit: (event) => seen.events.push(event), process: seen.process,
@@ -115,7 +115,7 @@ test("update builds and installs nothing until a pinned release is verified here
   assert.equal((await updateBody({ verdict: { result: "verified", message: "ok" }, scheduled: false })).install, 1);
   const install = fs.readFileSync(new URL("../install.sh", import.meta.url), "utf8");
   assert.match(install, /^set -euo pipefail$/m);
-  assert.ok(install.indexOf("\n  bin/t3blackout update\n") < install.indexOf("bin/t3blackout schedule --hour"));
+  assert.ok(install.indexOf("\n  bin/t3 update\n") < install.indexOf("bin/t3 schedule --hour"));
 });
 
 test("git settings in the environment can't point the check at another repository", async () => {
@@ -168,13 +168,13 @@ test("an evaluator pin that isn't a regular file is refused, however valid what 
 });
 
 /**
- * bin/t3blackout's update, with its own target, chooseTarget, pinnedFor and requirePinned, and the real
+ * bin/t3's update, with its own target, chooseTarget, pinnedFor and requirePinned, and the real
  * readPin and unpinnedProblem reading `file`; upstream's newest release is NEWEST, and verifying,
  * building and installing are stubbed (update reports the stubbed build's failure itself). What it
  * verified and built, and the error it stopped on, if any.
  */
 async function updateWithPin(file) {
-  const src = fs.readFileSync(new URL("../bin/t3blackout", import.meta.url), "utf8");
+  const src = fs.readFileSync(new URL("../bin/t3", import.meta.url), "utf8");
   const between = (from, to) => src.slice(src.indexOf(from), src.indexOf(to, src.indexOf(from) + from.length));
   const body = [
     between("const pinnedFor = ", "/**"),
@@ -190,7 +190,7 @@ async function updateWithPin(file) {
     readPin: () => readPin(file), unpinnedProblem, SOAK_HOURS: 3, cliChannel: (channel) => channel, appChannel: () => "nightly",
     soakOf: () => ({}), resolveRef: () => NEWEST, revParse: (ref) => (ref === NEWEST ? "b".repeat(40) : ref), channelOfRef: () => "nightly", commitTime: () => 0,
     soakedTags: () => [NEWEST], MAX_FALLBACK: 5, verdictFor: async () => ({ ok: true }), heldLine: () => "",
-    fetchUpstream: async () => {}, progress: quiet, CURRENT: "", readJson: () => ({}), versionOf: () => "v", blackoutCommit: () => "signed",
+    fetchUpstream: async () => {}, progress: quiet, CURRENT: "", readJson: () => ({}), versionOf: () => "v", blacksandCommit: () => "signed",
     expectedBuild: () => null, isExpectedBuild: () => true, readPending: () => null, platform: { isRunning: () => false, notify: quiet },
     verifyHead: async () => (seen.verified++, { result: "verified", message: "ok" }), log: quiet, emit: quiet, process: { exitCode: 0 },
     buildUpstream: async (sha) => {

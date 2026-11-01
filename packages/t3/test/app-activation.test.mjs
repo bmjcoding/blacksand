@@ -20,10 +20,10 @@ import { assertConsistent, world } from "./app-activation-fixtures.mjs";
 function apps() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "t3b-app-"));
   const paths = {
-    installed: path.join(dir, "T3 Blackout.app"),
-    staged: path.join(dir, ".T3 Blackout.new.app"),
-    previous: path.join(dir, ".T3 Blackout.previous.app"),
-    outgoing: path.join(dir, ".T3 Blackout.outgoing.app"),
+    installed: path.join(dir, "Blacksand T3.app"),
+    staged: path.join(dir, ".Blacksand T3.new.app"),
+    previous: path.join(dir, ".Blacksand T3.previous.app"),
+    outgoing: path.join(dir, ".Blacksand T3.outgoing.app"),
   };
   const make = (where, version) => {
     fs.mkdirSync(where, { recursive: true });
@@ -100,13 +100,13 @@ test("rollback without a previous build changes nothing", () => {
 });
 
 test("only the desktop holds an update back, not servers run from the app", () => {
-  const exe = "/Applications/T3 Blackout.app/Contents/MacOS/";
-  assert.equal(isDesktopCommand("/Applications/T3 Blackout.app/Contents/MacOS/T3 Blackout", exe), true);
-  assert.equal(isDesktopCommand("/Applications/T3 Blackout.app/Contents/MacOS/T3 Blackout -psn_0_12345", exe), true);
-  const server = "/Applications/T3 Blackout.app/Contents/MacOS/T3 Blackout /Applications/T3 Blackout.app/Contents/Resources/app.asar/apps/server/dist/bin.mjs";
-  assert.equal(isDesktopCommand(`${server} serve --host 127.0.0.1 --port 3773 --base-dir /Users/agent-claude/.t3blackout`, exe), false);
+  const exe = "/Applications/Blacksand T3.app/Contents/MacOS/";
+  assert.equal(isDesktopCommand("/Applications/Blacksand T3.app/Contents/MacOS/Blacksand T3", exe), true);
+  assert.equal(isDesktopCommand("/Applications/Blacksand T3.app/Contents/MacOS/Blacksand T3 -psn_0_12345", exe), true);
+  const server = "/Applications/Blacksand T3.app/Contents/MacOS/Blacksand T3 /Applications/Blacksand T3.app/Contents/Resources/app.asar/apps/server/dist/bin.mjs";
+  assert.equal(isDesktopCommand(`${server} serve --host 127.0.0.1 --port 3773 --base-dir /Users/agent-claude/.blacksand/t3`, exe), false);
   assert.equal(isDesktopCommand(`${server} auth pairing create --json`, exe), false);
-  assert.equal(isDesktopCommand("/Applications/T3 Blackout.app/Contents/Frameworks/T3 Blackout Helper.app/Contents/MacOS/T3 Blackout Helper", exe), false);
+  assert.equal(isDesktopCommand("/Applications/Blacksand T3.app/Contents/Frameworks/Blacksand T3 Helper.app/Contents/MacOS/Blacksand T3 Helper", exe), false);
   assert.equal(isDesktopCommand("/opt/t3/app/t3code --type=renderer", "/opt/t3/app/"), true);
   assert.equal(isDesktopCommand("/opt/t3/app/t3code /opt/t3/app/resources/app.asar/apps/server/dist/bin.mjs serve", "/opt/t3/app/"), false);
 });
@@ -180,12 +180,12 @@ function journalWorld() {
   const apps = path.join(dir, "Applications");
   fs.mkdirSync(apps);
   const slots = {
-    installed: path.join(apps, "T3 Blackout.app"),
-    previous: path.join(apps, ".T3 Blackout.previous.app"),
-    outgoing: path.join(apps, ".T3 Blackout.outgoing.app"),
+    installed: path.join(apps, "Blacksand T3.app"),
+    previous: path.join(apps, ".Blacksand T3.previous.app"),
+    outgoing: path.join(apps, ".Blacksand T3.outgoing.app"),
   };
-  const staged = path.join(apps, ".T3 Blackout.new.app");
-  const pending = path.join(apps, ".T3 Blackout.pending.app");
+  const staged = path.join(apps, ".Blacksand T3.new.app");
+  const pending = path.join(apps, ".Blacksand T3.pending.app");
   const make = (where, v) => {
     fs.mkdirSync(where);
     fs.writeFileSync(path.join(where, "version"), v);
@@ -273,7 +273,7 @@ test("journals this install wrote still recover, from either staging folder", ()
   assert.equal(fs.readFileSync(path.join(w.slots.previous, "version"), "utf8"), "2");
   // A pending build whose install was cut off before anything moved: undone, still staged.
   const p = journalWorld();
-  const pending = path.join(p.apps, ".T3 Blackout.pending.app");
+  const pending = path.join(p.apps, ".Blacksand T3.pending.app");
   fs.renameSync(p.staged, pending);
   p.write({ ...p.install, staged: pending });
   assert.deepEqual(p.recover(), { op: "install", committed: false, staged: pending, records: p.install.records });
@@ -299,8 +299,8 @@ test("the CLI refuses a crafted rollback journal naming another project, and lea
   );
   const home = path.join(dir, "home");
   fs.mkdirSync(home, { mode: 0o700 });
-  const env = { PATH: process.env.PATH, HOME: home, T3BLACKOUT_HOME: path.join(home, ".t3blackout"), T3BLACKOUT_APPS: path.join(dir, "Apps"), T3BLACKOUT_UPDATE_REQUESTS: path.join(dir, "Shared", "requests"), XDG_DATA_HOME: path.join(dir, "data"), T3BLACKOUT_HEADLESS: "1" };
-  const result = spawnSync(process.execPath, [path.join(repo, "bin", "t3blackout"), "rollback"], { cwd: repo, env, encoding: "utf8", timeout: 60_000 });
+  const env = { PATH: process.env.PATH, HOME: home, BLACKSAND_T3_HOME: path.join(home, ".blacksand/t3"), BLACKSAND_T3_APPS: path.join(dir, "Apps"), BLACKSAND_T3_UPDATE_REQUESTS: path.join(dir, "Shared", "requests"), XDG_DATA_HOME: path.join(dir, "data"), BLACKSAND_T3_HEADLESS: "1" };
+  const result = spawnSync(process.execPath, [path.join(repo, "bin", "t3"), "rollback"], { cwd: repo, env, encoding: "utf8", timeout: 60_000 });
   assert.equal(result.status, 1);
   assert.match(result.stdout, /activation\.json is damaged \(its app folders aren't this install's\)/);
   assert.deepEqual(fs.readdirSync(victim), ["important.txt"]);

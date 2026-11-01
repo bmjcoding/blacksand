@@ -28,8 +28,8 @@
 # any program on this Mac may listen on a free high port, and one on 15900 would
 # get what the desktop sends (a fake sign-in prompt, say). Two root launchd jobs,
 # loaded at boot, hold a port each and serve nothing (each connection goes to
-# /usr/bin/true, as nobody): hold (dev.t3blackout.screensharing-hold) has 15900
-# whenever Screen Sharing is off, park (dev.t3blackout.screensharing-park) 15901
+# /usr/bin/true, as nobody): hold (dev.blacksand.screensharing-hold) has 15900
+# whenever Screen Sharing is off, park (dev.blacksand.screensharing-park) 15901
 # always. While Screen Sharing is off the forward points at 15901 ("parked"). Every
 # change of 15900's holder happens while the forward is parked, read back from
 # tailscaled; then the new holder is verified (root's launchd, or root's
@@ -38,7 +38,7 @@
 # answering, or another Serve handler mentioning 15900 or 15901) means no port
 # changes hands. Parked, not removed: TCP 5900 on the tailnet stays tailscaled's.
 #
-# The check (dev.t3blackout.screen-sharing-check: root, at boot and every minute)
+# The check (dev.blacksand.screen-sharing-check: root, at boot and every minute)
 # keeps Apple's version unloaded and the switch off, and keeps Screen Sharing on
 # only while it's wanted and every rule holds: exactly the admin account you ran
 # this from may sign in (by name and GeneratedUID, nobody else, no groups); no VNC
@@ -67,15 +67,15 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/host-common.sh"
 
 LABEL=com.apple.screensharing
 APPLE_PLIST=/System/Library/LaunchDaemons/$LABEL.plist
-OWN_DIR="/Library/Application Support/t3blackout"
+OWN_DIR="/Library/Application Support/blacksand"
 OWN_PLIST="$OWN_DIR/$LABEL.plist"
-HOLD_LABEL=dev.t3blackout.screensharing-hold
+HOLD_LABEL=dev.blacksand.screensharing-hold
 HOLD_PLIST=/Library/LaunchDaemons/$HOLD_LABEL.plist
-PARK_LABEL=dev.t3blackout.screensharing-park
+PARK_LABEL=dev.blacksand.screensharing-park
 PARK_PLIST=/Library/LaunchDaemons/$PARK_LABEL.plist
-CHECK_LABEL=dev.t3blackout.screen-sharing-check
+CHECK_LABEL=dev.blacksand.screen-sharing-check
 CHECK_PLIST=/Library/LaunchDaemons/$CHECK_LABEL.plist
-HELPER_DIR=/usr/local/libexec/t3blackout
+HELPER_DIR=/usr/local/libexec/blacksand
 CHECK=$HELPER_DIR/screen-sharing-check
 CHECK_LOG=/var/log/$CHECK_LABEL.log
 # Kept across restarts: who may sign in ("name uid GeneratedUID"); that Screen
@@ -84,13 +84,13 @@ CHECK_LOG=/var/log/$CHECK_LABEL.log
 # a forward, and "forward" from just before that write on: then tailscaled's saved
 # configuration may hold one, so tailscaled not running is never "nothing
 # there". Until the next restart: the last failed check's reason, and the lock.
-USER_FILE=/var/db/dev.t3blackout.screensharing.user
-WANTED=/var/db/dev.t3blackout.screensharing.wanted
-SERVE=/var/db/dev.t3blackout.screensharing.serve
+USER_FILE=/var/db/dev.blacksand.screensharing.user
+WANTED=/var/db/dev.blacksand.screensharing.wanted
+SERVE=/var/db/dev.blacksand.screensharing.serve
 FAILING=/var/run/$CHECK_LABEL.failing
 LOCK=/var/run/$CHECK_LABEL.flock
 ACCESS_GROUP=com.apple.access_screensharing
-AGENT_GROUP=t3blackout-agents
+AGENT_GROUP=blacksand-agents
 VNC_PASSWORD_FILE=/Library/Preferences/com.apple.VNCSettings.txt
 RM_PREFS=/Library/Preferences/com.apple.RemoteManagement
 RM_LAUNCHD="/Library/Application Support/Apple/Remote Desktop/RemoteManagement.launchd"
@@ -203,7 +203,7 @@ EOF
 print_policy() {
   cat <<EOF
 {
-  // T3 Blackout Screen Sharing (scripts/enable-screen-sharing.sh): TCP only.
+  // Blacksand T3 Screen Sharing (scripts/enable-screen-sharing.sh): TCP only.
   "tagOwners": {
     "$PHONE_TAG": ["autogroup:admin"]
   },
@@ -550,7 +550,7 @@ backend_off() {
 refresh_own_plist() {
   local tmp out
   install -d -o root -g wheel -m 755 "$OWN_DIR" || { echo "can't make $OWN_DIR"; return 1; }
-  tmp="$(mktemp "$OWN_DIR/.t3blackout-ss.XXXXXX")" || { echo "can't make a file in $OWN_DIR"; return 1; }
+  tmp="$(mktemp "$OWN_DIR/.blacksand-ss.XXXXXX")" || { echo "can't make a file in $OWN_DIR"; return 1; }
   if ! render_own_plist "$tmp"; then rm -f "$tmp"; echo "couldn't make Screen Sharing's plist from $APPLE_PLIST"; return 1; fi
   if cmp -s "$tmp" "$OWN_PLIST"; then rm -f "$tmp"; return 0; fi
   chmod 644 "$tmp"
@@ -1002,6 +1002,8 @@ main() {
     print_policy
     return 0
   fi
+  # The installed check runs only where this installed it; --status only looks.
+  [[ $mode == check || $mode == status ]] || refuse_legacy_install
   [[ "$(uname -s)" == Darwin ]] || die "macOS only"
   [[ $EUID -eq 0 ]] || die "run with sudo: sudo $0 $*"
   case "$mode" in

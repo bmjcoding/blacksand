@@ -5,7 +5,7 @@ Issues and pull requests are welcome. Report vulnerabilities privately
 
 ## How changes reach `main`
 
-Every machine running T3 Blackout fast-forwards to `main` only when every new
+Every machine running Blacksand T3 fast-forwards to `main` only when every new
 commit, on side branches too, carries an SSH signature from a key listed in
 `.allowed_signers` ([self-update](docs/updates/self-update.md)). That list holds
 the owner's key and the CI evaluator's key, which may sign only pin moves. So:
@@ -61,7 +61,7 @@ in the fast tier and a fresh one in the deep tier; a failure prints the seed and
 the command that replays it ([tools/fuzz.ts](tools/fuzz.ts)).
 
 Changes under `packages/t3/bin/`, `packages/t3/lib/` or `packages/t3/test/stripped/`
-also need a full build: `T3BLACKOUT_UNISOLATED_BUILD=1 packages/t3/bin/t3blackout check --build`
+also need a full build: `BLACKSAND_T3_UNISOLATED_BUILD=1 blacksand t3 check --build`
 (in a checkout that isn't an install), or let the `build.yml` workflow run.
 [Testing](docs/security/testing.md) describes the suite.
 

@@ -23,7 +23,7 @@ The names below are examples; use your own consistently.
 | `agent-claude` | an agent account on the host (add more the same way) |
 | `agent-standby` | the standby lane's agent account on the desktop |
 | your admin account | the account you set each Mac up from; on the desktop, your daily account |
-| `~/.ssh/t3blackout.pub` | the public half of the SSH key agent accounts accept |
+| `~/.ssh/blacksand.pub` | the public half of the SSH key agent accounts accept |
 
 Steps marked **(you)** are ones only you can do: a sign-in, a consent dialog, or a
 device in your hand.
@@ -72,7 +72,7 @@ Set up the host first, because the desktop's SSH steps need it running.
 
 | Where | Check | Expected |
 |---|---|---|
-| Both | `packages/t3/bin/t3blackout status` | the pinned release installed, `builds: as _t3blackout`, `signing: Apple Development: …`, the schedule line for the role |
+| Both | `blacksand t3 status` | the pinned release installed, `builds: as _blacksand-build`, `signing: Apple Development: …`, the schedule line for the role |
 | Both | `git --version` (new Terminal window) | 2.55.0 or later, Homebrew's |
 | Both | `sudo /usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate`; `csrutil status`; `spctl --status` | firewall enabled; SIP enabled; assessments enabled |
 | Host | `pmset -g` | `sleep 0` |
@@ -106,6 +106,6 @@ Once, while you're at the host, run `sudo fdesetup authrestart` there.
 
 - From the desktop, `nc -z -G 5 t3b-host 22` succeeds again within a few minutes.
 - The host's environment reconnects. Switch it off and on if it doesn't on its own.
-- The host's `packages/t3/bin/t3blackout status` still shows the LaunchDaemon schedule line.
+- The host's `blacksand t3 status` still shows the LaunchDaemon schedule line.
 - With the phone service, its server is back within seconds of boot, with nobody
   logged in.

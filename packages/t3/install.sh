@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# T3 Blackout installer for macOS and Linux. Safe to rerun: every step checks
+# Blacksand T3 installer for macOS and Linux. Safe to rerun: every step checks
 # before acting.
 #
 #   ./install.sh [--role ui|host|both] [--unisolated-build]   # hourly update check (macOS: vault "Personal")
-#   T3BLACKOUT_UPDATE_DAY=daily T3BLACKOUT_UPDATE_HOUR=6 T3BLACKOUT_VAULT=Other ./install.sh
+#   BLACKSAND_T3_UPDATE_DAY=daily BLACKSAND_T3_UPDATE_HOUR=6 BLACKSAND_T3_VAULT=Other ./install.sh
 #
 # Run it as yourself, not with sudo: it asks for sudo for the steps that need it.
 #
@@ -13,10 +13,10 @@
 #         the app is installed for them in /Applications and not opened, and the
 #         update check runs as a LaunchDaemon (as you), so it keeps running with
 #         nobody logged in. Then add each account, e.g.:
-#         sudo scripts/add-agent-account.sh agent-claude --key ~/.ssh/t3blackout.pub
+#         sudo scripts/add-agent-account.sh agent-claude --key ~/.ssh/blacksand.pub
 #   both  macOS only. The desktop app plus an agent account on this machine (a
 #         standby lane), e.g.:
-#         sudo scripts/add-agent-account.sh agent-standby --loopback-only --key ~/.ssh/t3blackout.pub
+#         sudo scripts/add-agent-account.sh agent-standby --loopback-only --key ~/.ssh/blacksand.pub
 #
 # macOS: installs missing tools with Homebrew, sets up the shared signing
 #   identity from 1Password (from your Apple Development certificate on the
@@ -25,7 +25,7 @@
 #   with the distro package manager and Node 24 into your home directory, then
 #   builds and installs. No signing step: Linux keyrings don't tie access to an
 #   app's signature.
-# Both: creates a separate, unprivileged build account (_t3blackout) so the
+# Both: creates a separate, unprivileged build account (_blacksand-build) so the
 #   scheduled build's dependency and build scripts can't read your home (which
 #   it makes private if they could); on macOS its own home is closed to every
 #   account but it and yours. pnpm and, on Linux, rustup are pinned
@@ -33,7 +33,7 @@
 #   install stops before any upstream code runs.
 #   --unisolated-build: where the build account can't be set up (no sudo),
 #   build as you instead. Upstream's dependency and build scripts then run with
-#   your files and credentials; every later update does too (bin/t3blackout
+#   your files and credentials; every later update does too (bin/t3
 #   status says so), until ./install.sh runs again with sudo.
 
 set -euo pipefail
@@ -41,7 +41,9 @@ cd "$(dirname "$0")"
 # lib/pnpm.mjs: the pinned pnpm, and the checks of root's build tools and their lock.
 PNPM_CHECK="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/pnpm.mjs"
 
-die() { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
+# Output and the legacy install refusal (shared with the setup scripts).
+# shellcheck source=scripts/host-common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/scripts/host-common.sh"
 # Builds as root would run upstream's dependency and build scripts as root, and
 # leave root-owned files your own runs can't update.
 ((EUID != 0)) || die "run ./install.sh as yourself, not as root or with sudo; it asks for sudo when it needs it"
@@ -60,15 +62,13 @@ case "$ROLE" in ui | host | both) ;; *) printf 'unknown role: %s (ui, host or bo
 # Agent accounts, the shared /Applications install and host updates are macOS's.
 [[ "$ROLE" == ui || "$(uname -s)" == Darwin ]] || die "--role $ROLE is macOS only; on Linux, install with --role ui"
 
-HOUR="${T3BLACKOUT_UPDATE_HOUR:-4}"
+HOUR="${BLACKSAND_T3_UPDATE_HOUR:-4}"
 # Hourly: with pin.json a run builds only when the pin moved (security fixes within the hour).
-DAY="${T3BLACKOUT_UPDATE_DAY:-hourly}"
-VAULT="${T3BLACKOUT_VAULT:-Personal}"
-OP_ITEM="T3 Blackout code signing"
+DAY="${BLACKSAND_T3_UPDATE_DAY:-hourly}"
+VAULT="${BLACKSAND_T3_VAULT:-Personal}"
+OP_ITEM="Blacksand T3 code signing"
 NODE_MAJOR=24
 
-say() { printf '\033[1m==> %s\033[0m\n' "$*"; }
-warn() { printf '\033[33mwarning:\033[0m %s\n' "$*" >&2; }
 have() { command -v "$1" >/dev/null 2>&1; }
 # The oldest patched release on each line Node supports (Oct 2026 security release:
 # Brotli RCE CVE-2026-111497 and TLS hostname bypasses). Raise when Node ships a new one.
@@ -114,7 +114,7 @@ git_problem() {
   [[ "$out" =~ $re ]] || { echo "can't read git's version (${out:-nothing})"; return 1; }
   version="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[4]:-0}"
   if (($(version_key "$version") < $(version_key "$GIT_MIN"))); then
-    echo "git $version is too old: T3 Blackout needs $GIT_MIN or later, for security fixes (CVE-2024-52005)"
+    echo "git $version is too old: Blacksand T3 needs $GIT_MIN or later, for security fixes (CVE-2024-52005)"
     return 1
   fi
 }
@@ -175,8 +175,8 @@ install_pnpm() {
 # live outside /usr/local, which an Intel Mac's Homebrew owns; every directory up
 # to / must be root's, which the check below confirms here, not at a build.
 case "$(uname -s)" in
-  Darwin) BUILD_TOOLS="/Library/Application Support/t3blackout/tools" ;;
-  *) BUILD_TOOLS=/usr/local/libexec/t3blackout/tools ;;
+  Darwin) BUILD_TOOLS="/Library/Application Support/blacksand/tools" ;;
+  *) BUILD_TOOLS=/usr/local/libexec/blacksand/tools ;;
 esac
 
 # Why the build tools in $1 aren't fit for the build account (printed; status 1),
@@ -281,9 +281,9 @@ tools_flock_why() {
 # keeps fd 8 open (sudo closes it in what it runs; nothing started here outlives
 # the install), until release_tools_lock, or their exits, however they end. Waits
 # while a build uses the tools or another install replaces them, up to
-# T3BLACKOUT_TOOLS_LOCK_WAIT_SECONDS (2 h), saying so once.
+# BLACKSAND_T3_TOOLS_LOCK_WAIT_SECONDS (2 h), saying so once.
 hold_tools_lock() {
-  local lock="$BUILD_TOOLS.lock" wait="${T3BLACKOUT_TOOLS_LOCK_WAIT_SECONDS:-7200}" deadline problem status waiting=""
+  local lock="$BUILD_TOOLS.lock" wait="${BLACKSAND_T3_TOOLS_LOCK_WAIT_SECONDS:-7200}" deadline problem status waiting=""
   [[ "$wait" =~ ^[0-9]+$ ]] || wait=7200
   exec 8<"$lock" || die "couldn't open the build tools' lock $lock"
   problem="$(tools_lock_problem 8 2>&1)" || { exec 8<&-; die "the build tools' lock isn't as it must be: $problem"; }
@@ -434,21 +434,21 @@ mac_setup() {
   problem="$(git_problem)" || die "$problem (git on PATH: $(command -v git || echo none)). Run: brew install git"
   node_ok || die "Node $NODE_MAJOR or newer with the Oct 2026 security fixes is required (24.22.1 or later on 24.x, or 26.12.1 or later; found $(node --version)). Run: brew upgrade node"
 
-  if bin/t3blackout signing status | grep -q "not set up"; then
+  if bin/t3 signing status | grep -q "not set up"; then
     [[ -d /Applications/1Password.app ]] || die "Install the 1Password app and sign in, then rerun ./install.sh"
     op vault list >/dev/null 2>&1 ||
       die "Turn on 1Password → Settings → Developer → \"Integrate with 1Password CLI\", then rerun ./install.sh"
     if op item get "$OP_ITEM" --vault "$VAULT" >/dev/null 2>&1; then
       say "Importing the shared signing identity from 1Password ($VAULT)"
-      bin/t3blackout signing import --vault "$VAULT"
+      bin/t3 signing import --vault "$VAULT"
     elif security find-identity -v -p codesigning "$HOME/Library/Keychains/login.keychain-db" |
       grep -qE '"(Apple Development|Developer ID Application): '; then
       say "Sharing your Apple Development certificate through 1Password ($VAULT)"
-      bin/t3blackout signing adopt --vault "$VAULT"
+      bin/t3 signing adopt --vault "$VAULT"
     else
       say "No Apple Development certificate found; creating a self-signed one in \"$VAULT\""
-      say "Keychain will ask again after each update until you run: bin/t3blackout signing adopt --vault \"$VAULT\" (docs/install/signing-macos.md)"
-      bin/t3blackout signing init --vault "$VAULT"
+      say "Keychain will ask again after each update until you run: blacksand t3 signing adopt --vault \"$VAULT\" (docs/install/signing-macos.md)"
+      bin/t3 signing init --vault "$VAULT"
     fi
   else
     say "Signing certificate already set up"
@@ -456,7 +456,7 @@ mac_setup() {
 }
 
 # --- Linux ----------------------------------------------------------------------
-NODE_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/t3blackout/node"
+NODE_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/blacksand/t3/node"
 
 install_node() {
   local arch
@@ -537,28 +537,28 @@ linux_setup() {
   # (Chromium) sandbox needs. Allow them for exactly the installed binary; its
   # path stays fixed across updates.
   local restrict=/proc/sys/kernel/apparmor_restrict_unprivileged_userns
-  if [[ -r "$restrict" && "$(cat "$restrict")" == 1 && ! -f /etc/apparmor.d/t3blackout ]]; then
-    local exe="${XDG_DATA_HOME:-$HOME/.local/share}/t3blackout/app/t3code"
+  if [[ -r "$restrict" && "$(cat "$restrict")" == 1 && ! -f /etc/apparmor.d/blacksand ]]; then
+    local exe="${XDG_DATA_HOME:-$HOME/.local/share}/blacksand/t3/app/t3code"
     say "Adding an AppArmor profile so Electron's sandbox can start ($exe)"
-    $sudo tee /etc/apparmor.d/t3blackout >/dev/null <<EOF
+    $sudo tee /etc/apparmor.d/blacksand >/dev/null <<EOF
 abi <abi/4.0>,
 include <tunables/global>
 
-profile t3blackout $exe flags=(unconfined) {
+profile blacksand $exe flags=(unconfined) {
   userns,
-  include if exists <local/t3blackout>
+  include if exists <local/blacksand>
 }
 EOF
-    $sudo apparmor_parser -r /etc/apparmor.d/t3blackout
+    $sudo apparmor_parser -r /etc/apparmor.d/blacksand
   fi
 }
 
 # --- build account ----------------------------------------------------------------
-BUILDER=_t3blackout
+BUILDER=_blacksand-build
 if [[ "$(uname -s)" == Darwin ]]; then
-  BUILDER_HOME=/private/var/t3blackout-build
+  BUILDER_HOME=/private/var/blacksand-build
 else
-  BUILDER_HOME=/var/lib/t3blackout-build
+  BUILDER_HOME=/var/lib/blacksand-build
 fi
 
 builder_user_mac() {
@@ -570,13 +570,13 @@ builder_user_mac() {
   done
   sudo dscl . -create "/Groups/$BUILDER"
   sudo dscl . -create "/Groups/$BUILDER" PrimaryGroupID "$id"
-  sudo dscl . -create "/Groups/$BUILDER" RealName "T3 Blackout builder"
+  sudo dscl . -create "/Groups/$BUILDER" RealName "Blacksand T3 builder"
   sudo dscl . -create "/Users/$BUILDER"
   sudo dscl . -create "/Users/$BUILDER" UniqueID "$id"
   sudo dscl . -create "/Users/$BUILDER" PrimaryGroupID "$id"
   sudo dscl . -create "/Users/$BUILDER" UserShell /usr/bin/false
   sudo dscl . -create "/Users/$BUILDER" NFSHomeDirectory "$BUILDER_HOME"
-  sudo dscl . -create "/Users/$BUILDER" RealName "T3 Blackout builder"
+  sudo dscl . -create "/Users/$BUILDER" RealName "Blacksand T3 builder"
   sudo dscl . -create "/Users/$BUILDER" Password '*'
   sudo dscl . -create "/Users/$BUILDER" IsHidden 1
 }
@@ -584,7 +584,7 @@ builder_user_mac() {
 builder_user_linux() {
   id "$BUILDER" >/dev/null 2>&1 && return
   sudo useradd --system --home-dir "$BUILDER_HOME" --create-home \
-    --shell "$(command -v nologin || echo /bin/false)" --comment "T3 Blackout builder" "$BUILDER"
+    --shell "$(command -v nologin || echo /bin/false)" --comment "Blacksand T3 builder" "$BUILDER"
 }
 
 # The build account's home. On macOS, mode 700 with one ACL entry, on the folder
@@ -624,7 +624,7 @@ builder_sudo() {
     warn "$why, so this install builds as you (--unisolated-build): upstream's dependency and build scripts run with your files and credentials"
     return 1
   fi
-  die "$why. T3 Blackout runs upstream's dependency and build scripts only as its build account $BUILDER, which needs sudo once to set up; rerun ./install.sh from an account that can use sudo. To build as you instead, with those scripts able to read your files and credentials: ./install.sh --unisolated-build"
+  die "$why. Blacksand T3 runs upstream's dependency and build scripts only as its build account $BUILDER, which needs sudo once to set up; rerun ./install.sh from an account that can use sudo. To build as you instead, with those scripts able to read your files and credentials: ./install.sh --unisolated-build"
 }
 
 # Called as a plain command, never in a condition, so `set -e` stops the
@@ -643,7 +643,7 @@ setup_builder() {
   rule="$(mktemp)"
   printf '%s ALL=(%s) NOPASSWD: ALL\n' "$(id -un)" "$BUILDER" >"$rule"
   sudo visudo -cf "$rule" >/dev/null || die "the sudo rule for $BUILDER didn't validate"
-  sudo install -m 440 -o root -g "$(id -gn root)" "$rule" /etc/sudoers.d/t3blackout
+  sudo install -m 440 -o root -g "$(id -gn root)" "$rule" /etc/sudoers.d/blacksand
   rm -f "$rule"
   as_builder true 2>/dev/null ||
     die "sudo can't switch to $BUILDER; make sure /etc/sudoers includes /etc/sudoers.d"
@@ -677,7 +677,7 @@ setup_builder() {
   if [[ -d build/upstream/.git && ! -d "$BUILDER_HOME/upstream" ]]; then
     tar -C build -cf - upstream | as_builder tar -C "$BUILDER_HOME" -xf -
   fi
-  as_builder touch "$BUILDER_HOME/.t3blackout-builder"
+  as_builder touch "$BUILDER_HOME/.blacksand-builder"
   # Build data from before the build account existed; it keeps its own now.
   rm -rf upstream build
 }
@@ -693,6 +693,7 @@ setup_own_toolchain() {
 
 # --- main -----------------------------------------------------------------------
 main() {
+  refuse_legacy_install
   case "$(uname -s)" in
     Darwin) mac_setup ;;
     Linux) linux_setup ;;
@@ -705,48 +706,48 @@ main() {
   # build account refuses to build.
   if builder_sudo; then
     setup_builder
-    bin/t3blackout configure --role "$ROLE"
+    bin/t3 configure --role "$ROLE"
   else
     setup_own_toolchain
-    bin/t3blackout configure --role "$ROLE" --unisolated-build
+    bin/t3 configure --role "$ROLE" --unisolated-build
     warn "Building as you (--unisolated-build): no build account keeps upstream's scripts away from your files"
   fi
 
-  say "Building and installing T3 Blackout (a few minutes on first run)"
-  bin/t3blackout update
+  say "Building and installing Blacksand T3 (a few minutes on first run)"
+  bin/t3 update
 
   if [[ "$DAY" == hourly ]]; then say "Scheduling the update check: hourly, and on update requests"; else say "Scheduling the update: ${DAY}, ${HOUR}:00"; fi
   if [[ "$ROLE" == host ]]; then say "It runs as a LaunchDaemon (as you), so it keeps going with nobody logged in"; fi
-  bin/t3blackout schedule --hour "$HOUR" --day "$DAY" || say "Couldn't schedule automatic updates here; run bin/t3blackout update by hand."
+  bin/t3 schedule --hour "$HOUR" --day "$DAY" || say "Couldn't schedule automatic updates here; run blacksand t3 update by hand."
 
   say "Done"
-  bin/t3blackout status
+  bin/t3 status
   if [[ "$(uname -s)" == Linux && ":$PATH:" == *":$NODE_HOME/bin:"* ]]; then
     echo
-    echo "To run bin/t3blackout by hand, add this to your shell profile:"
+    echo "To run blacksand t3 by hand, add this to your shell profile:"
     echo "  export PATH=\"$NODE_HOME/bin:\$HOME/.local/bin:\$HOME/.cargo/bin:\$PATH\""
   fi
   case "$ROLE" in
     ui)
-      printf '\nOpen "T3 Blackout" from your app launcher, or run: bin/t3blackout launch\n'
+      printf '\nOpen "Blacksand T3" from your app launcher, or run: blacksand t3 launch\n'
       ;;
     host)
       cat <<'NEXT'
 
 Next, for each account agents run in (docs/accounts/agent-accounts.md), e.g.:
-  sudo scripts/add-agent-account.sh agent-claude --key ~/.ssh/t3blackout.pub
+  sudo scripts/add-agent-account.sh agent-claude --key ~/.ssh/blacksand.pub
 then turn on Remote Login and run that command again. Signed in as the account
 (ssh agent-claude@localhost): install the provider CLIs on its own PATH, run
 `codex login` and `claude setup-token`, then
-/usr/local/libexec/t3blackout/set-claude-token
+/usr/local/libexec/blacksand/set-claude-token
 NEXT
       ;;
     both)
       cat <<'NEXT'
 
-Open "T3 Blackout" from your app launcher, or run: bin/t3blackout launch
+Open "Blacksand T3" from your app launcher, or run: blacksand t3 launch
 For the local standby lane (docs/install/standby.md), e.g.:
-  sudo scripts/add-agent-account.sh agent-standby --loopback-only --key ~/.ssh/t3blackout.pub
+  sudo scripts/add-agent-account.sh agent-standby --loopback-only --key ~/.ssh/blacksand.pub
 NEXT
       ;;
   esac

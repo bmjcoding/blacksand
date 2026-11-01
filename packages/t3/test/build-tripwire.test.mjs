@@ -23,7 +23,7 @@ function underTripwire(source, { esm = false } = {}) {
   const result = spawnSync(process.execPath, [script], {
     encoding: "utf8",
     timeout: 30_000,
-    env: { PATH: process.env.PATH, HOME: dir, NODE_OPTIONS: `--require ${JSON.stringify(TRIPWIRE)}`, T3BLACKOUT_TRIPWIRE_LOG: log },
+    env: { PATH: process.env.PATH, HOME: dir, NODE_OPTIONS: `--require ${JSON.stringify(TRIPWIRE)}`, BLACKSAND_T3_TRIPWIRE_LOG: log },
   });
   assert.equal(result.status, 0, result.stderr);
   const attempts = fs.existsSync(log) ? fs.readFileSync(log, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line)) : [];

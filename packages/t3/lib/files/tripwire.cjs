@@ -1,7 +1,7 @@
 // Network tripwire for the update smoke test (and the screenshots and preview),
 // loaded via NODE_OPTIONS=--require.
 //
-// Blocks, and appends to $T3BLACKOUT_TRIPWIRE_LOG, every attempt from this Node
+// Blocks, and appends to $BLACKSAND_T3_TRIPWIRE_LOG, every attempt from this Node
 // process to leave the machine:
 //   - TCP, TLS, HTTP(S), fetch and WebSocket connections (they all end in
 //     net.Socket#connect) to anything but this machine. A name counts as this
@@ -47,7 +47,7 @@ const workerThreads = require("node:worker_threads");
 const { syncBuiltinESMExports } = require("node:module");
 const { isLoopbackAddress } = require("./loopback.cjs");
 
-const LOG = process.env.T3BLACKOUT_TRIPWIRE_LOG;
+const LOG = process.env.BLACKSAND_T3_TRIPWIRE_LOG;
 const SELF = __filename;
 
 function record(kind, host, port) {
@@ -57,7 +57,7 @@ function record(kind, host, port) {
   } catch {}
 }
 
-const blocked = (what, code) => Object.assign(new Error(`t3blackout tripwire: blocked ${what}`), { code });
+const blocked = (what, code) => Object.assign(new Error(`blacksand tripwire: blocked ${what}`), { code });
 
 // ------------------------------------------------------------ what's local --
 
@@ -251,7 +251,7 @@ function withTripwire(env) {
   const out = { ...(env ?? process.env) };
   const nodeOptions = out.NODE_OPTIONS ?? "";
   if (!preloadsSelfFirst(nodeOptionWords(nodeOptions))) out.NODE_OPTIONS = `--require ${JSON.stringify(SELF)} ${nodeOptions}`.trim();
-  if (LOG) out.T3BLACKOUT_TRIPWIRE_LOG = LOG;
+  if (LOG) out.BLACKSAND_T3_TRIPWIRE_LOG = LOG;
   return out;
 }
 
@@ -692,7 +692,7 @@ workerThreads.Worker = class Worker extends OriginalWorker {
     const env = options?.env;
     if (env === workerThreads.SHARE_ENV) {
       process.env.NODE_OPTIONS = withTripwire(process.env).NODE_OPTIONS;
-      if (LOG) process.env.T3BLACKOUT_TRIPWIRE_LOG = LOG;
+      if (LOG) process.env.BLACKSAND_T3_TRIPWIRE_LOG = LOG;
     }
     const own = env == null || typeof env === "object" ? { env: withTripwire(env ?? process.env) } : {};
     super(filename, { ...options, execArgv, ...own });

@@ -19,8 +19,8 @@ project and its agent are:
   agent builds and installs the app on a simulator it can see. The simulator reaches
   Metro or any other dev server on the host's `localhost`. You watch and tap it in the
   desktop's Device panel. Video and input travel over HTTP and WebSocket through the
-  host's T3 server and the SSH environment's forwarded loopback port. So T3
-  Blackout's WebRTC block doesn't touch them, and nothing but port 22 has to be open.
+  host's T3 server and the SSH environment's forwarded loopback port. So Blacksand
+  T3's WebRTC block doesn't touch them, and nothing but port 22 has to be open.
 - **Projects in the Local environment: on the desktop,** the same way through its
   local server. A standby-lane thread runs its devices in `agent-standby`, set up
   like a host account.
@@ -29,7 +29,7 @@ project and its agent are:
   source → Machine over SSH**) would have the host's server SSH back into the
   desktop, which the [Tailscale policy](../networking/tailscale.md) refuses on purpose.
 - **EAS Simulator** (Expo's cloud simulators) is the one source that streams over
-  WebRTC. T3 Blackout lets only a hidden window of the app's own use UDP for it,
+  WebRTC. Blacksand T3 lets only a hidden window of the app's own use UDP for it,
   straight to Expo's cloud. TURN over TCP or TLS isn't available, so on a network that
   blocks UDP an EAS device shows no video ([privacy](../security/privacy.md#webrtc)).
 
@@ -49,4 +49,4 @@ darwin-arm64 and linux-x64 only ([device tools](../building/device-tools.md)).
 
 Physical devices connect by USB to the machine whose environment uses them: the host,
 for host threads. A phone plugged into the desktop isn't a device of the host's
-environment. Physical devices haven't been tried with T3 Blackout yet.
+environment. Physical devices haven't been tried with Blacksand T3 yet.

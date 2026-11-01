@@ -92,7 +92,7 @@ export function gitVersionProblem(output) {
   const match = /^git version (\d+)\.(\d+)(?:\.(\d+))?/.exec(output ?? "");
   if (!match) return `can't read git's version (${String(output ?? "").trim() || "nothing"})`;
   const version = `${match[1]}.${match[2]}.${match[3] ?? 0}`;
-  return versionKey(version) < versionKey(GIT_MIN) ? `git ${version} is too old: T3 Blackout needs ${GIT_MIN} or later, for security fixes (CVE-2024-52005)` : null;
+  return versionKey(version) < versionKey(GIT_MIN) ? `git ${version} is too old: Blacksand T3 needs ${GIT_MIN} or later, for security fixes (CVE-2024-52005)` : null;
 }
 
 /** gitVersionProblem for the git `PATH` finds, asked once per PATH. */

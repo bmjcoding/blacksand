@@ -74,7 +74,7 @@ export function pnpmTarget(platform = process.platform, arch = process.arch) {
  * Homebrew owns, in a directory every ancestor of which is root's; install.sh checks
  * that the whole way up (install_build_pnpm) and fails there, not at a build.
  */
-export const buildToolsRoot = (platform = process.platform) => (platform === "darwin" ? "/Library/Application Support/t3blackout/tools" : "/usr/local/libexec/t3blackout/tools");
+export const buildToolsRoot = (platform = process.platform) => (platform === "darwin" ? "/Library/Application Support/blacksand/tools" : "/usr/local/libexec/blacksand/tools");
 export const BUILD_TOOLS_ROOT = buildToolsRoot();
 export const ROOT_PNPM_PREFIX = path.join(BUILD_TOOLS_ROOT, "pnpm");
 export const ROOT_VITE_PLUS_HOME = path.join(BUILD_TOOLS_ROOT, "vite-plus");
@@ -226,7 +226,7 @@ export function pnpmPinProblem(text, pinned = PNPM_VERSION) {
   }
   if (!manifest || typeof manifest !== "object") return "upstream's package.json isn't an object";
   const other = requests(manifest).find(([, , version]) => version !== pinned);
-  return other ? `upstream asks for ${other[1]} (${other[0]} in package.json), not pnpm ${pinned}, the one T3 Blackout pins` : null;
+  return other ? `upstream asks for ${other[1]} (${other[0]} in package.json), not pnpm ${pinned}, the one Blacksand T3 pins` : null;
 }
 
 /** pnpmPinProblem for the checkout in `dir`. */
@@ -290,7 +290,7 @@ export function seedVitePlusHome(dir, pnpm = verifiedPnpm()) {
  */
 export function checkVitePlusHome(dir, { target = pnpmTarget(), digests = PNPM_BINARY_SHA256, rootOwned = runsAsBuilder(), lstat = fs.lstatSync, acl, writable } = {}) {
   const fail = (why) => {
-    throw new Error(`upstream's Vite+ home isn't what T3 Blackout gave it (${why} in ${dir}); nothing was installed`);
+    throw new Error(`upstream's Vite+ home isn't what Blacksand T3 gave it (${why} in ${dir}); nothing was installed`);
   };
   const { dirs, files, native } = vitePlusEntries();
   // This account must get into every directory (top down, before anything is read
@@ -321,7 +321,7 @@ export function checkVitePlusHome(dir, { target = pnpmTarget(), digests = PNPM_B
   for (const entry of dirs) if (!lstat(path.join(dir, entry)).isDirectory()) fail(`${entry} isn't a directory`);
   for (const [entry, text] of Object.entries(files)) {
     if (!lstat(path.join(dir, entry)).isFile()) fail(`${entry} isn't a regular file`);
-    if (fs.readFileSync(path.join(dir, entry), "utf8") !== text) fail(`${entry} isn't Vite+'s launcher as T3 Blackout writes it`);
+    if (fs.readFileSync(path.join(dir, entry), "utf8") !== text) fail(`${entry} isn't Vite+'s launcher as Blacksand T3 writes it`);
   }
   for (const [entry, text] of Object.entries(files)) usable(entry, text ? fs.constants.R_OK | fs.constants.X_OK : fs.constants.R_OK);
   verifiedPnpm({ file: path.join(dir, native), target, digests, rootOwned: false });
@@ -366,7 +366,7 @@ export async function fetchPinnedPnpm(dir, { target = pnpmTarget(), tarballs = P
 
 /** `node lib/pnpm.mjs digests`: PNPM_BINARY_SHA256 for PNPM_VERSION, from the pinned tarballs. Run it when raising the pin. */
 async function printBinaryDigests() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "t3blackout-pnpm-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "blacksand-pnpm-"));
   try {
     const out = {};
     for (const target of Object.keys(PNPM_TARBALL_SHA512).filter((key) => key !== "wrapper")) {
@@ -444,8 +444,8 @@ export function toolsLockProblem(file, { platform = process.platform, builder = 
   return above ? `the directories above ${file}: ${above}` : null;
 }
 
-/** How long to wait for the tools' lock: T3BLACKOUT_TOOLS_LOCK_WAIT_SECONDS, or `seconds`. */
-const toolsLockWaitMs = (seconds) => 1000 * (Number(process.env.T3BLACKOUT_TOOLS_LOCK_WAIT_SECONDS) || seconds);
+/** How long to wait for the tools' lock: BLACKSAND_T3_TOOLS_LOCK_WAIT_SECONDS, or `seconds`. */
+const toolsLockWaitMs = (seconds) => 1000 * (Number(process.env.BLACKSAND_T3_TOOLS_LOCK_WAIT_SECONDS) || seconds);
 
 /**
  * Takes the tools' lock at `file`, shared (a build) or exclusive, waiting while it's

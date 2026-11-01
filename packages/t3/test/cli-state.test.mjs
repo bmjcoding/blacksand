@@ -28,20 +28,20 @@ function cli() {
   const env = {
     PATH: process.env.PATH,
     HOME: home,
-    T3BLACKOUT_HOME: path.join(home, ".t3blackout"),
-    T3BLACKOUT_APPS: apps,
-    T3BLACKOUT_UPDATE_REQUESTS: path.join(dir, "Shared", "t3blackout", "update-requests"),
+    BLACKSAND_T3_HOME: path.join(home, ".blacksand/t3"),
+    BLACKSAND_T3_APPS: apps,
+    BLACKSAND_T3_UPDATE_REQUESTS: path.join(dir, "Shared", "blacksand", "update-requests"),
     XDG_DATA_HOME: data,
     XDG_CONFIG_HOME: path.join(dir, "config"),
-    T3BLACKOUT_HEADLESS: "1",
+    BLACKSAND_T3_HEADLESS: "1",
   };
   const slots = isMac
-    ? { installed: path.join(apps, "T3 Blackout.app"), previous: path.join(apps, ".T3 Blackout.previous.app"), outgoing: path.join(apps, ".T3 Blackout.outgoing.app"), staged: path.join(apps, ".T3 Blackout.new.app") }
-    : { installed: path.join(data, "t3blackout", "app"), previous: path.join(data, "t3blackout", "app.previous"), outgoing: path.join(data, "t3blackout", "app.outgoing"), staged: path.join(data, "t3blackout", "app.new") };
+    ? { installed: path.join(apps, "Blacksand T3.app"), previous: path.join(apps, ".Blacksand T3.previous.app"), outgoing: path.join(apps, ".Blacksand T3.outgoing.app"), staged: path.join(apps, ".Blacksand T3.new.app") }
+    : { installed: path.join(data, "blacksand", "t3", "app"), previous: path.join(data, "blacksand", "t3", "app.previous"), outgoing: path.join(data, "blacksand", "t3", "app.outgoing"), staged: path.join(data, "blacksand", "t3", "app.new") };
   fs.mkdirSync(path.dirname(slots.installed), { recursive: true });
   const state = path.join(repo, "state");
   fs.mkdirSync(state, { recursive: true });
-  const run = (args, extra = {}) => spawnSync(process.execPath, [path.join(repo, "bin", "t3blackout"), ...args], { encoding: "utf8", env: { ...env, ...extra }, timeout: 60_000 });
+  const run = (args, extra = {}) => spawnSync(process.execPath, [path.join(repo, "bin", "t3"), ...args], { encoding: "utf8", env: { ...env, ...extra }, timeout: 60_000 });
   const make = (where, v) => {
     fs.mkdirSync(where, { recursive: true });
     fs.writeFileSync(path.join(where, "version"), v);
@@ -67,7 +67,7 @@ test("rollback waits its turn: refused while an update holds the lock, then swap
   try {
     const refused = c.run(["rollback"]);
     assert.equal(refused.status, 1);
-    assert.match(refused.stdout + refused.stderr, /another t3blackout update is running/);
+    assert.match(refused.stdout + refused.stderr, /another blacksand t3 update is running/);
     assert.equal(c.version(c.slots.installed), "v2", "nothing moved");
     assert.equal(c.record("current.json").ref, "v2");
   } finally {
@@ -103,7 +103,7 @@ test("an install cut off after its build went in is finished before the next com
   c.make(slots.previous, "v1");
   c.writeRecord("current.json", { ref: "v2" });
   c.writeRecord("previous.json", { ref: "v1" });
-  const build = { ref: "v3", sha: "3".repeat(40), version: "3", blackout: null };
+  const build = { ref: "v3", sha: "3".repeat(40), version: "3", blacksand: null };
   c.writeRecord("activation.json", {
     v: 1, op: "install", slots, staged, origin: slots.installed, committed: false,
     records: { current: { ...build, installedAt: "2026-10-30T00:00:00.000Z" }, previous: { ref: "v2" }, clearPending: true, build },
@@ -120,7 +120,7 @@ test("an install cut off after its build went in is finished before the next com
 test("an invalid install config stops every command but configure, which repairs it", () => {
   const c = cli();
   installedTwo(c);
-  fs.writeFileSync(path.join(c.state, "install.json"), '{"role":"host","env":{"T3BLACKOUT_APPS":');
+  fs.writeFileSync(path.join(c.state, "install.json"), '{"role":"host","env":{"BLACKSAND_T3_APPS":');
   const refused = c.run(["rollback"]);
   assert.equal(refused.status, 1);
   assert.match(refused.stdout + refused.stderr, /install\.json isn't valid JSON/);
@@ -136,8 +136,8 @@ test("configure refuses host roles that move what agent accounts rely on", { ski
   const c = cli();
   const refused = c.run(["configure", "--role", "host"]);
   assert.equal(refused.status, 1);
-  // The scratch apps folder is a T3BLACKOUT_APPS override; an account that can't write /Applications is refused first.
-  assert.match(refused.stdout + refused.stderr, /can't use T3BLACKOUT_APPS|installs the app in \/Applications/);
+  // The scratch apps folder is a BLACKSAND_T3_APPS override; an account that can't write /Applications is refused first.
+  assert.match(refused.stdout + refused.stderr, /can't use BLACKSAND_T3_APPS|installs the app in \/Applications/);
   assert.equal(fs.existsSync(path.join(c.state, "install.json")), false);
 });
 
@@ -155,9 +155,9 @@ function smokeClone() {
   fs.mkdirSync(scratch);
   const home = path.join(dir, "home");
   fs.mkdirSync(home, { mode: 0o700 });
-  const env = { PATH: process.env.PATH, HOME: home, TMPDIR: scratch, T3BLACKOUT_HEADLESS: "1", T3BLACKOUT_UNISOLATED_BUILD: "1", T3BLACKOUT_APPS: path.join(dir, "Apps"), T3BLACKOUT_UPDATE_REQUESTS: path.join(dir, "requests") };
-  const smoke = () => spawnSync(process.execPath, [path.join(repo, "bin", "t3blackout"), "smoke"], { cwd: repo, encoding: "utf8", env, timeout: 120_000 });
-  const left = () => fs.readdirSync(scratch).filter((name) => name.startsWith("t3blackout-smoke-"));
+  const env = { PATH: process.env.PATH, HOME: home, TMPDIR: scratch, BLACKSAND_T3_HEADLESS: "1", BLACKSAND_T3_UNISOLATED_BUILD: "1", BLACKSAND_T3_APPS: path.join(dir, "Apps"), BLACKSAND_T3_UPDATE_REQUESTS: path.join(dir, "requests") };
+  const smoke = () => spawnSync(process.execPath, [path.join(repo, "bin", "t3"), "smoke"], { cwd: repo, encoding: "utf8", env, timeout: 120_000 });
+  const left = () => fs.readdirSync(scratch).filter((name) => name.startsWith("blacksand-smoke-"));
   return { repo, smoke, left, state: path.join(repo, "state") };
 }
 

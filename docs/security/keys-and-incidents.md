@@ -9,12 +9,12 @@
 |---|---|---|---|
 | **Owner SSH signing key** | sign any commit every machine takes: the root of trust | your SSH agent or hardware key; its public half in `.allowed_signers` | add the new key in a commit the old key signs; sign the next commit with the new key, removing the old one ([below](#rotating-the-owner-key)) |
 | **Evaluator key** (`t3blackout-evaluator`) | sign `pin.json`-only, forward moves to real upstream releases, which machines re-check | the `T3BLACKOUT_EVALUATOR_SIGNING_KEY` repository Actions secret; its public half in `.allowed_signers` | new key pair; replace the secret; replace its line in `.allowed_signers` in an owner-signed commit |
-| **SSH key agent accounts accept** | log in to every agent account | your SSH agent; its public half in root's `/etc/ssh/t3blackout/authorized_keys/<account>` on each machine | rerun `sudo packages/t3/scripts/add-agent-account.sh <account> --key <new.pub>` for every account; the file is rewritten |
-| **Claude Code token** (`claude setup-token`) | use your Claude subscription from that agent account | `~/.t3blackout/server.env` in the agent account (owner only) | yearly: `claude setup-token`, then `/usr/local/libexec/t3blackout/set-claude-token`; switch the environment off and on; revoke the old token |
+| **SSH key agent accounts accept** | log in to every agent account | your SSH agent; its public half in root's `/etc/ssh/blacksand/authorized_keys/<account>` on each machine | rerun `sudo packages/t3/scripts/add-agent-account.sh <account> --key <new.pub>` for every account; the file is rewritten |
+| **Claude Code token** (`claude setup-token`) | use your Claude subscription from that agent account | `~/.blacksand/t3/server.env` in the agent account (owner only) | yearly: `claude setup-token`, then `/usr/local/libexec/blacksand/set-claude-token`; switch the environment off and on; revoke the old token |
 | **Codex login** | use your OpenAI account from that agent account | `~/.codex/auth.json` in the agent account | `codex logout`, `codex login` |
 | **GitHub CLI login** (yours) | push; with `workflow` scope, change workflows (and so read the evaluator key) | your account only, never an agent account | revoke at GitHub → Settings → Applications when you rebuild a machine |
 | **`state/github-token`** (optional) | nothing: a fine-grained token with no permissions, only for the advisory API's rate limit | the clone's `state/`, mode 600 | replace the file |
-| **Apple Development certificate** (macOS) | sign apps that your Keychain treats as T3 Blackout | 1Password item "T3 Blackout code signing"; `state/signing.keychain-db` on each Mac | yearly ([signing](../install/signing-macos.md#renewal)) |
+| **Apple Development certificate** (macOS) | sign apps that your Keychain treats as Blacksand T3 | 1Password item "Blacksand T3 code signing"; `state/signing.keychain-db` on each Mac | yearly ([signing](../install/signing-macos.md#renewal)) |
 | **Tailscale node keys** | be a device in your tailnet | each machine; the host's has key expiry disabled | remove the device in the admin console and re-join |
 | **Tailnet Lock keys and disablement secrets** | sign devices in; turn the lock off | each signing node; secrets in your password manager | `tailscale lock revoke-keys` ([Tailscale](../networking/tailscale.md#tailnet-lock-optional)) |
 | **Phone sessions** | act as that agent account's server | the paired phone | revoke in the desktop app: the environment → **Settings → Sharing & access → Authorized clients** |
@@ -44,6 +44,17 @@ Machines read `.allowed_signers` from each commit's first parent:
 
 Update your GitHub account's signing keys too, so commits show as verified there.
 That's display only; machines don't use it.
+
+### At the cutover
+
+Blacksand installs on a rebuilt machine. It doesn't upgrade a legacy T3 Blackout
+install in place, and its installer refuses to run while one is present.
+
+The evaluator key rotates at the cutover ([below](#the-evaluator-key-leaked)) under
+the **same** principal name, `t3blackout-evaluator`, in an owner-signed
+`.allowed_signers` change. Never rename that principal: the name is how both
+verifiers know which signer is restricted to pins, and every other principal in
+`.allowed_signers` has owner authority.
 
 ## Playbooks
 
@@ -76,7 +87,7 @@ code every machine runs at its next update.
 
 1. **Stop machines taking new commits.** Self-update runs whenever `update` or
    `poll` does: the scheduled job (and a host's update requests), the update button,
-   **Update everything**, or by hand. On each machine, run `packages/t3/bin/t3blackout
+   **Update everything**, or by hand. On each machine, run `blacksand t3
    unschedule`, and use none of the others.
 2. **Secure the GitHub account:** change its password, revoke tokens, check its SSH
    and signing keys, sessions and deploy keys. The ruleset already blocks force-push
@@ -91,7 +102,7 @@ code every machine runs at its next update.
 5. **Machines that may have taken a hostile commit:** treat them as compromised. A
    commit runs as the installing account at the next update. Rebuild from a fresh
    clone at a reviewed commit ([cloning](../install/clone.md)).
-6. Reschedule (`packages/t3/bin/t3blackout schedule`) once `main` is clean.
+6. Reschedule (`blacksand t3 schedule`) once `main` is clean.
 
 ### A machine was lost or stolen
 
@@ -118,7 +129,7 @@ The 3-day age gate is there for this: it gives the registry and security researc
 time to find and pull a hijacked version before any machine installs it. It doesn't
 guarantee they will, so the alert job keeps checking what's already pinned.
 
-1. **Stop update activity if the bad version may be pinned:** run `packages/t3/bin/t3blackout
+1. **Stop update activity if the bad version may be pinned:** run `blacksand t3
    unschedule` on each machine, and don't run `update` or `poll`, press the update
    button or **Update everything** until the pin is clean. Unscheduling alone doesn't
    disable those.
@@ -130,7 +141,7 @@ guarantee they will, so the alert job keeps checking what's already pinned.
    a bad dependency that upstream still uses, add a security override to a fixed
    version ([fast lane](../updates/fast-lane.md#security-overrides)), or hold the pin
    where it is.
-4. **A machine that installed it:** run `~/.t3blackout/bin/t3blackout rollback` to go
+4. **A machine that installed it:** run `blacksand t3 rollback` to go
    back one build. Then treat that machine's account (and the build account, for a
    malicious install script) as exposed: rotate the tokens it could read.
 5. Reschedule once a clean pin is on `main`.
@@ -146,4 +157,4 @@ Reports come through GitHub's private vulnerability reporting ([SECURITY.md](../
    fix. Land it as an owner-signed commit.
 4. Online machines take the fix at their next scheduled check, once it verifies and builds. Publish the advisory once it's on `main`,
    crediting the reporter if they want that.
-5. If it's upstream's bug, not T3 Blackout's, help the reporter take it to upstream.
+5. If it's upstream's bug, not Blacksand T3's, help the reporter take it to upstream.

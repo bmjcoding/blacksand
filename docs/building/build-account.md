@@ -7,11 +7,11 @@
 
 Every build runs upstream's build scripts, and the install scripts of the
 dependencies the desktop build needs. That's code you haven't read, running
-unattended. So `install.sh` creates an unprivileged account, `_t3blackout`. The
+unattended. So `install.sh` creates an unprivileged account, `_blacksand-build`. The
 fetch, build and smoke test run as it.
 
-- **Where its files live:** `/private/var/t3blackout-build` on macOS, and
-  `/var/lib/t3blackout-build` on Linux. That holds the upstream mirror, the build
+- **Where its files live:** `/private/var/blacksand-build` on macOS, and
+  `/var/lib/blacksand-build` on Linux. That holds the upstream mirror, the build
   checkout and its own pnpm store. On macOS, that folder is mode 700 with one ACL
   entry letting you list and pass through it, so no other account (agent accounts
   included) can open it. On Linux it's 755, because Linux has no agent accounts.
@@ -20,12 +20,12 @@ fetch, build and smoke test run as it.
   credentials. Each build starts in `/` (your clone is in a folder it can't open),
   with a private `TMPDIR`.
 - **Its tools:** the pinned pnpm, and the Vite+ home upstream's build runs pnpm from,
-  live in root-owned `/Library/Application Support/t3blackout/tools` (Linux:
-  `/usr/local/libexec/t3blackout/tools`). The build account can run them but not
+  live in root-owned `/Library/Application Support/blacksand/tools` (Linux:
+  `/usr/local/libexec/blacksand/tools`). The build account can run them but not
   change them. Every directory up the path must be root's, with no ACL that grants
   more. A build checks the binary's SHA-256 before every pnpm run
   ([pnpm pin](../updates/pnpm-pin.md)).
-- **How it's started:** through one sudo rule, `<you> ALL=(_t3blackout) NOPASSWD:
+- **How it's started:** through one sudo rule, `<you> ALL=(_blacksand-build) NOPASSWD:
   ALL`. The rule works in one direction only: you can act as the build account, and
   it can't act as you or as root.
 - **What it hands back:** an unsigned app. You scan it again, sign it and install it.
@@ -43,7 +43,7 @@ them.
   file is at its path. On Linux it's root's, mode 644.
 - Each side waits for the other, then gives up naming the lock: an install up to 2
   hours, a build 30 minutes. That limits the waiter, not the holder.
-  `sudo lsof "/Library/Application Support/t3blackout/tools.lock"` shows who holds it.
+  `sudo lsof "/Library/Application Support/blacksand/tools.lock"` shows who holds it.
 - An install that was killed part-way leaves its stage and the tools it moved aside.
   The next `install.sh` puts the old tools back or finishes, before anything else.
   Killed between its two renames, it leaves no tools in place. Builds (and the hourly
@@ -54,12 +54,12 @@ them.
 If sudo is missing or doesn't authorize you, `install.sh` stops before any upstream
 code runs. `packages/t3/install.sh --unisolated-build` builds as you instead, and upstream's
 scripts then run with your files and credentials. That choice is saved in
-`state/install.json`, and the `builds:` line in `packages/t3/bin/t3blackout status` shows it.
+`state/install.json`, and the `builds:` line in `blacksand t3 status` shows it.
 
 An install saved without it never builds as you. If its build account goes missing,
 update, check, poll, smoke and evaluate refuse, and say to rerun `packages/t3/install.sh`. A
 checkout that isn't an install (CI, development) builds as you only with
-`T3BLACKOUT_UNISOLATED_BUILD=1`. A clone with installed builds but no
+`BLACKSAND_T3_UNISOLATED_BUILD=1`. A clone with installed builds but no
 `state/install.json` is refused even then.
 
 ## What it doesn't protect

@@ -55,7 +55,7 @@ which `expo-device-hub` needs, is listed for darwin-arm64 and linux-x64 only.
 
 This stops the build with "pin.json has no reviewed dependency lockfile for device
 tool …". The evaluator proposes one when it clears a tool. For a version you reviewed
-by hand (listed in `packages/t3/lib/known-device-tools.txt`), run `packages/t3/bin/t3blackout
+by hand (listed in `packages/t3/lib/known-device-tools.txt`), run `blacksand t3
 device-tool-lock --tool name@version`, and commit `pin.json`, signed.
 
 ## Overrides
@@ -70,7 +70,7 @@ line below the fix.
 The raised version goes through everything above: listed in `known-device-tools.txt`,
 a reviewed lockfile, the native-asset list. Every count of what the app installs
 (evaluator, `pin-check`, self-update, the build, the alerts) uses it. To add one:
-the entry, the known-tools line with its review note, `packages/t3/bin/t3blackout
+the entry, the known-tools line with its review note, `blacksand t3
 device-tool-lock --tool name@version`, then a commit the owner signs. Drop it once
 upstream pins the fix and it's at least 3 days old.
 

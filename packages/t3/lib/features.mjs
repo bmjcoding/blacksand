@@ -3,7 +3,7 @@
 // A rule listed under a feature fails open: if upstream moves the code it hooks
 // into, the build drops the whole feature (every rule in it, and every feature
 // that requires it) and still installs. The update says what it left out, and
-// `t3blackout drift` shows what upstream changed (lib/drift.mjs).
+// `blacksand t3 drift` shows what upstream changed (lib/drift.mjs).
 //
 // Every rule not listed here is strict: telemetry, phone-homes, the CSP, the app's
 // identity and the updater. A strict rule that stops matching stops the update.
@@ -12,32 +12,32 @@
 //
 // `rules` are rule ids; a trailing * matches every id with that prefix.
 // `requires` names features this one can't build or show without. Data
-// attributes for t3blackout.css don't count: they're inert without it.
+// attributes for blacksand.css don't count: they're inert without it.
 
 export const features = [
   {
     name: "names",
-    label: "Blackout names",
-    description: "T3 Blackout as the app name in a plain browser and the page title; the Ink and Orchid theme names",
+    label: "Blacksand names",
+    description: "Blacksand T3 as the app name in a plain browser and the page title; the Ink and Orchid theme names",
     rules: ["web/branding-name", "web/branding-title", "web/theme-name-ink", "web/theme-name-orchid"],
   },
   {
     name: "product-name",
-    label: "T3 Blackout in dialogs and menus",
+    label: "Blacksand T3 in dialogs and menus",
     description: "Upstream's ~400 hardcoded mentions of T3 Code",
     rules: ["brand/name"],
   },
   {
     name: "styles",
-    label: "Blackout styles",
-    description: "t3blackout.css and the Blackout interface switches it loads with",
-    rules: ["web/blackout-css", "web/blackout-css-import", "web/blackout-interface-file"],
+    label: "Blacksand styles",
+    description: "blacksand.css and the Blacksand interface switches it loads with",
+    rules: ["web/blacksand-css", "web/blacksand-css-import", "web/blacksand-interface-file"],
   },
   {
     name: "brand-file",
-    label: "Blackout brand components",
+    label: "Blacksand brand components",
     description: "The wordmark, redaction art and version stamp components, and this build's version info and drift report",
-    rules: ["web/blackout-brand-file", "web/blackout-build-info", "web/blackout-drift-report"],
+    rules: ["web/blacksand-brand-file", "web/blacksand-build-info", "web/blacksand-drift-report"],
     // Its components read the interface switches, which load with the styles.
     requires: ["styles"],
   },
@@ -45,21 +45,21 @@ export const features = [
     name: "wordmark",
     label: "T3 BLACKOUT wordmark",
     description: "The sidebar logo",
-    rules: ["web/blackout-wordmark"],
+    rules: ["web/blacksand-wordmark"],
     requires: ["brand-file", "styles"],
   },
   {
     name: "stage-art",
     label: "Redaction art",
     description: "Replaces the nightly starfield behind the sidebar and send button",
-    rules: ["web/blackout-stage-art"],
+    rules: ["web/blacksand-stage-art"],
     requires: ["brand-file", "styles"],
   },
   {
     name: "version-stamp",
     label: "Version stamp",
     description: "The build version in the window's corner, with its changes and this report on hover",
-    rules: ["web/blackout-version-stamp"],
+    rules: ["web/blacksand-version-stamp"],
     requires: ["brand-file", "styles"],
   },
   {
@@ -71,33 +71,33 @@ export const features = [
   {
     name: "send-button",
     label: "Ringed send button",
-    description: "Lets t3blackout.css find the send button and the composer around it",
-    rules: ["web/blackout-send-button"],
+    description: "Lets blacksand.css find the send button and the composer around it",
+    rules: ["web/blacksand-send-button"],
   },
   {
     name: "interface-settings",
-    label: "Blackout interface switches",
-    description: "The Blackout switches in Settings → Appearance → Interface; without them everything stays on",
-    rules: ["web/blackout-interface-setting-file", "web/blackout-interface-setting-search", "web/blackout-interface-setting-rows"],
+    label: "Blacksand interface switches",
+    description: "The Blacksand switches in Settings → Appearance → Interface; without them everything stays on",
+    rules: ["web/blacksand-interface-setting-file", "web/blacksand-interface-setting-search", "web/blacksand-interface-setting-rows"],
     requires: ["styles"],
   },
   {
     name: "glow-sidebar",
     label: "Glow on the sidebar footer buttons",
     description: "An ember ring and glow when you hover the icon buttons at the foot of the sidebar",
-    rules: ["web/blackout-glow-sidebar"],
+    rules: ["web/blacksand-glow-sidebar"],
   },
   {
     name: "glow-update",
     label: "Glow on the update button",
     description: "An ember ring and glow when you hover the sidebar's update button",
-    rules: ["web/blackout-glow-update"],
+    rules: ["web/blacksand-glow-update"],
   },
   {
     name: "glow-attach",
     label: "Glow on the attach button",
     description: "An ember ring and glow when you hover the composer's attach button",
-    rules: ["web/blackout-glow-attach"],
+    rules: ["web/blacksand-glow-attach"],
   },
   {
     name: "stage-pins",
@@ -114,14 +114,14 @@ export const features = [
   {
     name: "host-update-requests",
     label: "Update everything for SSH hosts",
-    description: "Update everything includes SSH hosts and asks each one's T3 Blackout updater to build the signed pin; without it, they need a manual update",
+    description: "Update everything includes SSH hosts and asks each one's Blacksand T3 updater to build the signed pin; without it, they need a manual update",
     rules: [
-      "server/blackout-host-update-file",
+      "server/blacksand-host-update-file",
       "server/self-update-requests-host-build",
       "server/self-update-host-capability",
-      "contracts/self-update-blackout-host",
-      "client/self-update-blackout-host-queued",
-      "web/self-update-blackout-host*",
+      "contracts/self-update-blacksand-host",
+      "client/self-update-blacksand-host-queued",
+      "web/self-update-blacksand-host*",
     ],
   },
   {
@@ -133,7 +133,7 @@ export const features = [
   {
     name: "update-track-note",
     label: "Update track explained",
-    description: "Picking another update track says how T3 Blackout's pinned tracks are switched; without it, it says npm has no release",
+    description: "Picking another update track says how Blacksand T3's pinned tracks are switched; without it, it says npm has no release",
     rules: ["web/update-track-pinned"],
   },
   {
@@ -147,7 +147,7 @@ export const features = [
     // reworded upstream sentence costs accuracy, not privacy, and doesn't hold an update.
     name: "privacy-text",
     label: "Accurate privacy text",
-    description: "The welcome screen and Settings → About say T3 Blackout collects no usage data and link its README; without it, they repeat upstream's claim and link T3's privacy policy",
+    description: "The welcome screen and Settings → About say Blacksand T3 collects no usage data and link its README; without it, they repeat upstream's claim and link T3's privacy policy",
     rules: ["web/privacy-text-*"],
   },
 ];

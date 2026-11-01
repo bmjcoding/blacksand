@@ -1,6 +1,6 @@
 # What works in a virtual machine
 
-> **Applies to:** running a T3 Blackout role inside a VM, for example a macOS VM on
+> **Applies to:** running a Blacksand T3 role inside a VM, for example a macOS VM on
 > Apple silicon (Tart, UTM, Virtualization.framework) or a Linux VM.
 
 These come from testing in macOS 27.2 VMs (Tart, on Apple silicon) and Linux

@@ -1,4 +1,4 @@
-// --- t3blackout boot env (injected) ----------------------------------------------
+// --- blacksand boot env (injected) ----------------------------------------------
 // Runs first in the Electron main process. The bundled server and every agent CLI
 // it starts inherit this environment.
 {
@@ -27,7 +27,7 @@
   // </telemetry-env>
   // Own data directory. Never inherit T3CODE_HOME: a shell inside the official
   // T3 Code points it at the live ~/.t3.
-  process.env.T3CODE_HOME = process.env.T3BLACKOUT_HOME || nodePath.join(os.homedir(), ".t3blackout");
+  process.env.T3CODE_HOME = process.env.BLACKSAND_T3_HOME || nodePath.join(os.homedir(), ".blacksand/t3");
 
   // Electron's spellchecker downloads Hunspell dictionaries from Google's CDN on
   // Linux and Windows (macOS uses the system spellchecker). Off there, and the
@@ -48,7 +48,7 @@
   // all the app's windows talk to, never goes through a proxy; the preview browser,
   // a browser by design, has sessions of its own. One exception, made right after
   // this: the hidden window only the app's own page can open for the device viewer's
-  // peer connections may use UDP (apps/desktop/src/window/blackoutWebRtcWindow.ts).
+  // peer connections may use UDP (apps/desktop/src/window/blacksandWebRtcWindow.ts).
   if (process.type === "browser") {
     const electron = require("electron");
     electron.app.on("web-contents-created", (_event: Electron.Event, contents: Electron.WebContents) => {
@@ -64,10 +64,10 @@
       port
         .then((held: number) => electron.session.defaultSession.setProxy({ mode: "fixed_servers", proxyRules: `127.0.0.1:${held}` }))
         .catch((error: unknown) => {
-          console.error("t3blackout: couldn't hold the app's WebRTC to loopback, so it won't run", error);
+          console.error("blacksand: couldn't hold the app's WebRTC to loopback, so it won't run", error);
           electron.app.exit(1);
         });
     });
   }
 }
-// --- end t3blackout boot env -----------------------------------------------------
+// --- end blacksand boot env -----------------------------------------------------

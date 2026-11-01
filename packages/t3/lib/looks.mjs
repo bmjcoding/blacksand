@@ -6,7 +6,7 @@
 // can't be captured is reported as such, and never fails an update. What the
 // tripwire saw each server try is read before its scratch folder goes, and an
 // outbound attempt by the new build's packaged server does fail the update
-// (packagedEgress, in bin/t3blackout). Every
+// (packagedEgress, in bin/t3). Every
 // DevTools request has a deadline and fails the moment Chrome goes away, and
 // every server and browser is stopped within bounded time, so a hung Chrome
 // can't hold an update (and its lock) open.
@@ -145,7 +145,7 @@ export async function bootServer({ exec, entry, electron }, home, { baseDir = nu
       USER: process.env.USER ?? "",
       TMPDIR: os.tmpdir(),
       PATH: "/usr/bin:/bin:/usr/sbin:/sbin",
-      T3BLACKOUT_TRIPWIRE_LOG: tripLog,
+      BLACKSAND_T3_TRIPWIRE_LOG: tripLog,
       ...(electron ? { ELECTRON_RUN_AS_NODE: "1" } : {}),
       ...env,
     },
@@ -472,7 +472,7 @@ async function compare(chrome, before, after) {
 export async function captureLooks({ before, after }, { chromeBinary = findChrome() } = {}) {
   if (!chromeBinary) return { screens: [], note: "No Chrome or Chromium found, so there are no screenshots.", attempts: { before: [], after: [] } };
   log("screenshots: booting the installed and the new build's servers");
-  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "t3blackout-looks-"));
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "blacksand-looks-"));
   const servers = [];
   const attempts = { before: [], after: [] };
   let chrome = null;

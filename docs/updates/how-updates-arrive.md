@@ -24,7 +24,7 @@ smoke-tests the release before installing it.
 
 Only nightly is pinned and evaluated today. A track `pin.json` doesn't pin (preview,
 stable) is refused unless you pass `--unpinned`. That builds the track's newest
-release at least 48 hours old (`--soak-hours`, `T3BLACKOUT_SOAK_HOURS`), with none of
+release at least 48 hours old (`--soak-hours`, `BLACKSAND_T3_SOAK_HOURS`), with none of
 the evaluator's gates. `--unpinned` never bypasses a pin: a pinned track always builds
 its pinned release. `--ref` builds anything you name. **Settings → Update track** in
 the app doesn't switch tracks; it explains this.
@@ -32,15 +32,15 @@ the app doesn't switch tracks; it explains this.
 ## The hourly check
 
 Each machine's updater runs hourly. It builds only when the pin moved or this
-repository did. A build is the upstream commit plus the T3 Blackout commit that
+repository did. A build is the upstream commit plus the Blacksand T3 commit that
 stripped it, so a signed commit here, even one that only changes docs, rebuilds the
 same release with it. Before building, it takes new signed commits from `main`
 ([self-update](self-update.md)).
 
 - If the app is closed, the new build installs right away.
 - If it's open, the build waits, and the update button offers a restart into it.
-- To change the schedule, run `packages/t3/bin/t3blackout schedule --day daily` (or a weekday, and
-  `--hour`). `packages/t3/bin/t3blackout unschedule` stops scheduled updates.
+- To change the schedule, run `blacksand t3 schedule --day daily` (or a weekday, and
+  `--hour`). `blacksand t3 unschedule` stops scheduled updates.
 
 The app's automatic checks (at startup and every 4 minutes) only read local state:
 a build waiting from the scheduled run, or a newer tag that run already fetched. Only
@@ -58,11 +58,11 @@ The button is in the sidebar, the app menu, and **Settings → About**.
    If the approved release has moved since, it refuses and asks you to check again. A
    progress ring tracks the build.
 3. **Restart** installs only the build the app announced (`apply --expect-sha
-   --expect-blackout`). A different build staged meanwhile stays staged.
+   --expect-blacksand`). A different build staged meanwhile stays staged.
 
-A waiting build made by a different T3 Blackout commit than this clone's is offered
+A waiting build made by a different Blacksand T3 commit than this clone's is offered
 as a download, which rebuilds it, not as a restart. That happens, for example, when a
-self-update landed and its rebuild failed. Neither a restart nor `packages/t3/bin/t3blackout
+self-update landed and its rebuild failed. Neither a restart nor `blacksand t3
 launch` installs it.
 
 ## Review before you restart
@@ -70,7 +70,7 @@ launch` installs it.
 While a build waits, the version stamp's hover card offers **Preview** and **What
 changed**.
 
-- **Preview** (`packages/t3/bin/t3blackout preview`) opens the waiting build in a Chrome window of
+- **Preview** (`blacksand t3 preview`) opens the waiting build in a Chrome window of
   its own, against a copy of your profile: your projects, threads and settings,
   without your secrets. Chrome or Chromium must be installed. On macOS, its server
   runs in a `sandbox-exec` sandbox:
@@ -81,7 +81,7 @@ changed**.
 
   Linux has no sandbox for it yet, so there the preview gets an empty profile.
 - **What changed** opens the [build report](upstream-rules.md#the-build-report).
-  `packages/t3/bin/t3blackout review` gathers the report and every upstream commit since your
+  `blacksand t3 review` gathers the report and every upstream commit since your
   build, for an agent to read. Ask it what you'd notice and where to look in the
   preview, and, for each feature left out, whether to re-hook it, retire it or wait.
 
@@ -89,7 +89,7 @@ changed**.
 
 - **Hourly,** like any machine, through a LaunchDaemon that needs no login.
 - **Update everything** in the desktop app drops a request into each SSH host's
-  `/Users/Shared/t3blackout/update-requests`. That starts the host's updater; the
+  `/Users/Shared/blacksand/update-requests`. That starts the host's updater; the
   build usually takes 15 to 20 minutes. The app shows the host as "update requested",
   not updated. Nobody uses the app on the host, so the new build installs as soon as
   it's built.
@@ -103,12 +103,12 @@ changed**.
   server is still running: switch the environment off and on.
 - A [phone service](../remote-access/phone.md) restarts its server on the new build
   within seconds, by itself.
-- By hand, as the admin account that installed it: `~/.t3blackout/bin/t3blackout update`.
+- By hand, as the admin account that installed it: `blacksand t3 update`.
 
 ## When a build fails or leaves something out
 
 - **A failed build** leaves the installed app alone. You get a notification with the
-  reason, and the full log is in `state/t3blackout.log` (readable only by you). The
+  reason, and the full log is in `state/blacksand-t3.log` (readable only by you). The
   update button offers the release again. A build that's verified but can't be
   swapped in (for example, if macOS's App Management protection blocks the swap)
   stays staged, and the installed one keeps running. Causes and fixes are in

@@ -1,9 +1,9 @@
 // The alert job's issues (.github/workflows/evaluate.yml; the logic is in
 // reconcile.mjs):
 //   node packages/t3/ci/security-issues.mjs advisories <advisories.json>
-//       (written by bin/t3blackout advisories, against the pin on main)
+//       (written by bin/t3 advisories, against the pin on main)
 //   node packages/t3/ci/security-issues.mjs held --channel C --exit N --published REF --pinned REF --newer FILE --report FILE
-//       (--published: the ref the commit job pushed, if any; --newer: bin/t3blackout releases --out)
+//       (--published: the ref the commit job pushed, if any; --newer: bin/t3 releases --out)
 // GH_TOKEN and GH_REPO set; DRY_RUN=1 reads issues but only prints what it would change.
 
 import * as fs from "node:fs";
@@ -27,7 +27,7 @@ const { positionals, values } = parseArgs({
 const gh = githubClient({ token: process.env.GH_TOKEN, repo: process.env.GH_REPO, dryRun: process.env.DRY_RUN === "1" });
 const readIfThere = (file) => (file && fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "");
 
-/** The newer upstream releases bin/t3blackout releases found for `channel`, or null when it didn't say. */
+/** The newer upstream releases bin/t3 releases found for `channel`, or null when it didn't say. */
 function readNewer(file, channel) {
   try {
     const found = JSON.parse(readIfThere(file));

@@ -271,9 +271,9 @@ const REPO = fileURLToPath(new URL("..", import.meta.url));
 /**
  * SHA-256 over this repo's build code, every file under bin/ and lib/ (the
  * build, its strip rules, injected files and the security overrides): which
- * Blackout made a stage record. `root`: the repo.
+ * Blacksand made a stage record. `root`: the repo.
  */
-export function blackoutDigest(root = REPO) {
+export function blacksandDigest(root = REPO) {
   const hash = createHash("sha256");
   const walk = (rel) => {
     const full = path.join(root, rel);
@@ -292,33 +292,33 @@ export function blackoutDigest(root = REPO) {
 /** The platform a stage record is made on, as `${process.platform}-${process.arch}`. */
 export const stagePlatform = () => `${process.platform}-${process.arch}`;
 
-/** The platforms Blackout builds on, as stagePlatform names them: [, os, arch]. */
+/** The platforms Blacksand builds on, as stagePlatform names them: [, os, arch]. */
 const PLATFORM = /^(darwin|linux)-(arm64|x64)$/;
 
 /**
  * A stage record for the build of `sha`: the checked staged lockfiles (`locks`,
  * pnpm-lock.yaml texts, as lib/build.mjs buildArtifact returns them) and what
- * binds them: the commit, the build code (`blackout`, blackoutDigest) and the platform.
+ * binds them: the commit, the build code (`blacksand`, blacksandDigest) and the platform.
  */
-export function stageRecord({ sha, locks, blackout = blackoutDigest(), platform = stagePlatform(), builtAt = new Date().toISOString() }) {
+export function stageRecord({ sha, locks, blacksand = blacksandDigest(), platform = stagePlatform(), builtAt = new Date().toISOString() }) {
   if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error(`a stage record needs the upstream commit, not ${sha}`);
   if (!Array.isArray(locks) || !locks.length || !locks.every((lock) => typeof lock === "string")) throw new Error(`the build of ${sha.slice(0, 10)} returned no staged lockfiles`);
-  return { v: STAGE_RECORD_VERSION, sha, blackout, platform, builtAt, locks };
+  return { v: STAGE_RECORD_VERSION, sha, blacksand, platform, builtAt, locks };
 }
 
 /**
  * Reads a stage record (JSON text) for the build of `sha` by the build code
- * whose digest is `blackout` (and, when given, on `platform`): { locks,
+ * whose digest is `blacksand` (and, when given, on `platform`): { locks,
  * platform, builtAt }. Throws when it's for another commit, other build code
  * (rules, overrides or the build changed since) or another platform. Whether
  * its lockfiles are that build's is checkStageRecord's to say.
  */
-export function readStageRecord(text, { sha, blackout = blackoutDigest(), platform = null }) {
+export function readStageRecord(text, { sha, blacksand = blacksandDigest(), platform = null }) {
   const record = JSON.parse(text);
   if (record?.v !== STAGE_RECORD_VERSION) throw new Error(`stage record version ${record?.v} isn't ${STAGE_RECORD_VERSION}`);
   if (record.sha !== sha) throw new Error(`the stage record is for ${String(record.sha).slice(0, 10)}, not ${sha.slice(0, 10)}`);
-  if (record.blackout !== blackout) throw new Error("the stage record was made by other Blackout build code (lib/ or bin/ changed since: rules, overrides or the build)");
-  if (!PLATFORM.test(record.platform ?? "")) throw new Error(`the stage record was made on ${String(record.platform).slice(0, 40)}, which Blackout doesn't build on`);
+  if (record.blacksand !== blacksand) throw new Error("the stage record was made by other Blacksand build code (lib/ or bin/ changed since: rules, overrides or the build)");
+  if (!PLATFORM.test(record.platform ?? "")) throw new Error(`the stage record was made on ${String(record.platform).slice(0, 40)}, which Blacksand doesn't build on`);
   if (platform && record.platform !== platform) throw new Error(`the stage record was made on ${record.platform}, not ${platform}`);
   if (!Array.isArray(record.locks) || !record.locks.length || !record.locks.every((lock) => typeof lock === "string")) throw new Error("the stage record has no lockfiles");
   return { locks: record.locks, platform: record.platform, builtAt: String(record.builtAt).slice(0, 40) };
@@ -360,7 +360,7 @@ function catalogRange(workspace, name, range) {
  */
 export function stagedDependencies(show, sha, platform, overrides = readOverrides()) {
   const [, os, arch] = PLATFORM.exec(platform) ?? [];
-  if (!os) throw new Error(`Blackout doesn't build on ${platform}`);
+  if (!os) throw new Error(`Blacksand doesn't build on ${platform}`);
   const read = (file) => {
     const text = show(sha, file);
     if (text == null) throw new Error(`${file} is missing at ${sha.slice(0, 10)}`);
@@ -482,8 +482,8 @@ export async function stageLockProblems({ lock, workLock, staged, overrides = re
  * `workLock`). Returns { packages (registry name@version), platform, builtAt };
  * throws why it can't be that build's.
  */
-export async function checkStageRecord(text, { sha, show, workLock, blackout, platform = null, overrides = readOverrides() }, { meta = npmMeta } = {}) {
-  const record = readStageRecord(text, { sha, blackout, platform });
+export async function checkStageRecord(text, { sha, show, workLock, blacksand, platform = null, overrides = readOverrides() }, { meta = npmMeta } = {}) {
+  const record = readStageRecord(text, { sha, blacksand, platform });
   const staged = stagedDependencies(show, sha, record.platform, overrides);
   const packages = new Set();
   for (const [i, lock] of record.locks.entries()) {
@@ -515,7 +515,7 @@ export async function checkStageRecord(text, { sha, show, workLock, blackout, pl
  *     checked (checkStageRecord) against WORK's checked graph, or a gap.
  * With a gap, packages it may hold are unknown, so nothing may be called fixed.
  */
-export async function alertInventory({ sha, show, resolvedLock, toolPackages, stage, overrides = readOverrides(), toolOverrides = readToolOverrides(), blackout = blackoutDigest() }, { meta = npmMeta } = {}) {
+export async function alertInventory({ sha, show, resolvedLock, toolPackages, stage, overrides = readOverrides(), toolOverrides = readToolOverrides(), blacksand = blacksandDigest() }, { meta = npmMeta } = {}) {
   const at = sha.slice(0, 10);
   const packages = new Set();
   const gaps = [];
@@ -553,7 +553,7 @@ export async function alertInventory({ sha, show, resolvedLock, toolPackages, st
   else if (!workLock) gaps.push("the staged production install: its stage record can't be checked without WORK's checked lockfile");
   else {
     try {
-      const read = await checkStageRecord(stage, { sha, show, workLock, blackout, overrides }, { meta });
+      const read = await checkStageRecord(stage, { sha, show, workLock, blacksand, overrides }, { meta });
       for (const pkg of read.packages) packages.add(pkg);
       notes.push(`staged production install: ${read.packages.length} packages, as resolved on ${read.platform} at ${read.builtAt}`);
     } catch (error) {

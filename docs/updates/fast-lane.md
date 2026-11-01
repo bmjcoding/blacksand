@@ -26,9 +26,9 @@ check. Nothing is fast-laned, closed or called clean on a partial list.
 GitHub's API allows 60 unauthenticated requests an hour per address. A whole-release
 scan takes about 20, and a fast-lane check of one version takes 2 or 3. CI passes the
 job's read-only token. On a machine, put a fine-grained GitHub token **with no
-permissions** in `state/github-token` (mode 600, owned by you) to raise the limit. T3
-Blackout sends it only to api.github.com. It reaches the build account and its own
-reruns through one-shot files (`T3BLACKOUT_GITHUB_TOKEN_FILE`), never an environment
+permissions** in `state/github-token` (mode 600, owned by you) to raise the limit. Blacksand
+T3 sends it only to api.github.com. It reaches the build account and its own
+reruns through one-shot files (`BLACKSAND_T3_GITHUB_TOKEN_FILE`), never an environment
 variable, and no program it starts inherits it. Code running as the same account can
 still read it, so give it no permissions. Over the limit, a run holds or skips, and the
 next hour tries again.

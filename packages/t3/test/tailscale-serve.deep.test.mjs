@@ -85,7 +85,7 @@ test("a configuration that can't be read, comes without an ETag, or isn't JSON i
       assert.equal(api.posts.length, 0);
     });
   }
-  const missing = await sourced(`serve_add web ${HOST}:443 ${PHONE}`, { T3BLACKOUT_TAILSCALED_SOCKET: path.join(os.tmpdir(), "no-such.socket") });
+  const missing = await sourced(`serve_add web ${HOST}:443 ${PHONE}`, { BLACKSAND_T3_TAILSCALED_SOCKET: path.join(os.tmpdir(), "no-such.socket") });
   assert.match(missing.stderr, /couldn't read/);
 });
 
@@ -129,7 +129,7 @@ test("this Mac's name, HTTPS capability and tailnet addresses come from tailscal
   });
   const fields = await sourced(`jxa status '{"Self":{}}' https; jxa status 'x' dns`);
   assert.equal(fields.stdout, "unknown\ninvalid\n");
-  const down = await sourced("tailnet_name || echo DOWN", { T3BLACKOUT_TAILSCALED_SOCKET: path.join(os.tmpdir(), "no-such.socket") });
+  const down = await sourced("tailnet_name || echo DOWN", { BLACKSAND_T3_TAILSCALED_SOCKET: path.join(os.tmpdir(), "no-such.socket") });
   assert.match(down.stdout, /DOWN/);
 });
 
@@ -137,7 +137,7 @@ test("every LocalAPI request has a deadline: a tailscaled that accepts and never
   withApi({}, { hang: true }, async (api) => {
     for (const body of [`serve_add web ${HOST}:443 ${PHONE}`, "tailnet_name https", "tailnet_ips || echo FAILED", `serve_inventory 5900 ${PROTECTED} || echo FAILED`, `serve_tcp_set 5900 ${LIVE} ${PARKED} ${PROTECTED} || echo FAILED`]) {
       const started = Date.now();
-      const out = await sourced(body, { ...api.env, T3BLACKOUT_TAILSCALE_TIMEOUT: "1" });
+      const out = await sourced(body, { ...api.env, BLACKSAND_T3_TAILSCALE_TIMEOUT: "1" });
       assert.ok(Date.now() - started < 8_000, `${body}: bounded`);
       assert.ok(out.status !== 0 || /FAILED/.test(out.stdout), body);
     }

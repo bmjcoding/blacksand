@@ -1,4 +1,4 @@
-// The evaluator (bin/t3blackout evaluate, run by .github/workflows/evaluate.yml):
+// The evaluator (bin/t3 evaluate, run by .github/workflows/evaluate.yml):
 // picks the newest release on a channel, newer than pin.json's, that passes every
 // gate. Newest first in release order, up to MAX_FALLBACK back. A release is held
 // when it:
@@ -153,7 +153,7 @@ export async function advisoryReport({ pin, channel, now = () => new Date(), ove
       stage: io.stageRecord(entry.sha),
       overrides,
       toolOverrides: toolOverrides ?? io.toolOverrides ?? readToolOverrides(),
-      blackout: io.blackout?.(),
+      blacksand: io.blacksand?.(),
     },
     { meta: io.npmMeta ?? npmMeta },
   );
@@ -254,7 +254,7 @@ async function evaluateCandidate({ ref, sha }, ctx, io) {
 async function stageOfPinned({ baseRef, baseSha }, io, report) {
   try {
     const built = await io.build(baseRef, baseSha, { baseline: baseSha, approvals: [], locks: {} });
-    return stageRecord({ sha: baseSha, locks: built.stageLocks, blackout: io.blackout?.() });
+    return stageRecord({ sha: baseSha, locks: built.stageLocks, blacksand: io.blacksand?.() });
   } catch (error) {
     report.push("", `The staged production install of the pinned release, ${baseRef}, couldn't be recorded here, so the advisory check can't cover it: ${lines(error.message)[0] ?? error}`);
     return null;
@@ -324,7 +324,7 @@ export async function evaluateChannel({ channel, pin, ref = null, baseline = nul
   if (carried !== null) {
     try {
       if (resolvedBase === null) throw new Error("its dependencies couldn't be resolved here to check it against");
-      await checkStageRecord(carried, { sha: baseSha, show: io.show, workLock: resolvedBase, blackout: io.blackout?.(), platform: stagePlatform() }, { meta: io.npmMeta ?? npmMeta });
+      await checkStageRecord(carried, { sha: baseSha, show: io.show, workLock: resolvedBase, blacksand: io.blacksand?.(), platform: stagePlatform() }, { meta: io.npmMeta ?? npmMeta });
       keepStage(baseSha, JSON.parse(carried));
     } catch (error) {
       io.log(`not carrying over the earlier stage record of ${baseRef}: ${error.message}`);
@@ -369,7 +369,7 @@ export async function evaluateChannel({ channel, pin, ref = null, baseline = nul
       continue;
     }
     keepResolved(candidate.sha, result.resolvedLock);
-    if (result.stageLocks?.length) keepStage(candidate.sha, stageRecord({ sha: candidate.sha, locks: result.stageLocks, blackout: io.blackout?.() }));
+    if (result.stageLocks?.length) keepStage(candidate.sha, stageRecord({ sha: candidate.sha, locks: result.stageLocks, blacksand: io.blacksand?.() }));
     report.push(`Pinned **${candidate.ref}** (\`${candidate.sha.slice(0, 10)}\`)${build ? ", built and smoke-tested" : ""}.`);
     if (result.cleared.length) report.push("", `Device tools cleared: ${result.cleared.join(", ")}.`);
     if (result.fastLaned.length) report.push("", "Security fixes taken ahead of the age gate:", ...result.fastLaned.map((line) => `- ${line}`));

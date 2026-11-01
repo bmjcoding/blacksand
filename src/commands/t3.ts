@@ -1,4 +1,4 @@
-// blacksand t3 …: the t3 package's own CLI (packages/t3/bin/t3blackout), with
+// blacksand t3 …: the t3 package's own CLI (packages/t3/bin/t3), with
 // every argument after `t3` passed through, its own --json (event lines, not
 // an envelope) included.
 
@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import type { Command } from "../core/command.ts";
 import { EXIT } from "../core/envelope.ts";
 
-export const T3_CLI = fileURLToPath(new URL("../../packages/t3/bin/t3blackout", import.meta.url));
+export const T3_CLI = fileURLToPath(new URL("../../packages/t3/bin/t3", import.meta.url));
 
 export const t3: Command = {
   name: "t3",

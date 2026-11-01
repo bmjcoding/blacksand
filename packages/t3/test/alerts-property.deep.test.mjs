@@ -137,7 +137,7 @@ function github(issues) {
 const markersOf = (body) =>
   parse(body)
     .filter((t) => t.type === "html")
-    .map((t) => /^<!-- t3blackout (\{[^\n]*\}) -->/.exec(t.raw)?.[1])
+    .map((t) => /^<!-- blacksand (\{[^\n]*\}) -->/.exec(t.raw)?.[1])
     .filter(Boolean)
     .map((json) => JSON.parse(json));
 const LIFECYCLE = new Set(["notify", "fixed", "no-longer-alerting"]);

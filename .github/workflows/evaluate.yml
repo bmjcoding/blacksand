@@ -1,4 +1,4 @@
-# Picks the newest upstream release that passes every gate (bin/t3blackout
+# Picks the newest upstream release that passes every gate (bin/t3
 # evaluate), pins it in pin.json with the evaluator's key, and turns advisories
 # against the pin on main into issues. Hourly, so a security fix upstream ships
 # lands within the hour (the fast lane, lib/fastlane.mjs).
@@ -11,13 +11,13 @@
 #             ever a proposal
 #   commit    fresh runner that runs no upstream or npm code: re-derives every gate
 #             it can from git, npm and the advisory sources (OSV, GitHub's;
-#             bin/t3blackout pin-check, lib/pincheck.mjs), then signs and pushes the pin
+#             bin/t3 pin-check, lib/pincheck.mjs), then signs and pushes the pin
 #   alerts    after commit: advisories against the pin actually on main
-#             (bin/t3blackout advisories), then issues only. It runs when the
+#             (bin/t3 advisories), then issues only. It runs when the
 #             evaluate job failed or timed out too: what that job didn't leave is
 #             a coverage gap, and upstream's lockfile stands in for it. The held
 #             issue closes only on a pin the commit job pushed, or when upstream
-#             (read here, bin/t3blackout releases) has nothing newer than main's pin.
+#             (read here, bin/t3 releases) has nothing newer than main's pin.
 # All of this is advisory. Every machine's self-update accepts the evaluator's
 # key only for pin.json-only commits that move no channel backward
 # (lib/selfupdate.mjs), and then re-checks the pin itself before installing it,
@@ -25,7 +25,7 @@
 # worst hold an update or make it fail, never install unchecked code.
 #
 # Only nightly is evaluated. Another channel needs a first pin in a commit you
-# sign (bin/t3blackout evaluate --channel stable --baseline <tag> --write, run
+# sign (bin/t3 evaluate --channel stable --baseline <tag> --write, run
 # locally); until then every machine refuses it (lib/channels.mjs).
 
 name: Evaluate upstream
@@ -125,12 +125,12 @@ jobs:
         id: evaluate
         timeout-minutes: 90
         env:
-          T3BLACKOUT_GITHUB_TOKEN: ${{ github.token }}
-          T3BLACKOUT_UNISOLATED_BUILD: "1"
+          BLACKSAND_T3_GITHUB_TOKEN: ${{ github.token }}
+          BLACKSAND_T3_UNISOLATED_BUILD: "1"
         run: |
           set +e
           mkdir -p "$RUNNER_TEMP/out"
-          node bin/t3blackout evaluate --channel "$CHANNEL" --build --write --stage-from "$RUNNER_TEMP/previous/resolved" \
+          node bin/t3 evaluate --channel "$CHANNEL" --build --write --stage-from "$RUNNER_TEMP/previous/resolved" \
             --report "$RUNNER_TEMP/out/report.md" --resolved "$RUNNER_TEMP/out/resolved"
           echo "exit=$?" >> "$GITHUB_OUTPUT"
           cp pin.json "$RUNNER_TEMP/out/pin.json" 2>/dev/null || true
@@ -176,9 +176,9 @@ jobs:
       - name: Re-derive the gates
         id: check
         env:
-          T3BLACKOUT_GITHUB_TOKEN: ${{ github.token }}
+          BLACKSAND_T3_GITHUB_TOKEN: ${{ github.token }}
         run: |
-          node bin/t3blackout pin-check --channel "$CHANNEL" --candidate "$RUNNER_TEMP/evaluation/pin.json" \
+          node bin/t3 pin-check --channel "$CHANNEL" --candidate "$RUNNER_TEMP/evaluation/pin.json" \
             --resolved "$RUNNER_TEMP/evaluation/resolved" --result "$RUNNER_TEMP/verdict"
           echo "verdict=$(cat "$RUNNER_TEMP/verdict")" >> "$GITHUB_OUTPUT"
 
@@ -233,14 +233,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          T3BLACKOUT_GITHUB_TOKEN: ${{ github.token }}
+          BLACKSAND_T3_GITHUB_TOKEN: ${{ github.token }}
         run: |
-          node bin/t3blackout advisories --channel "$CHANNEL" --resolved "$RUNNER_TEMP/evaluation/resolved" --out "$RUNNER_TEMP/advisories.json"
+          node bin/t3 advisories --channel "$CHANNEL" --resolved "$RUNNER_TEMP/evaluation/resolved" --out "$RUNNER_TEMP/advisories.json"
           node ci/security-issues.mjs advisories "$RUNNER_TEMP/advisories.json"
 
       # EXIT and the report come from the job that ran upstream code: they can
       # open the held issue, never close it. Closing takes PUBLISHED (what the
-      # commit job pushed) or upstream's own tags (bin/t3blackout releases).
+      # commit job pushed) or upstream's own tags (bin/t3 releases).
       - name: Held releases
         if: always()
         env:
@@ -251,7 +251,7 @@ jobs:
         run: |
           pinned=$(node -p "require('./pin.json').channels[process.env.CHANNEL]?.ref ?? ''")
           releases=0
-          node bin/t3blackout releases --channel "$CHANNEL" --out "$RUNNER_TEMP/newer.json" || releases=$?
+          node bin/t3 releases --channel "$CHANNEL" --out "$RUNNER_TEMP/newer.json" || releases=$?
           node ci/security-issues.mjs held --channel "$CHANNEL" --exit "$EXIT" --published "$PUBLISHED" \
             --pinned "$pinned" --newer "$RUNNER_TEMP/newer.json" --report "$RUNNER_TEMP/evaluation/report.md"
           exit "$releases"

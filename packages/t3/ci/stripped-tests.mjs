@@ -48,7 +48,7 @@ if (isMain(import.meta.url)) {
   // Vite+ runs install.sh's pnpm too, never one it downloads (lib/pnpm.mjs seedVitePlusHome).
   Object.assign(env, seedVitePlusHome(path.join(work, "..", "vite-plus-tests")));
   // The stock-guidance patterns, for the tests that check the links and prompts the app builds at run time.
-  env.T3BLACKOUT_STOCK_GUIDANCE = JSON.stringify(stockGuidanceJson());
+  env.BLACKSAND_T3_STOCK_GUIDANCE = JSON.stringify(stockGuidanceJson());
   // install.sh's pnpm by absolute path, its bytes checked (lib/pnpm.mjs), never one PATH finds in the checkout.
   const result = spawnSync(verifiedPnpm(), ["exec", "vp", "test", "run", ...targets], { cwd: work, stdio: "inherit", env });
   process.exit(result.status ?? 1);

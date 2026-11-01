@@ -20,7 +20,7 @@ device in the tailnet gets no access until you add a grant for it.
 
 ```jsonc
 {
-  // T3 Blackout. No "ssh" section: T3's SSH environments use the host's own
+  // Blacksand T3. No "ssh" section: T3's SSH environments use the host's own
   // OpenSSH, not Tailscale SSH.
   "tagOwners": {
     "tag:t3b-host":    ["autogroup:admin"],

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sets up a macOS account that coding agents run in, reached from a T3 Blackout
+# Sets up a macOS account that coding agents run in, reached from a Blacksand T3
 # desktop over SSH (docs/accounts/agent-accounts.md). Run once per account, with sudo, from
 # the admin account that ran install.sh; rerun it any time, it puts everything
 # back the way it describes:
@@ -10,7 +10,7 @@
 # It creates a standard (non-admin) account if needed (macOS asks for its
 # password) and locks its home, and yours, to their owners. The account logs in
 # over SSH with your key only: root keeps the key in
-# /etc/ssh/t3blackout/authorized_keys/<account>, where the account can't add its
+# /etc/ssh/blacksand/authorized_keys/<account>, where the account can't add its
 # own. Every account logs in with keys only, never a password, and only agent
 # accounts may log in over SSH at all, and only from a tailnet address or this Mac.
 #   - Without --loopback-only, macOS's Remote Login is the listener (turn it on
@@ -21,11 +21,11 @@
 #     tailnet address and holds an authorized key isn't stopped (pf could tie
 #     SSH to Tailscale's interface, but a pf mistake can lock a remote host out
 #     of SSH for good). --allow-from narrows it to your desktop Mac's addresses.
-#   - With --loopback-only, a separate sshd (launchd job dev.t3blackout.sshd)
+#   - With --loopback-only, a separate sshd (launchd job dev.blacksand.sshd)
 #     listens on 127.0.0.1 and ::1 port 2222 only, for this Mac's own desktop;
 #     Remote Login stays off (its launchd socket can't be bound to loopback).
 # The app comes from /Applications (install.sh). Provider logins happen inside
-# the account afterwards, with /usr/local/libexec/t3blackout/set-claude-token.
+# the account afterwards, with /usr/local/libexec/blacksand/set-claude-token.
 #
 # Options:
 #   --key FILE        public key to authorize (default: the first key your SSH agent
@@ -42,7 +42,7 @@
 #                     addresses (your desktop Mac's, from `tailscale ip` on it,
 #                     comma-separated) and this Mac's loopback, with the same limit
 #                     (a LAN peer forging one of them with a stolen key). Kept in
-#                     /etc/ssh/t3blackout/allow-from for later runs (a run with
+#                     /etc/ssh/blacksand/allow-from for later runs (a run with
 #                     none of these options keeps it); --tailnet-only goes back
 #                     to the whole ranges.
 #   --allow-lan       also from your local network (key-only), dropping any
@@ -51,22 +51,22 @@
 
 set -euo pipefail
 
-APP="/Applications/T3 Blackout.app"
-AGENT_GROUP=t3blackout-agents
+APP="/Applications/Blacksand T3.app"
+AGENT_GROUP=blacksand-agents
 # Remote Login's "Only these users" list; PAM (pam_sacl) checks it for every sshd.
 SSH_ACCESS_GROUP=com.apple.access_ssh
-SSH_DIR=/etc/ssh/t3blackout
+SSH_DIR=/etc/ssh/blacksand
 KEYS_DIR=$SSH_DIR/authorized_keys
 # Before macOS's 100-macos.conf: sshd keeps the first value it reads.
-DROPIN=/etc/ssh/sshd_config.d/010-t3blackout.conf
-LOOPBACK_LABEL=dev.t3blackout.sshd
+DROPIN=/etc/ssh/sshd_config.d/010-blacksand.conf
+LOOPBACK_LABEL=dev.blacksand.sshd
 LOOPBACK_PORT=2222
 LOOPBACK_CONFIG=$SSH_DIR/sshd_config
 LOOPBACK_HOSTKEY=$SSH_DIR/ssh_host_ed25519_key
 LOOPBACK_PLIST=/Library/LaunchDaemons/$LOOPBACK_LABEL.plist
-HELPER_DIR=/usr/local/libexec/t3blackout
+HELPER_DIR=/usr/local/libexec/blacksand
 HELPER=$HELPER_DIR/set-claude-token
-SHARED_RATES=/Users/Shared/t3blackout/usage-model-rates.json
+SHARED_RATES=/Users/Shared/blacksand/usage-model-rates.json
 KEY_RE='^(ssh-ed25519|ecdsa-sha2-nistp256|sk-ssh-ed25519@openssh\.com|ssh-rsa) [A-Za-z0-9+/]+=*( .*)?$'
 # Where --tailnet-only logins may come from: Tailscale's IPv4 (CGNAT) and IPv6
 # ranges, and this Mac's loopback.
@@ -81,9 +81,9 @@ ALLOW_LAN=0
 ALLOW_FROM=""
 ALLOW_FROM_FILE=$SSH_DIR/allow-from
 
-say() { printf '\033[1m==> %s\033[0m\n' "$*"; }
-warn() { printf '\033[33mwarning:\033[0m %s\n' "$*" >&2; }
-die() { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
+# Output and the legacy install refusal (shared with the other setup scripts).
+# shellcheck source=scripts/host-common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/host-common.sh"
 
 # Runs a command as `user`, never as root: inside an account's home, root would
 # follow whatever symlinks that account planted there. From /: the folder sudo
@@ -102,7 +102,7 @@ group_values() { { dscl . -read "/Groups/$1" "$2" 2>/dev/null || true; } | sed "
 # ----------------------------------------------------------------- configs --
 
 # Remote Login's sshd (and any other reading /etc/ssh/sshd_config): keys only for
-# everyone; agent accounts get the root-owned keys and only what T3 Blackout's
+# everyone; agent accounts get the root-owned keys and only what Blacksand T3's
 # SSH environments use (a shell, and forwards to this Mac's loopback). sshd ends
 # a Match block at the end of an included file, so macOS's settings after it stay
 # global. Unless ALLOW_LAN=1, logins from any source address but TAILNET_SOURCES
@@ -119,7 +119,7 @@ render_dropin() {
   fi
   for source in "${sources[@]}"; do not_tailnet+="!$source,"; done
   cat <<EOF
-# Written by t3blackout scripts/add-agent-account.sh; rewritten on each run.
+# Written by blacksand scripts/add-agent-account.sh; rewritten on each run.
 PasswordAuthentication no
 KbdInteractiveAuthentication no
 PermitRootLogin no
@@ -208,7 +208,7 @@ save_allow_from() {
 # sockets, so ListenAddress holds (unlike Remote Login, whose socket launchd owns).
 render_loopback_config() {
   cat <<EOF
-# Written by t3blackout scripts/add-agent-account.sh; rewritten on each run.
+# Written by blacksand scripts/add-agent-account.sh; rewritten on each run.
 # The standby lane's sshd (launchd job $LOOPBACK_LABEL): this Mac's loopback
 # only, agent accounts only, keys only.
 Port $LOOPBACK_PORT
@@ -320,7 +320,7 @@ make_admin_home_private() {
 
 join_agent_group() {
   if ! dscl . -read "/Groups/$AGENT_GROUP" >/dev/null 2>&1; then
-    dseditgroup -o create -r "T3 Blackout agent accounts" "$AGENT_GROUP"
+    dseditgroup -o create -r "Blacksand T3 agent accounts" "$AGENT_GROUP"
   fi
   dseditgroup -o edit -a "$NAME" -t user "$AGENT_GROUP"
   dsmemberutil flushcache
@@ -351,10 +351,10 @@ write_authorized_keys() {
 }
 
 # The pricing table cost estimates read: the one the updater published, else
-# yours. The server copies newer ones itself (lib/files/ssh-runner-blackout.sh).
+# yours. The server copies newer ones itself (lib/files/ssh-runner-blacksand.sh).
 seed_pricing() {
   local candidate src=""
-  for candidate in "$SHARED_RATES" "$ADMIN_HOME/.t3blackout/userdata/usage-model-rates.json"; do
+  for candidate in "$SHARED_RATES" "$ADMIN_HOME/.blacksand/t3/userdata/usage-model-rates.json"; do
     if [[ -f "$candidate" && ! -L "$candidate" && "$(stat -f '%u' "$candidate")" == "$(id -u "$SUDO_USER")" ]]; then
       src="$candidate"
       break
@@ -366,7 +366,7 @@ seed_pricing() {
   fi
   # shellcheck disable=SC2016 # expanded by the inner sh
   as_user "$NAME" /bin/sh -c 'umask 077 && mkdir -p "$1" && cat >"$1/usage-model-rates.json.new" && mv -f "$1/usage-model-rates.json.new" "$1/usage-model-rates.json"' \
-    sh "$HOME_DIR/.t3blackout/userdata" <"$src"
+    sh "$HOME_DIR/.blacksand/t3/userdata" <"$src"
 }
 
 # The home's own ACL entries go too, as the account (its owner): mode 0700
@@ -384,9 +384,10 @@ prepare_agent_home() {
   if as_user "$SUDO_USER" /bin/test -r "$HOME_DIR" || as_user "$SUDO_USER" /bin/test -x "$HOME_DIR"; then
     die "$SUDO_USER can still open $HOME_DIR; see: ls -led '$HOME_DIR'"
   fi
-  say "Preparing $HOME_DIR/.t3blackout (owner only, no ACL entries)"
+  say "Preparing $HOME_DIR/.blacksand and its t3 (owner only, no ACL entries, no symlinks)"
   # shellcheck disable=SC2016 # expanded by the inner sh
-  as_user "$NAME" /bin/sh -c 'umask 077 && mkdir -p "$1" && chmod 700 "$1" && chmod -N "$1"' sh "$HOME_DIR/.t3blackout"
+  as_user "$NAME" /bin/sh -c 'umask 077 && for d; do [ ! -L "$d" ] && mkdir -p "$d" && chmod 700 "$d" && chmod -N "$d" || exit 1; done' sh "$HOME_DIR/.blacksand" "$HOME_DIR/.blacksand/t3" ||
+    die "couldn't prepare $HOME_DIR/.blacksand/t3 as $NAME's own; a symlink there? see: ls -led '$HOME_DIR/.blacksand' '$HOME_DIR/.blacksand/t3'"
   seed_pricing
 }
 
@@ -454,7 +455,7 @@ sources_problem() {
       elif [[ " ${REFUSED_PROBES[*]} " == *" $addr "* ]]; then
         want=refuse
       fi
-      out="$(effective_config "user=$user,host=t3blackout-check,addr=$addr" 2>&1)" || { echo "sshd -T failed for $user from $addr: $out"; return 1; }
+      out="$(effective_config "user=$user,host=blacksand-check,addr=$addr" 2>&1)" || { echo "sshd -T failed for $user from $addr: $out"; return 1; }
       got=allow
       if grep -qix 'denyusers \*' <<<"$out"; then got=refuse; fi
       [[ "$got" == "$want" ]] || { echo "sshd would $got $user from $addr"; return 1; }
@@ -468,11 +469,11 @@ sources_problem() {
 install_dropin() {
   local new backup="" out
   # Beside sshd_config.d, not in it: sshd reads every file there.
-  new="$(mktemp "${DROPIN%/*/*}/.t3blackout-dropin.XXXXXX")"
+  new="$(mktemp "${DROPIN%/*/*}/.blacksand-dropin.XXXXXX")"
   render_dropin >"$new"
   chmod 644 "$new"
   if [[ -f "$DROPIN" ]]; then
-    backup="$(mktemp "${DROPIN%/*/*}/.t3blackout-dropin-old.XXXXXX")"
+    backup="$(mktemp "${DROPIN%/*/*}/.blacksand-dropin-old.XXXXXX")"
     cp -p "$DROPIN" "$backup"
   fi
   mv -f "$new" "$DROPIN"
@@ -504,7 +505,7 @@ verify_loopback_listener() {
 install_loopback_sshd() {
   local config plist out
   say "Standby sshd: 127.0.0.1 and ::1 port $LOOPBACK_PORT only (launchd job $LOOPBACK_LABEL)"
-  [[ -f "$LOOPBACK_HOSTKEY" ]] || ssh-keygen -q -t ed25519 -N '' -C t3blackout-standby -f "$LOOPBACK_HOSTKEY"
+  [[ -f "$LOOPBACK_HOSTKEY" ]] || ssh-keygen -q -t ed25519 -N '' -C blacksand-standby -f "$LOOPBACK_HOSTKEY"
   config="$(mktemp "$SSH_DIR/.sshd_config.XXXXXX")"
   render_loopback_config >"$config"
   chmod 644 "$config"
@@ -513,7 +514,7 @@ install_loopback_sshd() {
     die "sshd rejected the standby config: $out"
   fi
   mv -f "$config" "$LOOPBACK_CONFIG"
-  plist="$(mktemp /Library/LaunchDaemons/.t3blackout-sshd.XXXXXX)"
+  plist="$(mktemp /Library/LaunchDaemons/.blacksand-sshd.XXXXXX)"
   render_loopback_plist >"$plist"
   if ! plutil -lint -s "$plist"; then
     rm -f "$plist"
@@ -547,6 +548,7 @@ trust_loopback_host_key() {
 # --------------------------------------------------------------------- main --
 
 main() {
+  refuse_legacy_install
   [[ "$(uname -s)" == Darwin ]] || die "macOS only"
   [[ $EUID -eq 0 ]] || die "run with sudo: sudo $0 $*"
   [[ -n "${SUDO_USER:-}" && "$SUDO_USER" != root ]] || die "run with sudo from your admin account, not as root"
@@ -578,7 +580,7 @@ main() {
   [[ -z "$allow_from" ]] || ((!tailnet_only)) || die "--tailnet-only (the whole tailnet ranges) and --allow-from contradict each other"
   choose_allow_from "$allow_from" "$tailnet_only"
 
-  [[ -x "$APP/Contents/MacOS/T3 Blackout" ]] ||
+  [[ -x "$APP/Contents/MacOS/Blacksand T3" ]] ||
     die "$APP is missing; run ./install.sh --role host (or both) as an admin first"
   ADMIN_HOME="$(home_of "$SUDO_USER")"
 
@@ -643,7 +645,7 @@ Done. Next, as $NAME (ssh $( ((LOOPBACK)) && echo "-p $LOOPBACK_PORT ")$NAME@loc
   2. codex login                       (Codex keeps its login in a file)
   3. claude setup-token                (SSH sessions can't unlock the Keychain)
   4. $HELPER   (stores it, owner only)
-Then in T3 Blackout: Settings > Connections > Environments > Add environment > SSH: $target.
+Then in Blacksand T3: Settings > Connections > Environments > Add environment > SSH: $target.
 NEXT
 }
 

@@ -16,7 +16,7 @@ const OUR_LINKS = [
 ];
 const RATINGS = new Set(["CRITICAL", "HIGH", "MODERATE", "LOW", "UNKNOWN"]);
 /** The automation's hidden lines: an issue's or comment's marker, and the line an issue's own text starts with. */
-const MARKER_BLOCK = /^<!-- t3blackout (\{[^\n]*\}|text) -->\n*$/;
+const MARKER_BLOCK = /^<!-- blacksand (\{[^\n]*\}|text) -->\n*$/;
 
 export const parse = (markdown) => new Lexer({ gfm: true }).lex(markdown);
 
