@@ -1,0 +1,33 @@
+# The commit-trust differential at full size, nightly and on demand: the old and
+# new verifiers on 10,000 generated signed histories
+# (packages/t3/test/trust-port.deep.test.mjs; ci.yml's deep tier runs 500 on
+# every push). A disagreement fails the job with its seed; rerun that seed
+# locally to get its repository and keys. Read-only token, no secrets.
+
+name: Trust nightly
+
+on:
+  schedule:
+    - cron: "23 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  histories:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+
+      - name: 10,000 generated signed histories
+        env:
+          TRUST_HISTORIES: "10000"
+        run: node --test packages/t3/test/trust-port.deep.test.mjs

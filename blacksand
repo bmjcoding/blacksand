@@ -1,0 +1,14 @@
+#!/bin/sh
+# blacksand: runs src/main.ts with Node, which strips the types (no build step).
+# Until apply installs the pinned, root-owned Node, this is whichever node is on
+# PATH, so it refuses root: root must never run an interpreter its user can
+# replace.
+set -eu
+# The root check runs a fixed system binary, never one found on PATH.
+uid=$(/usr/bin/id -u) || { echo "blacksand: can't tell which user this is" >&2; exit 4; }
+if [ "$uid" = 0 ]; then
+  echo "blacksand: refusing to run as root until the pinned Node is installed" >&2
+  exit 4
+fi
+here=$(dirname -- "$(realpath -- "$0")")
+exec node "$here/src/main.ts" "$@"
