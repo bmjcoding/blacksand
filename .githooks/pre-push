@@ -21,6 +21,8 @@ done
 # A shell script: *.sh, or no extension and a sh or bash shebang.
 is_script() {
   case "$1" in
+    # A template, not a script: CI renders it, then checks what /bin/sh runs (ci.yml, "SSH runner").
+    packages/t3/lib/files/ssh-runner-*.sh) return 1 ;;
     *.sh) return 0 ;;
     *.*) return 1 ;;
   esac
