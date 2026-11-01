@@ -5,7 +5,7 @@ Issues and pull requests are welcome. Report vulnerabilities privately, as
 
 ## How changes reach `main`
 
-A machine running Blacksand T3 fast-forwards to `main` only when every new commit
+A machine running blacksand-t3 fast-forwards to `main` only when every new commit
 carries an SSH signature from a key in `.allowed_signers`. That includes commits on
 side branches. [Self-update](tooling/t3code/docs/updates/self-update.md) has the details.
 

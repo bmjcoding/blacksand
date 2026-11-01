@@ -1,11 +1,11 @@
-# Blacksand T3 documentation
+# blacksand-t3 documentation
 
 Each page starts with the platforms and roles it applies to.
 
 ## Getting started
 
-- [Roles and platforms](getting-started/roles.md): desktop, always-on host, standby;
-  what macOS and Linux support today
+- [Roles and platforms](getting-started/roles.md): the desktop, always-on host and
+  standby roles, and what macOS and Linux support today
 - [Prerequisites](getting-started/prerequisites.md): tools, minimum versions, accounts
 - [Example: a desktop Mac and an always-on host Mac](getting-started/example-desktop-and-host.md):
   every step in order, with the verification checklist
@@ -35,8 +35,9 @@ Each page starts with the platforms and roles it applies to.
 ## Devices
 
 - [Simulators, emulators and devices](devices/overview.md): where they run
-- [iOS](devices/ios.md) · [Android](devices/android.md) ·
-  [What works in a virtual machine](devices/virtual-machines.md)
+- [iOS](devices/ios.md)
+- [Android](devices/android.md)
+- [What works in a virtual machine](devices/virtual-machines.md)
 
 ## Updates
 

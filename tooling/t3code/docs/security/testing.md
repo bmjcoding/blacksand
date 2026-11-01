@@ -10,13 +10,14 @@ npm test            # the fast tier, a few seconds
 npm run test:deep   # the deep tier: signed histories, installer runs, property sweeps
 ```
 
-It needs Node 24 or later and git 2.55.0 or later. The deep tier takes about a minute
-on a recent Mac; [CONTRIBUTING.md](../../../../CONTRIBUTING.md) says what belongs in each. It works in throwaway folders, repositories and SSH keys, with local fakes
-for npm, GitHub, OSV and tailscaled. It doesn't touch your clone, `~/.ssh`,
-`~/.blacksand/t3` or the installed app. CI runs it on every push and pull request (`ci.yml`), and again
-before each evaluation (`evaluate.yml`).
+The suite needs Node 24 or later and git 2.55.0 or later. The deep tier takes about a
+minute on a recent Mac. [CONTRIBUTING.md](../../../../CONTRIBUTING.md) says what
+belongs in each tier. The suite works in throwaway folders, repositories and SSH keys,
+with local fakes for npm, GitHub, OSV and tailscaled. It doesn't touch your clone,
+`~/.ssh`, `~/.blacksand/t3` or the installed app. CI runs it on every push and pull
+request (`ci.yml`), and again before each evaluation (`evaluate.yml`).
 
-Five tests are skipped unless you opt in:
+Five tests run only if you opt in:
 
 | Variable | What the test then does |
 |---|---|
@@ -25,12 +26,12 @@ Five tests are skipped unless you opt in:
 | `BLACKSAND_T3_TEST_PACKED_APP=<Blacksand T3.app>` | runs the phone service's supervisor, the SSH runner sharing its server, an update, and shutdown, against a real packed build |
 | `BLACKSAND_T3_PNPM_DIGESTS_ONLINE=1` | downloads the four pinned pnpm tarballs, and checks `PNPM_BINARY_SHA256` against them |
 
-The tests in `tooling/t3code/test/stripped/` run inside a stripped upstream checkout, in upstream's
-own Vitest and Playwright setup. `build.yml` runs them after each build
-(`node ci/stripped-tests.mjs build/work`, from `tooling/t3code`). They cover the injected files:
-the CSP in each place it's applied, the WebRTC window, provider and ACP Registry
-release ages, device tools, release links, update requests, the SSH runner, the CLI's
-routes, and the interface settings.
+The tests in `tooling/t3code/test/stripped/` run inside a stripped upstream checkout,
+in upstream's own Vitest and Playwright setup. `build.yml` runs them after each build
+(`node ci/stripped-tests.mjs build/work`, from `tooling/t3code`). They cover the
+injected files: the CSP in each place it's applied, the WebRTC window, provider and
+ACP Registry release ages, device tools, release links, update requests, the SSH
+runner, the CLI's routes, and the interface settings.
 
 ## How it's organised
 
@@ -47,28 +48,30 @@ Files are named by behaviour, with a prefix for the area:
 | `pipeline-*`, `alerts-*` | CI's evaluator, `pin-check`, inventories and stage records; the alert job's GitHub issues |
 | `cli-state`, `scheduled-jobs` | rollback and recovery from the CLI; launchd and systemd jobs |
 
-Shell scripts are tested by sourcing them, for their functions, with system commands
-(`launchctl`, `dscl`, `lsof`, `sudo`) stubbed over a scratch folder. Where a real
-program decides the outcome, the tests use it: Apple's sshd evaluates the generated
-drop-in, real git and SSH keys sign and verify commits, and a scratch sshd takes a
-real login.
+The tests source shell scripts to call their functions, and stub system commands
+such as `launchctl`, `dscl`, `lsof` and `sudo` over a scratch folder. Where a real
+program decides the outcome, the tests use that program. Apple's sshd evaluates the
+generated drop-in, real git and SSH keys sign and verify commits, and a scratch sshd
+takes a real login.
 
 ## Kinds of tests
 
-- **Unit and behaviour tests:** most of the suite. Each file's header says what
-  behaviour it pins, and why.
-- **Property tests:** with fixed seeds, so a failure names its seed.
+- **Unit and behaviour tests.** These make up most of the suite. Each file's header
+  says what behaviour it pins, and why.
+- **Property tests.** They use fixed seeds, so a failure names its seed.
   - `alerts-property` runs random sequences of hourly alert runs, with failures
-    injected, against an oracle with its own model of what the owner was told
-    (`T3B_PROPERTY_SEEDS=<n>` runs more seeds; `T3B_PROPERTY_SEED=<n>` reruns one).
-  - `commit-trust` checks random signer changes, signers and batch splits: hourly
+    injected, against an oracle that has its own model of what the owner was told.
+    `T3B_PROPERTY_SEEDS=<n>` runs more seeds, and `T3B_PROPERTY_SEED=<n>` reruns one.
+  - `commit-trust` checks random signer changes, signers and batch splits. Hourly
     self-update and a fresh clone's walk must agree with a model of the trust rule.
-- **Positive controls:** where a test proves something is refused, a control shows the
-  harness would catch it otherwise. Examples: unstripped upstream trips the tripwire,
-  and upstream's runner lines lose the race the rule fixes.
-- **Mutation testing:** done by hand while the security-relevant areas were written.
-  A deliberate defect was put into the code under test, and the suite had to fail. No
-  mutation tool is in the repository, so these results can't be reproduced from CI.
+- **Positive controls.** Where a test proves that something is refused, a control
+  shows that the test would catch the case if the refusal were missing. For example,
+  unstripped upstream trips the tripwire, and upstream's runner lines lose the race
+  the rule fixes.
+- **Mutation testing.** This was done by hand while the security-relevant areas were
+  written. Each time, a deliberate defect went into the code under test, and the suite
+  had to fail. The repository has no mutation tool, so CI can't reproduce these
+  results.
 
 ## What was exercised natively
 
@@ -85,11 +88,11 @@ in place of the owner's certificate:
 - Screen Sharing: install, the port-holding jobs (96 bind attempts by an agent
   account, all refused), sign-in by the admin only, the check's responses to five rule
   changes, `--off`, `--uninstall`, and no LAN reach across ordinary reboots. Killing
-  the check while it loads Screen Sharing, then rebooting, gave about 2 s of LAN reach
-  (a documented limit). During swaps an agent did capture 15900; checks detected it and
-  refused transitions, which shows detection and an availability limit, not
-  uninterrupted reservation. Real Serve forwarding and existing-session teardown
-  weren't tested;
+  the check while it loads Screen Sharing, then rebooting, gave about 2 s of LAN reach,
+  a documented limit. During swaps, an agent did capture port 15900. The checks
+  detected it and refused transitions. This shows detection and an availability
+  limit, but the jobs don't hold the port without interruption. Real Serve forwarding
+  and existing-session teardown weren't tested;
 - fresh-clone trust on synthetic histories: refusing evaluator self-promotion,
   signer rotation, shallow clones, a clock ahead, and rollback of the verification
   record.

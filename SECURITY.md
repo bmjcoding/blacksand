@@ -23,7 +23,7 @@ Everything in this repository is in scope:
 - the `blacksand` command and its commit trust checks (`src/`, `.allowed_signers`);
 - the Kubernetes sandbox: its proxy, manifests, node egress floor and run records
   (`substrates/kubernetes/`);
-- Blacksand T3:
+- blacksand-t3:
   - the strip rules and the files they inject (`tooling/t3code/lib/rules.mjs`,
     `tooling/t3code/lib/files/`);
   - the build, verification and install pipeline (`tooling/t3code/bin/`,
@@ -46,7 +46,7 @@ Examples of what to report:
 
 Out of scope:
 
-- T3 Code itself, when Blacksand T3's changes didn't cause the issue. Report it to
+- T3 Code itself, when blacksand-t3's changes didn't cause the issue. Report it to
   [pingdotgg/t3code](https://github.com/pingdotgg/t3code).
 - Third-party software: agent-sandbox, gVisor, Kubernetes, the agent CLIs, Tailscale,
   macOS, Homebrew, npm packages and the rest. Report it to that project.
@@ -69,7 +69,7 @@ Out of scope:
 ## Supported versions
 
 Only `main` is supported. Fixes land there as signed commits. There are no release
-branches. Machines running Blacksand T3 follow `main` through
+branches. Machines running blacksand-t3 follow `main` through
 [self-update](tooling/t3code/docs/updates/self-update.md).
 
 ## Security documentation

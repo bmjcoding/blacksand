@@ -18,9 +18,9 @@ The cluster needs:
 
 It runs on k3s today. EKS support comes later.
 
-The `command` adapter runs a fixed command instead of an agent, and gives back the
-files it wrote. With a caller's `--key`, the output directory is a durable receipt,
-so one key never launches twice.
+The `command` adapter runs a fixed command instead of an agent, and returns the files
+it wrote. With a caller's `--key`, the output directory is a durable receipt, so one
+key never launches twice.
 
 ## What a run is
 
@@ -57,9 +57,8 @@ allowlisted hosts · the model backend           NetworkPolicy: only its own pro
    applies from the sandbox's first instruction. A tripwire tries cluster DNS once. If
    the lookup works, the floor is missing, and the tripwire stops the run.
 5. **Clone and agent.** The sandbox clones the bundle. `agent.sh` runs with the prompt
-   on stdin.
-   A command run has no bundle and no clone: its argv runs in `/workspace`, with stdin
-   empty.
+   on stdin. A command run makes no bundle and clones nothing. Its argv runs in
+   `/workspace`, with stdin empty.
 6. **Freeze, export, seal.** Blacksand kills every agent process. It exports the
    workspace's files as a tar, without `.git`. Hard links are dereferenced, so every
    name carries its bytes. Then it seals the proxy, which closes the proxy's audit log.
@@ -69,9 +68,8 @@ allowlisted hosts · the model backend           NetworkPolicy: only its own pro
    runs.
 8. **Patch and record.** Outside the cluster, a git the agent never touched makes the
    patch, from the original base and the export. Blacksand checks the whole audit log:
-   every entry numbered, the log sealed, and every request ended.
-   For a command run, Blacksand copies the files out of the export here instead, each
-   with its digest.
+   every entry numbered, the log sealed, and every request ended. For a command run,
+   Blacksand instead copies the files out of the export, each with its digest.
 
 ## Agents have full access inside the sandbox
 
@@ -100,7 +98,8 @@ Full access is safe only because every sandbox Pod is locked down:
 
 `test/full-access.test.ts` checks both halves for every registered adapter. A new
 adapter without full access fails it, and so does a change to any of these settings.
-The `command` adapter is registered like the others, and the same Pod holds it.
+The `command` adapter is registered like the others, so the test checks its Pod's
+lockdown too.
 
 ## Setup
 
@@ -173,14 +172,14 @@ The defaults:
 
 | Option | Meaning |
 |---|---|
-| `--agent fake\|claude\|codex\|command` | The adapter. `fake` is for tests: it edits a file, makes allowed and denied calls, and attacks the proxy and its own git. `command` runs `--argv` with `--input` files: see [The command adapter](#the-command-adapter). |
+| `--agent fake\|claude\|codex\|command` | The adapter. `fake` is for tests: it edits a file, makes allowed and denied calls, and attacks the proxy and its own git. `command` runs `--argv` with `--input` files. See [The command adapter](#the-command-adapter). |
 | `--route KIND=URL@SECRET` | The model route. `anthropic` uses the Messages API and sends the credential as `x-api-key`. `openai` uses the Responses API and sends it as `Authorization: Bearer`. The URL is an origin, with an optional path prefix. |
 | `--model ID`, `--grant-model ID …` | The agent's model, and any other models the run may name. The proxy refuses every other model. The default is `gpt-6.1-sol` for codex and `claude-sonnet-5-5` for claude. `fake` needs one. |
 | `--allow HOST:PORT` | One exact entry in the CONNECT allowlist. Wildcards and IP literals aren't accepted. A name that resolves to a private address is refused unless you give it with `--allow-private`. |
 | `--image`, `--tools-image`, `--proxy-image` | Images, each pinned by digest. The agent and proxy default to Node 24.22.2 images: Debian bookworm for the agent, because it has git, and Alpine for the proxy. Claude and Codex need a tools image, or an `--image` that has their binary. |
 | `--timeout SECONDS` | The agent's time limit, 1800 by default. Everything in the run expires 300 seconds after it. |
 | `--max-model-requests N` | The proxy's request budget for the run: 2000 by default, at most 100000. Past it, the proxy refuses model requests. |
-| `--key KEY` | Your own ID for the run, copied into the record. The output directory becomes the key's receipt: see [Receipts](#receipts-one-launch-per-key). Use it instead of `--out`. |
+| `--key KEY` | Your own ID for the run, copied into the record. The output directory becomes the key's receipt. See [Receipts](#receipts-one-launch-per-key). Use it instead of `--out`. |
 | `--receipts DIR` | Where receipts live. The default is `$BLACKSAND_RECEIPTS`, else `$XDG_STATE_HOME/blacksand/k8s-receipts`. |
 
 Exit code 0 means the run completed with all its evidence, the agent exited 0, and
@@ -197,34 +196,36 @@ still runs, and the record says `cancelled`.
   --key attempt/case-7/repeat-2 --json
 ```
 
-- **What runs.** The argv, given as one JSON list. No shell ever parses it. The runner
-  writes each argument to its own read-only input file (`argv.0`, …). The adapter's
-  fixed `agent.sh` reads them back whole and runs the list with `exec`: no `eval`, no
-  word splitting, no globbing. There's no agent, no prompt and no repository. The
-  command runs in `/workspace` as UID 1000, with stdin empty and its own empty HOME
-  and `/tmp`.
-- **Inputs.** Each `--input PATH=FILE` is mounted read-only, byte for byte, at
+- **What runs.** The command runs the argv you give as one JSON list. No shell parses
+  it. The runner writes each argument to its own read-only input file (`argv.0`, …).
+  The adapter's fixed `agent.sh` reads them back whole and passes the list to `exec`,
+  with no `eval`, word splitting or globbing. A command run has no agent, prompt or
+  repository. The command runs in `/workspace` as UID 1000, with stdin empty and its
+  own empty HOME and `/tmp`.
+- **Inputs.** Blacksand mounts each `--input PATH=FILE` read-only, byte for byte, at
   `/workspace/inputs/PATH`. With no inputs, `/workspace/inputs` is still an empty
-  read-only mount, so nothing the command writes can land there. PATH is relative and
-  made of plain segments, and no segment starts with a dot. Inputs ride in the run's
-  ConfigMap, so they're limited to 768 KiB and 1000 files in all. Each file is a
-  ConfigMap projection: its name is a symlink into a timestamped directory beside it.
-- **Output.** Every regular file the command leaves under `/workspace`, apart from its
-  inputs. Blacksand exports the workspace as a tar, with hard links dereferenced, and
-  reads it outside the sandbox. The runner copies each file to `files/PATH` in the
-  output directory and lists it in `result.files` with its SHA-256. Symlinks, devices,
-  `..` and `.git` paths are skipped and counted in `result.skipped_entries`, never
-  followed. The run fails on a hard-link entry, on more than 10,000 files, or on two
-  paths that would be one file on a case-insensitive disk. stdout and stderr are kept
-  as `agent.stdout` and `agent.stderr`. There's no patch.
-- **Model route, optional.** With no `--route`, the proxy's model listener has an
-  empty route table, so it refuses every model request. No credential is mounted in
-  the proxy, and the sandbox's environment names no model. With
+  read-only mount, so nothing the command writes can land there. PATH must be relative
+  and made of plain segments, and no segment may start with a dot. Inputs travel in
+  the run's ConfigMap, so together they're limited to 768 KiB and 1000 files.
+  Kubernetes projects each file from that ConfigMap, so its name is a symlink into a
+  timestamped directory beside it.
+- **Output.** The output is every regular file the command leaves under `/workspace`,
+  apart from its inputs. Blacksand exports the workspace as a tar, with hard links
+  dereferenced, and reads the tar outside the sandbox. The runner copies each file to
+  `files/PATH` in the output directory and lists it in `result.files` with its
+  SHA-256. It skips symlinks, devices, `..` paths and `.git` paths, never follows
+  them, and counts them in `result.skipped_entries`. The run fails on a hard-link
+  entry, on more than 10,000 files, or on two paths that would be one file on a
+  case-insensitive disk. The runner keeps stdout and stderr as `agent.stdout` and
+  `agent.stderr`. A command run makes no patch.
+- **The model route is optional.** With no `--route`, the proxy's model listener has
+  an empty route table, so it refuses every model request. Blacksand mounts no
+  credential in the proxy, and the sandbox's environment names no model. With
   `--route KIND=URL@SECRET --model ID`, the run gets that one route and grant, as an
-  agent does. `--allow` works the same either way.
-- **The record** says what ran: `command.argv_sha256` (the SHA-256 of
-  `JSON.stringify(argv)`), `command.inputs` (path → SHA-256), the image as requested
-  and as resolved, the Sandbox's and Pod's UIDs, the runtime class, and
+  agent run does. `--allow` works the same either way.
+- **The record.** It says what ran: `command.argv_sha256` (the SHA-256 of
+  `JSON.stringify(argv)`), `command.inputs` (each input path's SHA-256), the image as
+  requested and as resolved, the Sandbox's and Pod's UIDs, the runtime class, and
   `run.request_sha256`.
 
 ## Receipts: one launch per key
@@ -232,40 +233,42 @@ still runs, and the record says `cancelled`.
 With `--key KEY`, the output directory is the key's receipt:
 `<receipts>/<sha256(KEY)>`. The receipts root is `--receipts DIR`, else
 `$BLACKSAND_RECEIPTS`, else `$XDG_STATE_HOME/blacksand/k8s-receipts`
-(`~/.local/state/…`). Keep it on the runner's durable disk. `--key` and `--out` don't
-go together.
+(`~/.local/state/…`). Keep it on the runner's durable disk. You can't give both
+`--key` and `--out`.
 
-**Provision the root once,** with `k8s setup` on the runner, using the same
-`--receipts` or `BLACKSAND_RECEIPTS`. Setup makes each missing directory and syncs its
-name into its parent. Only then does it write a `READY` marker in the root. A run never
-creates the root, and refuses one without `READY`. So no claim can sit under a
-directory that a crash could still lose, even beside a setup that's still running or
-one that died. Running setup again completes such a root.
+**Provision the root once.** Run `k8s setup` on the runner, with the same `--receipts`
+or `BLACKSAND_RECEIPTS`. Setup makes each missing directory and syncs its name into
+its parent. Only then does it write a `READY` marker in the root. A run never creates
+the root, and it refuses a root without `READY`. So every claim sits in a directory
+that a crash can't lose, even while another setup is still running or after one died.
+Running setup again completes a root that a dead setup left without `READY`.
 
-- **The claim** is the key's directory, made with a single `mkdir`, with no check
-  first. However many runner processes try, exactly one makes it. Before the run
-  touches the cluster, it writes `claim.json` and syncs it to disk. The claim holds the
-  key, the digest of the whole request, the run's id and its deadline. Every write is
-  complete: a short write is continued, never taken for the whole.
-- **The record** is renamed into place last, after the files it names are synced, and
-  before the run reports anything.
+- **The claim.** The runner claims a key by making the key's directory with a single
+  `mkdir`, without checking first. However many runner processes try, exactly one
+  makes it. Before the run touches the cluster, the runner writes `claim.json` and
+  syncs it to disk. The claim holds the key, the digest of the whole request, the
+  run's id and its deadline. The runner writes every file completely. When a write is
+  short, it writes the rest.
+- **The record.** The runner renames `record.json` into place last, after it syncs
+  the files the record names, and before the run reports anything.
 - **Nothing deletes a receipt.** Teardown and reconcile act only on cluster objects.
 
 | `k8s status --key KEY [--json]` | Meaning | `k8s run` with the same key |
 |---|---|---|
-| `completed`, with the record | The run ended, whatever its status. A failed record is final too. | Same request: returns the record and launches nothing. Changed request: refused (`request-changed`). |
-| `claimed`, with no record | **Unknown.** The runner stopped after its claim and before its record. Never relaunch it. | Refused (`claimed`), or `request-changed`. |
-| `unclaimed` | There's no receipt. | Runs. |
+| `completed`, with the record | The run ended, whatever its status. A failed record is final too. | With the same request, it returns the record and launches nothing. With a changed request, it refuses with `request-changed`. |
+| `claimed`, with no record | **Unknown.** The runner stopped after its claim and before its record. Never relaunch it. | It refuses with `claimed`, or with `request-changed` if the request changed. |
+| `unclaimed` | There's no receipt. | It runs. |
 
 For a claimed key, `status` also reports the claim's deadline, whether this runner's
-clock has passed it, and the run's objects still in the cluster. **These are facts, not
-proof that the run can no longer act.** A runner process paused after its claim can
+clock has passed it, and the run's objects still in the cluster. These facts don't
+prove that the run can no longer act. A runner process paused after its claim can
 still create the run's objects later, and the cluster's clock isn't the runner's. So a
-caller can't decide "not performed" from them.
+caller can't conclude "not performed" from them.
 
-**One runner per cluster** is assumed. Receipts live on that runner's disk, so a second
-runner with its own receipts could launch the same key. The request digest counts a
-local repository by its path; the record's `source.base` says which commit ran.
+**One runner per cluster.** Blacksand assumes one runner per cluster. Receipts live on
+that runner's disk, so a second runner with its own receipts could launch the same
+key. The request digest counts a local repository by its path, not by its commit. The
+record's `source.base` says which commit ran.
 
 ## What it protects against
 
@@ -313,7 +316,7 @@ Fast (`npm test`):
 - the proxy, with real sockets on loopback: SSRF attempts, grants, limits, audit
   pairing and sealing, expiry;
 - the trusted collector against a real repository, including the replace-object attack;
-- the run orchestration against a scripted kubectl.
+- the run orchestration against a scripted kubectl;
 - the command adapter: its argv through `sh` and `dash` with hostile arguments, its
   inputs, its file collection (hard links, symlinks, case collisions), and refused specs;
 - receipts: six runner processes racing for one key, a runner killed between its claim
@@ -328,8 +331,8 @@ Deep:
   attacks, clean repeat runs and a lost runner. With `BLACKSAND_K8S_TOOLS_IMAGE` set,
   it runs the real Claude Code and Codex at their default models against a fake model
   backend. Codex edits with apply_patch, then runs a probe that may reach only its
-  proxy. It also runs a command under a receipt: argv as data, read-only inputs, a
-hard link, and no model route. The file's header lists the environment it needs.
+  proxy. It also runs a command under a receipt, with argv as data, read-only inputs, a
+  hard link, and no model route. The file's header lists the environment it needs.
 
 ## Long-lived mode
 

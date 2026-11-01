@@ -2,12 +2,12 @@
 
 > **Applies to:** the Blacksand T3 app and its servers, macOS and Linux.
 
-This page lists what Blacksand T3 removes, what still leaves the machine and why, how
+This page lists what blacksand-t3 removes, what still leaves the machine and why, how
 each part is enforced, and how you can check it yourself.
 
 ## What is removed
 
-The [strip rules](../updates/upstream-rules.md) remove, from every build:
+The [strip rules](../updates/upstream-rules.md) remove these from every build:
 
 | Removed | Rules (in `tooling/t3code/lib/rules.mjs`) |
 |---|---|
@@ -21,20 +21,20 @@ The [strip rules](../updates/upstream-rules.md) remove, from every build:
 | upstream's background service (`t3 up`, `t3 status`); a stock service's hidden launcher refuses to start | `server/no-t3-up*`, `server/no-stock-service-launcher`, `server/no-stock-service-install` |
 | text that sends you to stock T3 (`npx t3 …`, t3.codes downloads, upstream's release pages) | the `web/no-stock-*` and `server/no-stock-commands-*` rules; `stock/no-stock-guidance` fails the build on any left |
 
-The app also gets its own name, bundle ID and data directory (`~/.blacksand/t3`), and
-the welcome screen and **Settings → About** say it collects no usage data.
+The app also gets its own name, bundle ID and data directory (`~/.blacksand/t3`). The
+welcome screen and **Settings → About** say it collects no usage data.
 
 ## The agent CLIs
 
-The boot environment (`tooling/t3code/lib/files/boot-env.ts`, rule `desktop/boot-env`) runs first in
-the app:
+The boot environment (`tooling/t3code/lib/files/boot-env.ts`, rule `desktop/boot-env`)
+runs first in the app. It does three things:
 
-- it switches T3's telemetry off a second time;
-- it switches off the agent CLIs' own analytics and crash reporting where a switch
-  exists: Claude Code (`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`), Grok, Pi, Muse, and
-  Bun's crash reporter (which OpenCode uses). Codex only takes launch flags, so rule
-  `provider/codex-analytics-off` adds them to every Codex launch;
-- on Linux and Windows, it turns off Electron's spellchecker, which would otherwise
+- It switches T3's telemetry off a second time.
+- It switches off the agent CLIs' own analytics and crash reporting where a switch
+  exists. That covers Claude Code (`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`), Grok,
+  Pi, Muse, and Bun's crash reporter, which OpenCode uses. Codex takes only launch
+  flags, so rule `provider/codex-analytics-off` adds them to every Codex launch.
+- On Linux and Windows, it turns off Electron's spellchecker, which would otherwise
   download dictionaries from Google.
 
 A server started without the desktop app (on an SSH host) gets the same switches
@@ -42,40 +42,43 @@ A server started without the desktop app (on an SSH host) gets the same switches
 
 ## What the app can reach
 
-**Content-Security-Policy.** The UI can only talk to loopback, so remote images, CDN
-icons and anything upstream adds to the page fail into their existing fallbacks. One
-policy (`tooling/t3code/lib/files/blacksandCsp.ts`) is applied by the page itself, by the server's
-static responses and by the desktop's app protocol. Files the server serves from your
-projects get the same policy. Agent-written HTML, MCP apps, SVGs and downloads keep
-upstream's sandbox policy, plus a second one with the same loopback-only reach (their
-inline scripts still run). So they can't load anything from outside either: no CDNs,
-no external APIs. Inline PDFs get no policy, because Chrome's PDF viewer breaks under
-one.
+**Content-Security-Policy.** The UI can talk only to loopback. Remote images, CDN
+icons and anything else upstream adds to the page fail to load, and the UI shows the
+fallbacks it already has. The page itself, the server's static responses and the
+desktop's app protocol all apply one policy, `tooling/t3code/lib/files/blacksandCsp.ts`.
+Files the server serves from your projects get the same policy. Agent-written HTML,
+MCP apps, SVGs and downloads keep upstream's sandbox policy and also get a second
+policy with the same loopback-only reach. Their inline scripts still run, but they
+can't load anything from outside, such as a CDN or an external API. Inline PDFs get no
+policy, because Chrome's PDF viewer breaks under one.
 
 ### WebRTC
 
 A CSP doesn't cover WebRTC, so the boot environment closes that route too.
 
 - Every web contents in the app may send WebRTC over UDP only through a proxy
-  (`disable_non_proxied_udp`), and Chromium never proxies UDP, so none does.
-- The app's own session (its windows, and the requests the desktop process makes
-  through Electron's network stack) goes through a proxy that refuses every
-  connection. It listens on a loopback port the app holds itself, so nothing else can
-  answer there. WebRTC's TCP path follows it. Loopback never goes through a proxy, so
-  the app's windows still reach the local server and forwarded SSH ports, and nothing
-  else. If the proxy can't be set, the app quits.
+  (`disable_non_proxied_udp`). Chromium never proxies UDP, so no web contents sends
+  WebRTC over UDP.
+- The app's own session goes through a proxy that refuses every connection. That
+  session covers the app's windows and the requests the desktop process makes through
+  Electron's network stack. The proxy listens on a loopback port the app holds itself,
+  so nothing else can answer there. WebRTC's TCP path follows the proxy setting.
+  Loopback traffic never goes through a proxy, so the app's windows still reach the
+  local server and forwarded SSH ports, and reach nothing else. If the app can't set
+  the proxy, it quits.
 - The preview browser has sessions of its own. It loses WebRTC over UDP, but keeps
   everything else, TCP WebRTC included. Copy Image on a preview-browser page fetches
   the image again through that page's own session (rule
   `desktop/context-menu-image-session`).
-- **EAS Simulator** (Expo's cloud simulators) streams over WebRTC. For it, the app's
-  own page, and only its top frame, may open one hidden window of the app's own (rules
-  `desktop/webrtc-window*`). That window keeps Chromium's default WebRTC policy. It
-  stays on `about:blank`, opens nothing, and closes with the page that opened it. The
-  device viewer makes its peer connections there, directly to Expo's cloud over UDP.
-  Anything else that asks for that window (an agent's preview, an MCP app) gets an
-  ordinary blocked one. The hidden window's TCP still goes to the refusing proxy, so
-  TURN over TCP or TLS isn't available.
+- EAS Simulator, Expo's cloud simulator service, streams over WebRTC. For it, the top
+  frame of the app's own page, and no other frame, may open one hidden window that
+  belongs to the app (rules `desktop/webrtc-window*`). That window keeps Chromium's
+  default WebRTC policy. It stays on `about:blank`, opens nothing, and closes with the
+  page that opened it. The device viewer makes its peer connections in that window,
+  directly to Expo's cloud over UDP. Anything else that asks for that window, such as
+  an agent's preview or an MCP app, gets an ordinary blocked window. The hidden
+  window's TCP traffic still goes to the refusing proxy, so TURN over TCP or TLS isn't
+  available.
 - Local and SSH simulators and emulators don't use WebRTC. Their video and input go
   over HTTP and WebSocket through T3's own server connection
   ([devices](../devices/overview.md)).
@@ -95,10 +98,11 @@ A CSP doesn't cover WebRTC, so the boot environment closes that route too.
 
 ## Trade-offs
 
-- **Remote environments over SSH only; no T3 Connect.** Relay and mobile pairing
-  through T3's servers are gone. The phone can pair directly with a host over
-  Tailscale instead, without push notifications.
-- **Remote images in chat don't render** (GitHub's do). Link favicons show a generic icon.
+- **Remote environments connect over SSH only.** T3 Connect is gone, along with relay
+  and mobile pairing through T3's servers. The phone can pair directly with a host
+  over Tailscale instead, without push notifications.
+- **Remote images in chat don't render, except GitHub's.** Link favicons show a
+  generic icon.
 - **Agent previews can't load outside resources.** Agent-written HTML and MCP apps get
   the loopback-only CSP too.
 - **The model list is the one bundled in each build.** Pinned rebuilds keep it at most
@@ -113,44 +117,54 @@ A CSP doesn't cover WebRTC, so the boot environment closes that route too.
 Every build, on every machine, runs these before installing
 ([build pipeline](../building/pipeline.md)):
 
-1. **The host scan:** URL literals in selected upstream app source are checked
-   against `tooling/t3code/lib/known-hosts.txt`, excluding reserved names and loopback. An unlisted
-   host stops the update. Calls to listed hosts, runtime-assembled names and files
-   outside the scan can escape it ([limits](../building/pipeline.md#limits)).
-2. **Strict strip rules:** a privacy rule that no longer matches stops the update.
-3. **The forbidden-endpoint scan** of the build output and the packaged app.
-4. **The network tripwire smoke test:** zero non-loopback connections, DNS lookups or
-   UDP sends from the built server in its first 20 seconds.
+1. **The host scan.** The scan checks URL literals in selected upstream app source
+   against `tooling/t3code/lib/known-hosts.txt`, excluding reserved names and
+   loopback. An unlisted host stops the update. Calls to listed hosts,
+   runtime-assembled names and files outside the scan can escape it
+   ([limits](../building/pipeline.md#limits)).
+2. **Strict strip rules.** A privacy rule that no longer matches stops the update.
+3. **The forbidden-endpoint scan.** It scans the build output and the packaged app.
+4. **The network tripwire smoke test.** The built server must make zero non-loopback
+   connections, DNS lookups or UDP sends in its first 20 seconds.
 
-Tests: `tooling/t3code/test/strip-rules.test.mjs`, `tooling/t3code/test/build-strip-engine.test.mjs`,
-`tooling/t3code/test/build-tripwire.test.mjs`, `tooling/t3code/test/build-tripwire-exec.test.mjs`,
-`tooling/t3code/test/app-webrtc.test.mjs`, `tooling/t3code/test/app-stock-guidance.test.mjs`,
-`tooling/t3code/test/privacy-text.test.mjs`, and `tooling/t3code/test/stripped/blacksand*Csp.test.ts` (run inside the
-stripped checkout).
+These tests cover the enforcement:
+
+- `tooling/t3code/test/strip-rules.test.mjs`
+- `tooling/t3code/test/build-strip-engine.test.mjs`
+- `tooling/t3code/test/build-tripwire.test.mjs`
+- `tooling/t3code/test/build-tripwire-exec.test.mjs`
+- `tooling/t3code/test/app-webrtc.test.mjs`
+- `tooling/t3code/test/app-stock-guidance.test.mjs`
+- `tooling/t3code/test/privacy-text.test.mjs`
+- `tooling/t3code/test/stripped/blacksand*Csp.test.ts`, which runs inside the stripped
+  checkout
 
 ## Check it yourself
 
-- **The rules against a release:** `blacksand t3 check` applies them to the pinned
-  release without building; `blacksand t3 check --build` also builds, scans and runs
+- **Run the rules against a release.** `blacksand t3 check` applies them to the pinned
+  release without building. `blacksand t3 check --build` also builds, scans and runs
   the smoke test, without installing.
-- **The smoke test on your last build:** `blacksand t3 smoke`.
+- **Run the smoke test on your last build.** Use `blacksand t3 smoke`.
 - **Watch the running app.** Use a per-process firewall or monitor (Little Snitch,
   LuLu, or `nettop -p <pid>` on macOS; `ss -tpn` on Linux). Then compare what the app
   and its servers connect to with the table above. Expect your providers, plus
   whatever you opened in the preview browser.
-- **Read the rules.** Each rule in `tooling/t3code/lib/rules.mjs` has an id, the anchor it must match,
-  and a `why`. `tooling/t3code/lib/known-hosts.txt` says why each listed host is fine.
+- **Read the rules.** Each rule in `tooling/t3code/lib/rules.mjs` has an id, the anchor
+  it must match, and a `why`. `tooling/t3code/lib/known-hosts.txt` says why each listed
+  host is fine.
 
 ## Limits
 
-- **Network isn't enforced at runtime.** T3's own code is checked for calls home on
-  every update, within the limits of the [smoke test](../building/pipeline.md#limits).
+- **blacksand-t3 doesn't enforce network limits at runtime.** Every update checks T3's
+  own code for calls home, within the limits of the
+  [smoke test](../building/pipeline.md#limits).
   The agent CLIs talk to their providers directly. Sandbox the agents with your own
   tooling ([threat model](threat-model.md#non-goals)).
-- **Electron timing.** The app sets its refusing proxy asynchronously at startup (in
-  effect 27–32 ms after Electron is ready, measured), long before an agent's preview or
-  an MCP app can load. Whether such a frame's `<link rel=dns-prefetch>` makes Chromium
-  resolve a name locally hasn't been measured; a CSP doesn't cover it.
+- **Electron timing.** The app sets its refusing proxy asynchronously at startup.
+  Measured, it takes effect 27 to 32 ms after Electron is ready, long before an agent's
+  preview or an MCP app can load. Nobody has measured whether such a frame's
+  `<link rel=dns-prefetch>` makes Chromium resolve a name locally. A CSP doesn't cover
+  it.
 - **EAS Simulator video needs UDP.** On a network that blocks UDP, EAS devices show no
   video. Allowing TCP would mean letting the whole session, untrusted frames included,
   reach those relays.

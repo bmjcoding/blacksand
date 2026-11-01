@@ -3,31 +3,32 @@
 > **Applies to:** every role. Host-side rows are macOS-only, because only macOS has
 > the host role.
 
-This page says what Blacksand T3 protects, from whom, where each control is enforced,
-and which test checks it. It also lists what it deliberately doesn't protect.
+This page says what blacksand-t3 protects, from whom, where the code enforces each
+control, and which test checks it. It also lists what blacksand-t3 doesn't protect, by
+design.
 
 ## Assets
 
-1. **Your account on each machine:** your files, your SSH key's use, your GitHub
-   login, the code-signing certificate, your password manager session.
-2. **Agent accounts' contents:** provider tokens, projects, threads.
-3. **The integrity of what runs:** the installed app, the build that made it, and the
-   update channel (this repository and `pin.json`).
-4. **Privacy:** what the app reports about you and your work.
-5. **Availability:** updates keep arriving; the host stays reachable; a failed update
-   leaves a working app.
+1. **Your account on each machine.** This covers your files, the use of your SSH key,
+   your GitHub login, the code-signing certificate and your password manager session.
+2. **Agent accounts' contents.** These are provider tokens, projects and threads.
+3. **The integrity of what runs.** This covers the installed app, the build that made
+   it, and the update channel, which is this repository and `pin.json`.
+4. **Privacy.** This is what the app reports about you and your work.
+5. **Availability.** Updates keep arriving, the host stays reachable, and a failed
+   update leaves a working app.
 
 ## Adversaries
 
 | Adversary | Starting position |
 |---|---|
-| **Agent account** | runs code you don't control (an agent, a CLI, a hostile CLI update), as a standard macOS user on the host |
-| **LAN peer** | on the same local network as the host or desktop; can spoof source addresses; may hold a stolen key |
-| **Tailnet peer** | another device in your tailnet, or one a compromised coordination server adds |
-| **Compromised evaluator** | holds the evaluator's signing key, or controls the CI `evaluate` job's output |
-| **GitHub account access** | can push to the repository, but doesn't hold the owner's signing key |
-| **Compromised upstream or npm** | a malicious upstream commit or tag, a hijacked npm package or publisher, a swapped tarball |
-| **Lost or stolen machine** | physical possession of a powered-off or locked machine |
+| Agent account | runs code you don't control (an agent, a CLI, a hostile CLI update), as a standard macOS user on the host |
+| LAN peer | on the same local network as the host or desktop; can spoof source addresses; may hold a stolen key |
+| Tailnet peer | another device in your tailnet, or one a compromised coordination server adds |
+| Compromised evaluator | holds the evaluator's signing key, or controls the CI `evaluate` job's output |
+| GitHub account access | can push to the repository, but doesn't hold the owner's signing key |
+| Compromised upstream or npm | a malicious upstream commit or tag, a hijacked npm package or publisher, a swapped tarball |
+| Lost or stolen machine | physical possession of a powered-off or locked machine |
 
 ## Trust boundaries
 
@@ -68,8 +69,8 @@ flowchart LR
 
 Each box is a boundary. Your account trusts the build account's output only after
 scanning it. An agent account trusts nothing outside itself, and nothing trusts it.
-Machines trust GitHub only for transport: they verify signatures and re-derive the
-evaluator's gates themselves. Dashed lines are what an adversary reaches without
+Machines trust GitHub only for transport. They verify signatures and re-derive the
+evaluator's gates themselves. A dashed line marks a path an adversary reaches without
 passing a control first.
 
 ## Threats and controls
@@ -140,36 +141,40 @@ passing a control first.
 
 These are out of scope by design. Nothing in the code tries to cover them.
 
-- **Runtime network enforcement.** Blacksand T3 doesn't limit what the agents, the CLIs
-  or the app reach at runtime. Sandbox the agents with your own tooling. Codex's and
-  Claude Code's own sandboxes work normally. Enforcement outside this repository is
-  planned.
-- **Auditing upstream.** You still run upstream's code and its dependency tree. This
-  removes their telemetry; it doesn't review everything else. The app runs as you.
-- **Root, or your admin account, on any machine.** It has sudo, so compromising it
-  compromises the machine. Root on the host can undo every host control.
+- **Runtime network enforcement.** blacksand-t3 doesn't limit what the agents, the
+  CLIs or the app reach at runtime. Sandbox the agents with your own tooling. Codex's
+  and Claude Code's own sandboxes work normally. Enforcement outside this repository
+  is planned.
+- **Auditing upstream.** You still run upstream's code and its dependency tree.
+  blacksand-t3 removes upstream's telemetry. It doesn't review the rest of that code.
+  The app runs as you.
+- **Root, or your admin account, on any machine.** The admin account has sudo, so
+  compromising it compromises the machine. Root on the host can undo every host
+  control.
 - **The owner's signing key.** Whoever holds it is the owner, as far as machines can
   tell ([playbook](keys-and-incidents.md#the-owner-key-leaked)).
 - **Agents within one account.** Everything running as one agent account can read
   that account's tokens and files.
 - **Vendor self-updaters.** `claude update`, `codex update` and the CLIs'
-  auto-updates install the vendors' newest builds, without the 3-day wait. That's
-  accepted.
-- **Hand-made configuration.** Unusual things the owner configures by hand: Serve
-  mappings or foreground sessions on the scripts' ports, edited plists or state files.
-- **Failing root filesystem operations** (`rm`, `mv`, `mktemp`, writes in `/var/db`,
-  `/var/run`, `/Library`), other than a full disk.
-- **A crash or power loss in a millisecond window.** The one known window is listed
-  below.
-- **HTTPS interception by local security software.** Not supported; remove it.
+  auto-updates install the vendors' newest builds, without the 3-day wait. This is an
+  accepted risk.
+- **Hand-made configuration.** This covers unusual things the owner configures by
+  hand, such as Serve mappings or foreground sessions on the scripts' ports, and edited
+  plists or state files.
+- **Failing root filesystem operations.** This covers `rm`, `mv`, `mktemp` and writes
+  in `/var/db`, `/var/run` and `/Library` failing, except from a full disk.
+- **A crash or power loss in a millisecond window.** The residual risks below list the
+  one known window.
+- **HTTPS interception by local security software.** blacksand-t3 doesn't support it.
+  Remove it.
 
 ## Residual risks
 
-These are within scope, and limited, but not closed:
+These risks are in scope and limited, but not closed:
 
 | Residual | Bound | Detail |
 |---|---|---|
-| LAN peers reach the host's sshd before login | key-only, agent-only; source filter | a LAN peer that spoofs a tailnet address and holds an authorized key gets in. The filter checks the claimed address, not the interface ([agent accounts](../accounts/agent-accounts.md#what-the-source-filter-does-and-doesnt-do)) |
+| LAN peers reach the host's sshd before login | key-only, agent-only; source filter | a LAN peer that spoofs a tailnet address and holds an authorized key gets in, because the filter checks the claimed address, not the interface ([agent accounts](../accounts/agent-accounts.md#what-the-source-filter-does-and-doesnt-do)) |
 | The FileVault unlock over SSH takes a password from the LAN | unlocks the disk only, opens no session; keep `fdesetup list` to the admin account | [host](../install/host.md#power-restarts-and-filevault) |
 | Screen Sharing: a crash while loading it | about 2 s of password-protected LAN reach at the next boot, measured | [Screen Sharing](../remote-access/screen-sharing.md#what-this-doesnt-protect) |
 | Screen Sharing: the check polls once a minute | up to about a minute in a changed state | same |
@@ -183,6 +188,6 @@ These are within scope, and limited, but not closed:
 | Without Tailnet Lock, the coordination server could add a device | the policy still limits what it reaches | [Tailscale](../networking/tailscale.md#tailnet-lock-optional) |
 | The desktop Tailscale app uploads diagnostic logs | Tailscale documents no opt-out for app variants | [Tailscale](../networking/tailscale.md#the-desktop-the-tailscale-app) |
 | The stock phone app sends upstream's telemetry | only if you pair a phone | [phone](../remote-access/phone.md) |
-| The app's WebRTC proxy is set 27–32 ms after start; `dns-prefetch` unmeasured | long before untrusted frames load | [privacy](privacy.md#limits) |
+| The app's WebRTC proxy is set 27 to 32 ms after start; `dns-prefetch` unmeasured | long before untrusted frames load | [privacy](privacy.md#limits) |
 | Both apps register `t3code://` | with the official app installed, the system picks one | [desktop](../install/desktop.md#changing-role-or-locations) |
-| Linux tested in containers only | — | [roles](../getting-started/roles.md#linux-today) |
+| Linux tested in containers only | no bound | [roles](../getting-started/roles.md#linux-today) |

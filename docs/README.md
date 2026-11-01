@@ -5,7 +5,7 @@ which links to the rest.
 
 ## Tools
 
-- [Blacksand T3](../tooling/t3code/README.md) builds T3 Code from upstream source, with
+- [blacksand-t3](../tooling/t3code/README.md) builds T3 Code from upstream source, with
   its telemetry and other calls home removed. Its guides are in
   [`tooling/t3code/docs/`](../tooling/t3code/docs/README.md).
 

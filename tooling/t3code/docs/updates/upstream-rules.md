@@ -1,73 +1,80 @@
 # Upstream rules and drift
 
 > **Applies to:** every build, macOS and Linux. Code: `tooling/t3code/lib/rules.mjs`,
-> `tooling/t3code/lib/features.mjs`, `tooling/t3code/lib/strip-engine.mjs`, `tooling/t3code/lib/drift.mjs`, `tooling/t3code/lib/looks.mjs`.
-> Tests: `tooling/t3code/test/strip-rules.test.mjs`, `tooling/t3code/test/build-strip-engine.test.mjs`,
-> `tooling/t3code/test/app-rules.test.mjs`, `tooling/t3code/test/app-stock-guidance.test.mjs`.
+> `tooling/t3code/lib/features.mjs`, `tooling/t3code/lib/strip-engine.mjs`,
+> `tooling/t3code/lib/drift.mjs`, `tooling/t3code/lib/looks.mjs`. Tests:
+> `tooling/t3code/test/strip-rules.test.mjs`,
+> `tooling/t3code/test/build-strip-engine.test.mjs`,
+> `tooling/t3code/test/app-rules.test.mjs`,
+> `tooling/t3code/test/app-stock-guidance.test.mjs`.
 
-Each rule is a small, anchored source edit applied to every upstream checkout. It
-states how many times its anchor must match. What happens when upstream moves that
-code depends on the rule.
+Each rule is a small source edit, tied to an anchor in the code, that the build applies
+to every upstream checkout. The rule states how many times its anchor must match. What
+happens when upstream moves that code depends on the kind of rule.
 
 ## Strict rules and feature rules
 
-- **Strict rules** stop the update, and the installed build stays. These cover
-  privacy, identity, the updater, the CSP, and stock-T3 guidance. Every rule is
+- **Strict rules stop the update when they fail, and the installed build stays.** They
+  cover privacy, identity, the updater, the CSP and stock-T3 guidance. Every rule is
   strict unless `tooling/t3code/lib/features.mjs` says otherwise.
-- **Feature rules** are grouped into features in `tooling/t3code/lib/features.mjs`. They cover the
-  look, the usage-limits fix, host update requests, the PDF preview, the update-track
-  note and the privacy text. If one stops matching, or stops compiling, the build
-  leaves that whole feature out, plus any feature that requires it, and installs
-  anyway. Upstream's own code runs in its place until the rule is updated.
+- **Feature rules are grouped into features in `tooling/t3code/lib/features.mjs`.** They
+  cover the look, the usage-limits fix, host update requests, the PDF preview, the
+  update-track note and the privacy text. If a feature rule stops matching or stops
+  compiling, the build leaves out that whole feature, plus any feature that requires
+  it, and installs anyway. Upstream's own code runs in its place until someone updates
+  the rule.
 
-A last strict rule (`stock/no-stock-guidance`) fails the build if any text sending
-you to stock T3 is left (`npx t3 …`, `t3@latest`, t3.codes downloads, pingdotgg's
-GitHub releases, "update manually"). New stock wording upstream adds holds updates at
-the last good pin until a rule replaces it.
+One last strict rule, `stock/no-stock-guidance`, fails the build if any text that sends
+you to stock T3 is left. That text includes `npx t3 …`, `t3@latest`, t3.codes
+downloads, pingdotgg's GitHub releases and "update manually". If upstream adds new
+stock wording, updates stay at the last good pin until a rule replaces that wording.
 
-The evaluator pins only a release its strict rules apply to, so a machine following
-the pin doesn't meet one that fails. If a strict rule fails anyway, the update stops.
-On a track built without a pin, the update runs the rules first and falls back to the
-newest release (up to 5 back) that still works. If none does, it stays on the
-installed build and says why.
+The evaluator pins only a release that its strict rules apply to. So a machine that
+follows the pin doesn't meet a strict rule that fails. If a strict rule fails anyway,
+the update stops. On a track built without a pin, the update runs the rules first. It
+falls back to the newest release, up to 5 back, that still works. If none works, the
+machine stays on the installed build and says why.
 
 ## What the rules change
 
-Beyond removing what [privacy](../security/privacy.md) lists, the rules give the app
-its own name, bundle ID and data directory, plus its look. The look is the Redacted
-app icon, and touches that follow whichever theme you pick: the T3 BLACKOUT wordmark,
-redaction bars in place of the nightly starfield, a ringed send button, button glow, a
-version stamp and accent text selection. Each has its own switch in **Settings →
-Appearance → Interface**. There are no Blacksand themes; use upstream's, or add a
-custom theme to change the accent.
+The rules remove what [privacy](../security/privacy.md) lists. They also give the app
+its own name, bundle ID, data directory and look. The look is the Redacted app icon
+plus touches that follow whichever theme you pick. Those touches are the T3 BLACKOUT
+wordmark, redaction bars in place of the nightly starfield, a ringed send button,
+button glow, a version stamp and accent text selection. Each has its own switch in
+**Settings → Appearance → Interface**. Blacksand adds no themes of its own. Use
+upstream's themes, or add a custom theme to change the accent.
 
 ## The build report
 
-Every build writes a report (`tooling/t3code/lib/drift.mjs`, `tooling/t3code/lib/looks.mjs`). It opens with
-screenshots. Your installed build and the new one each boot offline, with an empty
-profile and the default theme in dark mode. Headless Chrome photographs the same
-screens in both, and the report shows them side by side, with what changed
-highlighted. The packaged server runs under the [network tripwire](../building/pipeline.md#the-smoke-test)
-while it's photographed; if it tries to reach the network, the update fails and
-nothing is installed.
+Every build writes a report (`tooling/t3code/lib/drift.mjs`,
+`tooling/t3code/lib/looks.mjs`). The report opens with screenshots. Your installed
+build and the new one each boot offline, with an empty profile and the default theme
+in dark mode. Headless Chrome photographs the same screens in both builds. The report
+shows the screenshots side by side and highlights what changed. The packaged server
+runs under the [network tripwire](../building/pipeline.md#the-smoke-test) while Chrome
+photographs it. If the server tries to reach the network, the update fails and installs
+nothing.
 
-For each feature left out, the report lists the upstream commits and pull requests
-that touched its code, and the diff with the lines the rule hooked into highlighted. It
-also shows where those lines live now, if upstream moved them. A strict failure gets
-its own report: which strict rules stopped the update, and how to get updates going
-again. Open it from the version stamp's hover card, or with `blacksand t3 drift`.
-Beside it are the report's data and screenshots as files (`<version>.json`,
-`<version>/`), which `blacksand t3 review` gathers for an agent to read.
+For each feature the build left out, the report lists the upstream commits and pull
+requests that touched that feature's code. It shows the diff and highlights the lines
+the rule hooked into. If upstream moved those lines, it also shows where they are now.
+A strict failure gets its own report. That report lists which strict rules stopped the
+update, and how to get updates going again.
+
+Open the report from the version stamp's hover card, or with `blacksand t3 drift`. Next
+to it are the report's data and screenshots as files (`<version>.json` and
+`<version>/`). `blacksand t3 review` gathers those files for an agent to read.
 
 ## Fixing a rule
 
-1. `blacksand t3 drift` shows what upstream changed.
-2. Update the anchor in `tooling/t3code/lib/rules.mjs`. `blacksand t3 check` dry-runs the rules
-   against the pinned release (`--ref` for any), so you can iterate quickly.
-   `blacksand t3 check --build` also builds, scans and smoke-tests it, without
-   installing.
-3. Commit it, signed. The rules are a repo file, so a change needs the owner's
-   signature to reach any machine.
+1. Run `blacksand t3 drift` to see what upstream changed.
+2. Update the anchor in `tooling/t3code/lib/rules.mjs`. `blacksand t3 check` dry-runs
+   the rules against the pinned release, or against any release with `--ref`, so you
+   can try a change without building. `blacksand t3 check --build` also builds, scans
+   and smoke-tests the release, without installing it.
+3. Commit the change, signed. The rules are a repository file, so a change reaches a
+   machine only with the owner's signature.
 
-New stock-T3 wording needs a rule that replaces it, placed before `brand/name` in
-`tooling/t3code/lib/rules.mjs`.
+New stock-T3 wording needs a rule that replaces it. Place that rule before
+`brand/name` in `tooling/t3code/lib/rules.mjs`.

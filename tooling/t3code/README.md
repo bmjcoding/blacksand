@@ -1,6 +1,6 @@
-# Blacksand T3
+# blacksand-t3
 
-Blacksand T3 builds [T3 Code](https://github.com/pingdotgg/t3code) from upstream
+blacksand-t3 builds [T3 Code](https://github.com/pingdotgg/t3code) from upstream
 source, with its telemetry, stock auto-updater and other calls home removed. Each
 machine checks the release this repository pins, then builds it itself.
 

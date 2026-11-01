@@ -14,113 +14,125 @@ sudo tooling/t3code/scripts/enable-screen-sharing.sh
 
 ## How it stays off your local network
 
-macOS's own Screen Sharing listens on every interface, your local network included,
-and the Tailscale policy can't filter that. The script doesn't use a firewall the host
-would depend on, since that's one more way to lock yourself out. Instead it:
+macOS's own Screen Sharing listens on every interface, your local network included.
+The Tailscale policy can't filter that. The script doesn't rely on a firewall, because
+a firewall the host depends on is one more way to lock yourself out. Instead, the
+script does this:
 
-- normally keeps macOS's Screen Sharing switch off (the crash window below can leave
-  Apple's every-interface job enabled for the next boot). It runs the same `screensharingd` from a
-  plist of its own, whose only socket is port 15900 on the host's loopback (127.0.0.1
-  and ::1);
-- has Tailscale Serve forward the tailnet's TCP 5900 there, but only while Screen
-  Sharing is verified to hold 15900. Otherwise a program on the host (an agent's)
-  could listen on 15900 and fake a sign-in prompt. Two small root jobs hold 15900
-  while Screen Sharing is off, and 15901 always. While it's off, the forward points at
-  15901 ("parked"). That's read back from tailscaled each time, never assumed;
-- touches no firewall, pf or sshd, so it can't block SSH;
-- limits sign-in to exactly your admin account (its macOS password), and turns off
-  VNC passwords and "Anyone may request permission".
+- It normally keeps macOS's Screen Sharing switch off. A crash at one moment, described
+  below, can leave Apple's every-interface job enabled for the next boot. The script
+  runs the same `screensharingd` from a plist of its own, whose only socket is port
+  15900 on the host's loopback (127.0.0.1 and ::1).
+- It has Tailscale Serve forward the tailnet's TCP 5900 to 15900, but only while it
+  has verified that Screen Sharing holds 15900. Otherwise a program on the host, such
+  as an agent's, could listen on 15900 and fake a sign-in prompt. Two small root jobs
+  hold 15900 while Screen Sharing is off, and hold 15901 at all times. While Screen
+  Sharing is off, the forward points at 15901. The script calls this "parked". It
+  reads the forward back from tailscaled each time, and never assumes it.
+- It touches no firewall, pf or sshd, so it can't block SSH.
+- It allows sign-in only by your admin account, with that account's macOS password.
+  It turns off VNC passwords and "Anyone may request permission".
 
-Setup succeeds only once `screensharingd` answers on loopback and macOS lets it
-capture the screen and take input. If setup fails after starting Screen Sharing, it
-turns it off again and says whether that worked. If Tailscale isn't up yet, Screen
-Sharing works on loopback, and the forward follows once tailscaled is up.
+Setup succeeds once `screensharingd` answers on loopback. If its check-in line says
+macOS denies it screen capture or input, setup fails and names the System Settings step
+that grants it. If there's no check-in line to go by, setup warns and still succeeds. If setup fails after it starts Screen Sharing, it
+turns Screen Sharing off again and says whether that worked. If Tailscale isn't up
+yet, Screen Sharing works on loopback, and the forward is set up once tailscaled is up.
 
 ## The check
 
 A root check (`dev.blacksand.screen-sharing-check`) runs at boot and every minute.
 Within about a minute, it undoes or stops what's wrong:
 
-- Apple's version loaded or its switch on (System Settings can do that): it unloads
-  Apple's version, switches it off, and loads its own again;
-- a sign-in rule broken (another account allowed, a VNC password, Remote Management
-  on): it turns Screen Sharing off, ending any session;
-- anything but root's tailscaled on 5900, or anything but its own jobs on 15900 or
-  15901, or IP forwarding or the host model unsafe ([host](../install/host.md#network-settings-the-tailnet-relies-on)):
-  it turns Screen Sharing off and says why;
-- tailscaled not answering when Screen Sharing must go off: it can't read the forward
-  back as parked, so Screen Sharing stays on and keeps its port, and the next check
-  tries again.
+- If Apple's version is loaded or its switch is on, which System Settings can do, the
+  check unloads Apple's version, switches it off, and loads its own again.
+- If a sign-in rule is broken, it turns Screen Sharing off and ends any session.
+  Another account allowed, a VNC password, or Remote Management on each break a rule.
+- If anything but root's tailscaled is on 5900, or anything but its own jobs is on
+  15900 or 15901, or IP forwarding or the host model is unsafe
+  ([host](../install/host.md#network-settings-the-tailnet-relies-on)), it turns Screen
+  Sharing off and says why.
+- If tailscaled isn't answering when Screen Sharing must go off, the check can't read
+  the forward back as parked. Screen Sharing then stays on and keeps its port, and the
+  next check tries again.
 
-A failed or timed-out check attempts a bounded shutdown; if the forward can't be verified as parked, the backend can stay loaded and the failure is reported. The script
-moves only its own TCP 5900 forward. Serve rules you made by hand that could reach
-15900 or 15901 stop it from changing anything until you remove them (`--status`
-names them).
+When a check fails or times out, it tries to shut Screen Sharing down within a time
+limit. If it can't verify the forward as parked, the backend can stay loaded, and the
+check reports the failure. The script moves only its own TCP 5900 forward. If you made
+Serve rules by hand that could reach 15900 or 15901, the script changes nothing until
+you remove them. `--status` names them.
 
 ## The one-time capture step
 
-This hasn't yet been confirmed on a real Mac. If setup says macOS hasn't granted
-screen capture and control (you'd see a black screen that takes no input), do this at
-the Mac:
+No one has confirmed this step on a real Mac yet. Setup may say that macOS hasn't
+granted screen capture and control. You'd see a black screen that takes no input. If
+so, do this at the Mac:
 
 1. Open **System Settings → General → Sharing**, and turn Screen Sharing on.
 2. Wait until it shows as on, then turn it off again.
 3. Rerun the script.
 
-While it's on, Apple's version listens on your local network (password-protected,
-your account only). So do this with the firewall on ([base system](../install/base-system.md)),
-or with the Mac off your network, before any agent account exists.
+While the switch is on, Apple's version listens on your local network. It's
+password-protected, and only your account can sign in. So do this before any agent
+account exists, with the firewall on ([base system](../install/base-system.md)) or
+with the Mac off your network.
 
 ## Connect
 
-On the desktop: **Finder → Go → Connect to Server → `vnc://t3b-host`**, and sign in as
-the host's admin account. Use Standard mode only: Serve forwards TCP, and High
-Performance mode needs UDP. **System Settings shows Screen Sharing as off while it
-runs.** Leave it so.
+On the desktop, open **Finder → Go → Connect to Server**, enter `vnc://t3b-host`, and
+sign in as the host's admin account. Use Standard mode only. Serve forwards TCP, and
+High Performance mode needs UDP. **System Settings shows Screen Sharing as off while it
+runs.** Leave the switch off.
 
 | Command (`sudo tooling/t3code/scripts/enable-screen-sharing.sh …`) | What it does |
 |---|---|
-| `--status` | whether it's on, whether macOS granted capture, who holds each port, where the forward points, the switch, and any problem |
-| `--off` / `--on` | turn it off (the forward stays parked) or on again. Each reports success only when the state is verified; otherwise it names what remains |
-| `--no-serve` | set up for the host's loopback only; reach it through an SSH tunnel. Switching an existing Serve setup to this needs tailscaled running |
-| `--uninstall` | park the forward and turn Screen Sharing off, remove the forward, check nothing in Serve still reaches 15900 or 15901, and only then remove the check and the jobs. Without tailscaled, it stops before the forward and keeps everything holding its ports; rerun once tailscaled is back. Then remove the `tcp:5900` grant from your policy |
-| `--print-policy` | the Tailscale grant and tests (no sudo) |
+| `--status` | shows whether it's on, whether macOS granted capture, who holds each port, where the forward points, the switch, and any problem |
+| `--off` / `--on` | turns it off, leaving the forward parked, or on again. Each reports success only once it has verified the state. Otherwise it names what remains |
+| `--no-serve` | sets it up for the host's loopback only, which you reach through an SSH tunnel. Switching an existing Serve setup to this needs tailscaled running |
+| `--uninstall` | parks the forward, turns Screen Sharing off, removes the forward, and checks that nothing in Serve still reaches 15900 or 15901. Only then does it remove the check and the jobs. Without tailscaled, it stops before the forward and leaves everything that holds a port in place. Rerun it once tailscaled is back. Then remove the `tcp:5900` grant from your policy |
+| `--print-policy` | prints the Tailscale grant and tests. It doesn't need sudo |
 
 If it ever reports a state it doesn't recognize, run `--uninstall`, then set it up
-again. Screen Sharing isn't available until FileVault is unlocked after a restart.
+again. After a restart, Screen Sharing is available only once FileVault is unlocked.
 
 ## Tested so far
 
-In macOS 27.2 VMs, all 96 bind variants were refused while the ports were held by the
-live or holding jobs. During swaps, an agent captured both families of port 15900;
-checks detected it and refused transitions until the agent released the port. Admin-only
-sign-in, the checks, `--off`/`--uninstall` and sampled ordinary reboots were exercised.
-Setup refuses when macOS denies capture or input; a session with a usable picture and
-control hasn't been accepted yet. A real tailnet's Serve forwarding, what happens to an
-existing session during a swap, and the System Settings consent step remain unverified. The [verification rows](../getting-started/example-desktop-and-host.md#verification)
+In macOS 27.2 VMs, macOS refused all 96 bind variants while the live or holding jobs
+held the ports. During swaps, an agent took port 15900 on both address families. The
+checks detected it, and refused transitions until the agent released the port. Tests
+also exercised admin-only sign-in, the checks, `--off`, `--uninstall` and a sample of
+ordinary reboots. Setup refuses when macOS denies capture or input. No session with a
+usable picture and control has been accepted yet.
+
+Three things remain unverified: a real tailnet's Serve forwarding, what happens to an
+existing session during a swap, and the System Settings consent step. The
+[verification rows](../getting-started/example-desktop-and-host.md#verification)
 check them on your host.
 
 ## What this doesn't protect
 
-- It adds a password-authenticated service. It's reachable from the host's loopback,
-  where any local account can connect (agent accounts and their SSH forwards
-  included), but only your account can sign in. Through Serve, it's reachable from
-  the devices your policy allows.
-- The check polls once a minute. For up to about a minute after a change (Apple's
-  version turned on in System Settings, a sign-in rule broken, Remote Management on,
-  forwarding on), the old state stands.
+- It adds a password-authenticated service. Any local account can connect to it on
+  the host's loopback, including agent accounts and their SSH forwards, but only your
+  account can sign in. Through Serve, the devices your policy allows can reach it.
+- The check polls once a minute. So for up to about a minute after a change, the old
+  state stays in effect. Such a change could be Apple's version turned on in System
+  Settings, a broken sign-in rule, Remote Management turned on, or forwarding turned
+  on.
 - If the check job is removed or broken, a running Screen Sharing stays up until the
-  next restart, and isn't started after it.
-- A sign-in rule broken while tailscaled doesn't answer leaves Screen Sharing loaded
-  until the forward can be read back as parked. The check records that it could NOT
-  be turned off, in its log and in `--status`'s "last failed check".
-- **A crash or power loss in the moment the check loads it.** Loading switches the
-  switch on for one `launchctl bootstrap` (8–12 ms on test Macs), then off again. A
-  signal is caught; a SIGKILL or power loss isn't. The next boot then starts Apple's
-  every-interface version (password-protected, your account only) until the
-  boot-time check, which runs first, unloads it. That was measured at about 2 s of
-  reach from the local network on test Macs.
-- A tailnet address also present on a physical interface isn't detected.
-- Failures of root filesystem operations other than a full disk (writing or removing
-  files in `/var/db`, `/var/run` or `/Library`) aren't handled specially.
+  next restart, and doesn't start after it.
+- If a sign-in rule breaks while tailscaled doesn't answer, Screen Sharing stays
+  loaded until the check can read the forward back as parked. The check records that
+  Screen Sharing "could NOT be turned off", in its log and in `--status`'s "last
+  failed check".
+- **A crash or power loss in the moment the check loads it.** Loading turns the
+  switch on for one `launchctl bootstrap`, which took 8 to 12 ms on test Macs, then
+  off again. The check catches a signal, but not a SIGKILL or a power loss. After
+  one, the next boot starts Apple's every-interface version until the boot-time
+  check, which runs first, unloads it. That version is password-protected, and only
+  your account can sign in. On test Macs, it was reachable from the local network for
+  about 2 s.
+- The check doesn't detect a tailnet address that's also on a physical interface.
+- The script doesn't handle failures of root filesystem operations specially, except
+  a full disk. These operations write or remove files in `/var/db`, `/var/run` or
+  `/Library`.
 - Root on the host can undo all of it.

@@ -10,15 +10,15 @@ machine re-checks what CI proposes.
 
 - **Machines take only signed history.** Self-update fast-forwards to `main` only
   when every new commit, side branches included, has exactly one SSH signature from a
-  principal in `.allowed_signers`. The list is read **from each commit's first
-  parent**, so a commit can't add the key that signs it. OpenPGP and X.509 signatures,
-  unsigned commits and commits with no parent are refused
+  principal in `.allowed_signers`. Self-update reads that list from each commit's
+  first parent, so a commit can't add the key that signs it. It refuses OpenPGP and
+  X.509 signatures, unsigned commits, and commits with no parent
   ([self-update](../updates/self-update.md)).
 - **Two principals.** The owner's SSH key may sign anything. The evaluator's key
   (`t3blackout-evaluator`) may sign only single-parent commits that change `pin.json`
   alone and move a channel forward to a real upstream release.
-- **A fresh clone gets the same rule.** It's verified from its first commit forward,
-  by the same code. A shallow clone is refused.
+- **A fresh clone gets the same rule.** The same code verifies it from its first
+  commit forward, and refuses a shallow clone.
 - **GitHub's role is transport.** Someone who gets into the GitHub account can push,
   but machines refuse what the allowed keys didn't sign. The `main` ruleset blocks
   force-push and deletion, with no bypass actors. Secret scanning and push protection
@@ -32,32 +32,35 @@ machine re-checks what CI proposes.
   code, before the key is in reach ([evaluator](../updates/evaluator.md)).
 - **Each machine is the authority.** It re-derives the gates from upstream's git, npm,
   the advisory sources and this repository, then strips, typechecks, scans and
-  smoke-tests the release itself. A forged CI result or a stolen evaluator key can at
-  worst hold an update or make it fail, or pin a real newer release that passes the
+  smoke-tests the release itself. At worst, a forged CI result or a stolen evaluator
+  key can hold an update, make it fail, or pin a real newer release that passes the
   machine's own gates.
-- **Strict strip rules** stop a release when their required anchors drift. The host
+- Strict strip rules stop a release when their required anchors drift. The host
   scan stops unlisted, non-reserved hosts found in URL literals in the scanned app
   source. Neither audits arbitrary new code or proves that a release has no new
   outbound behaviour ([limits](../building/pipeline.md#limits)).
 
 ## npm dependencies
 
-- **A 3-day minimum age** for every dependency version a release adds. Upstream's own
-  code isn't held, only new third-party packages, which is where a hijacked release
-  does its damage. The **security fast lane** waives the wait only for a fix to an
-  advisory open against the pinned release, or a same-major Electron that takes a
-  Node.js security release or a new Chromium, and only from the usual publisher. A
-  publisher change never gets it ([fast lane](../updates/fast-lane.md)).
-- **Identity is bytes.** A dependency is name, version, source and integrity. A changed
-  tarball for an existing version is refused, and a non-registry source needs an
-  owner-signed entry ([dependencies](../building/dependencies.md)).
-- **Install scripts run for five packages only,** the ones the desktop build needs. The
-  packager's own production install is guarded and verified file by file.
-- **Device tools** install from frozen, reviewed lockfiles, with no install scripts.
-  Native files come from an owner-signed list of archives checked by SHA-256
-  ([device tools](../building/device-tools.md)).
-- **Builds run as an unprivileged account** that can't read your home, with tools
-  only root can change ([build account](../building/build-account.md)).
+- **A 3-day minimum age.** Every dependency version a release adds must be at least 3
+  days old. The gate holds only new third-party packages, which is where a hijacked
+  release does its damage. It doesn't hold upstream's own code.
+- **The security fast lane.** It waives the wait in two cases: a fix to an advisory
+  open against the pinned release, or a same-major Electron that takes a Node.js
+  security release or a new Chromium. Either must come from the usual publisher. A
+  publisher change never gets the fast lane ([fast lane](../updates/fast-lane.md)).
+- **A dependency's identity includes its bytes.** The identity is the name, version,
+  source and integrity. The gates refuse a changed tarball for an existing version,
+  and a non-registry source needs an owner-signed entry
+  ([dependencies](../building/dependencies.md)).
+- **Install scripts run for five packages only.** These are the ones the desktop build
+  needs. The build guards the packager's own production install and verifies it file
+  by file.
+- **Device tools install from frozen, reviewed lockfiles.** Their install scripts
+  don't run. Native files come from an owner-signed list of archives checked by
+  SHA-256 ([device tools](../building/device-tools.md)).
+- **Builds run as an unprivileged account.** That account can't read your home, and
+  only root can change its tools ([build account](../building/build-account.md)).
 
 ## Build tools
 
@@ -74,20 +77,21 @@ machine re-checks what CI proposes.
 ## GitHub Actions
 
 - **Only GitHub-owned actions, pinned to full commit SHAs.** The repository allows
-  GitHub-owned actions only, and GitHub enforces SHA pinning. `ci.yml` checks every
-  `uses:` in every workflow, parsed as YAML; one the check can't read fails it.
-- **Why third-party actions are refused:** an action runs with the job's token, and in
-  the `commit` job, next to the signing key. A tag can be moved to new code, and a
-  third-party publisher can be compromised. GitHub-owned actions pinned by SHA leave
-  one publisher, and fixed code.
+  GitHub-owned actions only, and GitHub enforces SHA pinning. `ci.yml` parses every
+  workflow as YAML and checks every `uses:`. A `uses:` the check can't read fails it.
+- **Why third-party actions are refused.** An action runs with the job's token, and in
+  the `commit` job it runs next to the signing key. Someone can move a tag to new
+  code, and a third-party publisher can be compromised. With GitHub-owned actions
+  pinned by SHA, there is one publisher and the code can't change.
 - **Least privilege.** The default workflow token is read-only, and workflows can't
   approve pull requests. `evaluate.yml` starts from `permissions: {}`, and each job
-  asks only for what it needs (see the [evaluator](../updates/evaluator.md#the-three-jobs-evaluateyml-hourly)).
+  asks only for what it needs
+  ([evaluator](../updates/evaluator.md#the-three-jobs-evaluateyml-hourly)).
   `actions/checkout` runs with `persist-credentials: false`. The evaluator key is a
-  repository Actions secret, read only in the final sign-and-push step. That step
-  writes it to a mode-600 file and deletes it after signing.
-- **Anyone who can push a workflow can read the evaluator's key.** So no token with
-  `workflow` scope lives in an agent account
+  repository Actions secret, and only the final sign-and-push step reads it. That step
+  writes the key to a mode-600 file and deletes the file after signing.
+- **Anyone who can push a workflow can read the evaluator's key.** For that reason,
+  agent accounts hold no token with `workflow` scope
   ([keys and incidents](keys-and-incidents.md)).
 
 ## Advisories and alerts
@@ -96,21 +100,21 @@ The alert job checks everything a build of the pinned release installs: the reso
 lockfile, each device tool's frozen closure, and the staged production install. It
 reads OSV, GitHub's Advisory Database and the device tools' own repositories, and
 fails closed on a partial answer. High, critical, unrated and malicious-package
-advisories open an issue per package, which GitHub emails and pushes. Moderate and low
-ones are listed in one rolling issue that never notifies
-([alerts](../updates/evaluator.md#alerts)).
+advisories open an issue per package, and GitHub sends each issue by email and push
+notification. The job lists moderate and low advisories in one rolling issue that
+never notifies ([alerts](../updates/evaluator.md#alerts)).
 
 ## Not done yet
 
 - No SBOM is published. The inventory is `pin.json` (the release and device tool
   lockfiles), upstream's lockfile at the pinned commit, and the alert job's stage
   records.
-- npm provenance is read, never verified. It can take a version out of the fast lane,
-  never put one in.
+- The fast lane reads npm provenance but never verifies it. Provenance can take a
+  version out of the fast lane, never put one in.
 - The evaluator key isn't in a GitHub environment with required reviewers. It's a
   repository secret, so a workflow pushed to the repository could read it. Machines
-  would refuse that unsigned commit, but the key would be exposed. Its damage is then
-  bounded by what the evaluator key may sign, and you rotate it
+  would refuse that unsigned commit, but the key would be exposed. The damage is then
+  limited to what the evaluator key may sign, and you rotate the key
   ([keys and incidents](keys-and-incidents.md#the-evaluator-key-leaked)). Pull
   requests from forks don't get secrets.
 
