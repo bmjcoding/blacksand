@@ -1,23 +1,31 @@
 # Blacksand T3
 
 Blacksand T3 builds [T3 Code](https://github.com/pingdotgg/t3code) from upstream
-source with its telemetry, stock auto-updater and other calls home removed. Each
-machine rebuilds the release this repository pins, after checking that release
-itself. Optionally, coding agents run in separate macOS accounts on an always-on
-host, which the desktop app reaches over SSH.
+source, with its telemetry, stock auto-updater and other calls home removed. Each
+machine checks the release this repository pins, then builds it itself.
+
+Coding agents can also run in separate macOS accounts on an always-on host. The
+desktop app reaches them over SSH.
 
 ## What it protects against
 
-It stops T3 Code from sending usage data or contacting T3's services. It holds back
-new third-party dependency versions for 3 days, unless a version is a vetted security
-fix. A machine takes repository changes only when the owner's SSH key
-signed them. The CI evaluator's key may sign pin moves, but only forward ones to
-real upstream releases, and every machine checks those again. Upstream's build
-scripts run in an unprivileged account. On a host, agents run in standard
-accounts that log in over SSH with one key only. It doesn't limit what the agents
-reach on the network, audit upstream's code, or protect a machine whose admin
-account is compromised. The full picture is in the
-[threat model](docs/security/threat-model.md).
+- Every build removes T3 Code's usage reporting and its calls to T3's services.
+- A new third-party dependency version waits 3 days before a build uses it. A vetted
+  security fix can skip the wait.
+- A machine takes repository changes only when the owner's SSH key signed them.
+- The CI evaluator's key can sign one kind of change: moving a pin forward to a real
+  upstream release. Every machine checks each of those moves again.
+- Upstream's build scripts run in an unprivileged account.
+- On a host, agents run in standard accounts. Each account logs in over SSH with one
+  key.
+
+It doesn't protect against:
+
+- what the agents reach on the network;
+- flaws in upstream's code, which it doesn't audit;
+- a machine whose admin account is compromised.
+
+The [threat model](docs/security/threat-model.md) has the full picture.
 
 ## What it removes, and what still connects out
 
@@ -43,8 +51,8 @@ What still connects out:
 - device tools, when you turn device support on; EAS Simulator video (Expo's cloud),
   if you use it; and the pages you open in the preview browser
 
-How each of these is enforced and checked, and how to check it yourself:
-[privacy](docs/security/privacy.md).
+The [privacy page](docs/security/privacy.md) says how each of these is enforced, and
+how to check it yourself.
 
 ## Platforms and roles
 
@@ -80,7 +88,7 @@ The app's startup error links here.
   `blacksand t3 update --force`.
 - The last update's log is `packages/t3/state/blacksand-t3.log` in your clone.
 
-More in [troubleshooting](docs/troubleshooting.md).
+[Troubleshooting](docs/troubleshooting.md) covers more cases.
 
 ## Documentation
 
