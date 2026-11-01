@@ -19,9 +19,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { BOT_PRINCIPAL } from "../lib/selfupdate.mjs";
-import { DAY, NIGHTLY, OLD_DEPS, YOUNG, fixture, mockFetch, npmRoutes, pin, recorded, run, youngPin } from "./trust-fixtures.mjs";
+import { DAY, NIGHTLY, OLD_DEPS, YOUNG, fixture, forgeSigned, mockFetch, npmRoutes, pin, recorded, run, youngPin } from "./trust-fixtures.mjs";
 
 const { verifyHead } = await import("../lib/selfupdate.mjs");
+const { readPin } = await import("../lib/pin.mjs");
+const { unpinnedProblem } = await import("../lib/channels.mjs");
 const { registryTime } = await import("../lib/gates.mjs");
 
 const T = Date.now();
@@ -114,6 +116,156 @@ test("update builds and installs nothing until a pinned release is verified here
   const install = fs.readFileSync(new URL("../install.sh", import.meta.url), "utf8");
   assert.match(install, /^set -euo pipefail$/m);
   assert.ok(install.indexOf("\n  bin/t3blackout update\n") < install.indexOf("bin/t3blackout schedule --hour"));
+});
+
+test("git settings in the environment can't point the check at another repository", async () => {
+  const f = fixture();
+  const good = f.fresh("good");
+  f.commit(null, { "lib/x.mjs": "evil\n" }, "unsigned");
+  const bad = f.fresh("bad");
+  const saved = process.env.GIT_DIR;
+  // As a hook in a linked worktree has it: an absolute GIT_DIR naming another, signed clone.
+  process.env.GIT_DIR = path.join(good, ".git");
+  try {
+    const verdict = await verify(f, bad);
+    assert.equal(verdict.result, "refused");
+    assert.match(verdict.message, /isn't signed/);
+  } finally {
+    if (saved === undefined) delete process.env.GIT_DIR;
+    else process.env.GIT_DIR = saved;
+  }
+  assert.equal(recorded(good), null, "nothing recorded in the other clone");
+  assert.equal(recorded(bad), null);
+});
+
+test("an evaluator pin that isn't a regular file is refused, however valid what it holds or names", async () => {
+  for (const [make, mode] of [
+    ["symlink", "120000"],
+    ["executable", "100755"],
+  ]) {
+    const f = fixture();
+    mockFetch({}, () => assert.fail("refused on the history alone"));
+    const file = path.join(f.origin, "pin.json");
+    // A symlink whose target text is a valid forward pin: git stores that text as the blob, a checkout makes it a link.
+    const text = pin(NIGHTLY(3917), f.shas[1]);
+    fs.rmSync(file);
+    if (make === "symlink") fs.symlinkSync(text, file);
+    else fs.writeFileSync(file, text, { mode: 0o755 });
+    const sha = f.commit(f.bot, {}, "Pin nightly");
+    assert.equal(run(f.origin, ["ls-tree", "HEAD", "pin.json"]).split(" ")[0], mode);
+    assert.deepEqual(await verify(f, f.fresh()), { result: "refused", message: `evaluator commit ${sha.slice(0, 10)} makes pin.json mode ${mode}; it must stay a regular file (100644)` });
+  }
+  // One the owner made a symlink can't be moved on by the evaluator either.
+  const f = fixture();
+  mockFetch({});
+  const file = path.join(f.origin, "pin.json");
+  fs.rmSync(file);
+  fs.symlinkSync(pin(NIGHTLY(3904), f.shas[0]), file);
+  f.commit(f.owner, {}, "a symlinked pin");
+  fs.rmSync(file);
+  const sha = f.commit(f.bot, { "pin.json": pin(NIGHTLY(3917), f.shas[1]) }, "Pin nightly");
+  assert.deepEqual(await verify(f, f.fresh()), { result: "refused", message: `evaluator commit ${sha.slice(0, 10)} follows a pin.json of mode 120000, not a regular file (100644)` });
+});
+
+/**
+ * bin/t3blackout's update, with its own target, chooseTarget, pinnedFor and requirePinned, and the real
+ * readPin and unpinnedProblem reading `file`; upstream's newest release is NEWEST, and verifying,
+ * building and installing are stubbed (update reports the stubbed build's failure itself). What it
+ * verified and built, and the error it stopped on, if any.
+ */
+async function updateWithPin(file) {
+  const src = fs.readFileSync(new URL("../bin/t3blackout", import.meta.url), "utf8");
+  const between = (from, to) => src.slice(src.indexOf(from), src.indexOf(to, src.indexOf(from) + from.length));
+  const body = [
+    between("const pinnedFor = ", "/**"),
+    between("function requirePinned(", "/**"),
+    between("async function chooseTarget(", "/** One line"),
+    between("function target(opts, current) {", "/** Downloads the pricing"),
+    between("async function update(opts) {", "/** Takes the update lock"),
+  ].join("\n");
+  const NEWEST = NIGHTLY(3940);
+  const seen = { verified: 0, built: [] };
+  const quiet = () => {};
+  const context = vm.createContext({
+    readPin: () => readPin(file), unpinnedProblem, SOAK_HOURS: 3, cliChannel: (channel) => channel, appChannel: () => "nightly",
+    soakOf: () => ({}), resolveRef: () => NEWEST, revParse: (ref) => (ref === NEWEST ? "b".repeat(40) : ref), channelOfRef: () => "nightly", commitTime: () => 0,
+    soakedTags: () => [NEWEST], MAX_FALLBACK: 5, verdictFor: async () => ({ ok: true }), heldLine: () => "",
+    fetchUpstream: async () => {}, progress: quiet, CURRENT: "", readJson: () => ({}), versionOf: () => "v", blackoutCommit: () => "signed",
+    expectedBuild: () => null, isExpectedBuild: () => true, readPending: () => null, platform: { isRunning: () => false, notify: quiet },
+    verifyHead: async () => (seen.verified++, { result: "verified", message: "ok" }), log: quiet, emit: quiet, process: { exitCode: 0 },
+    buildUpstream: async (sha) => {
+      seen.built.push(sha);
+      throw new Error("scratch build boundary");
+    },
+    buildChanges: () => ({}), install: quiet, fs: { rmSync: quiet },
+  });
+  const stopped = await vm.runInContext(`${body}\nupdate({})`, context).then(() => null, (error) => error.message);
+  return { ...seen, stopped };
+}
+
+test("an update given a pin.json that isn't a regular file stops before it picks a release or builds; only a missing pin is unpinned", async () => {
+  const f = fixture();
+  const dir = path.join(f.dir, "pins");
+  fs.mkdirSync(dir);
+  const text = pin(NIGHTLY(3917), "a".repeat(40));
+  const regular = path.join(dir, "regular.json");
+  fs.writeFileSync(regular, text);
+  // The pinned release is verified, then built.
+  assert.deepEqual(await updateWithPin(regular), { verified: 1, built: ["a".repeat(40)], stopped: null });
+  // A symlink named by a pin's text (what a checkout of a symlinked pin makes), one to a valid pin, and a folder: none is "no pin".
+  const named = path.join(dir, "named.json");
+  fs.symlinkSync(text, named);
+  const linked = path.join(dir, "linked.json");
+  fs.symlinkSync(regular, linked);
+  const folder = path.join(dir, "folder.json");
+  fs.mkdirSync(folder);
+  for (const file of [named, linked, folder]) {
+    const seen = await updateWithPin(file);
+    assert.deepEqual([seen.verified, seen.built], [0, []], file);
+    assert.match(seen.stopped, /pin\.json is invalid: .* isn't a regular file$/, file);
+  }
+  assert.throws(() => readPin(named), /isn't a regular file/);
+  // Only no pin.json at all is the unpinned path, which builds the newest soaked release without the pin's checks.
+  assert.deepEqual(await updateWithPin(path.join(dir, "missing.json")), { verified: 0, built: ["b".repeat(40)], stopped: null });
+});
+
+test("replace refs and a grafts file don't change which history is checked", async () => {
+  const f = fixture();
+  mockFetch({});
+  const root = run(f.origin, ["rev-parse", "HEAD"]);
+  const unsigned = f.commit(null, { "lib/x.mjs": "evil\n" }, "unsigned");
+  // A replace ref standing the signed first commit in for the unsigned tip.
+  const replaced = f.fresh("replaced");
+  run(replaced, ["replace", unsigned, root]);
+  const swapped = await verify(f, replaced);
+  assert.equal(swapped.result, "refused");
+  assert.match(swapped.message, new RegExp(`^commit ${unsigned.slice(0, 10)} isn't signed$`));
+  // A graft that makes a later signed commit parentless, hiding the unsigned one behind it.
+  f.commit(f.owner, { "README.md": "after\n" }, "after");
+  const grafted = f.fresh("grafted");
+  fs.writeFileSync(path.join(grafted, ".git", "info", "grafts"), `${run(grafted, ["rev-parse", "HEAD"])}\n`);
+  assert.equal(run(grafted, ["rev-parse", "--is-shallow-repository"]), "false", "a graft isn't a shallow clone");
+  const hidden = await verify(f, grafted);
+  assert.equal(hidden.result, "refused");
+  assert.match(hidden.message, new RegExp(`^commit ${unsigned.slice(0, 10)} isn't signed$`));
+});
+
+test("an OpenPGP or X.509 commit is refused without running a signature program the clone configures", async () => {
+  const f = fixture();
+  mockFetch({});
+  const marker = path.join(f.dir, "ran");
+  const program = path.join(f.dir, "marker.sh");
+  fs.writeFileSync(program, `#!/bin/sh\necho "$@" >> "${marker}"\nexit 1\n`, { mode: 0o755 });
+  for (const armor of ["PGP SIGNATURE", "SIGNED MESSAGE"]) {
+    const sha = forgeSigned(f, armor);
+    const repo = f.fresh(`forged-${armor.length}`);
+    for (const key of ["gpg.program", "gpg.openpgp.program", "gpg.x509.program"]) run(repo, ["config", key, program]);
+    const verdict = await verify(f, repo);
+    assert.equal(verdict.result, "refused");
+    assert.match(verdict.message, new RegExp(`^commit ${sha.slice(0, 10)} is signed with (openpgp|x509), not an SSH key in \\.allowed_signers$`));
+    assert.equal(fs.existsSync(marker), false, `${armor}: no signature program ran`);
+    run(f.origin, ["reset", "-q", "--hard", "HEAD^"]);
+  }
 });
 
 // ------------------------------------------------------- who may sign what --

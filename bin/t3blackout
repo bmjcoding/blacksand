@@ -306,7 +306,11 @@ async function verdictFor(ref, sha, current, mayCheck) {
   return verdict;
 }
 
-/** pin.json's entry for a channel, or null when the repo has no pin for it. */
+/**
+ * pin.json's entry for a channel, or null when the repo has no pin for it. A pin.json
+ * that's there but isn't a readable regular file throws (readPin): it's never "no pin",
+ * which would build the newest release without the pin's checks.
+ */
 const pinnedFor = (channel) => readPin()?.channels[cliChannel(channel)] ?? null;
 
 /** Refuses a channel pin.json doesn't pin, unless --unpinned (lib/channels.mjs). */
