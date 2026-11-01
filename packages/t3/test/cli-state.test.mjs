@@ -10,6 +10,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { tryLock } from "../lib/lock.mjs";
+import { BUILDER_MARKER } from "../lib/util.mjs";
 const REPO = path.dirname(path.dirname(new URL(import.meta.url).pathname));
 const isMac = process.platform === "darwin";
 const tmp = () => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "t3b-cli-")));
@@ -160,7 +161,11 @@ function smokeClone() {
   return { repo, smoke, left, state: path.join(repo, "state") };
 }
 
-test("the smoke test's scratch folder is removed however it fails, before the server starts included", () => {
+// A machine with a build account builds there, not in the clone's build/, so
+// the clone's stand-in server is never the one the smoke test boots.
+const hasBuilder = fs.existsSync(BUILDER_MARKER) && "this machine has a build account";
+
+test("the smoke test's scratch folder is removed however it fails, before the server starts included", { skip: hasBuilder }, () => {
   const c = smokeClone();
   // The log can't be opened.
   fs.mkdirSync(path.join(c.state, "smoke.log"), { recursive: true });
