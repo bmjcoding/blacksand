@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // t3blackout: build upstream T3 Code with every phone-home stripped.
 //
-//   t3blackout update [--ref <tag|branch|sha>] [--channel nightly|preview|stable] [--force] [--stage-only] [--unpinned]
+//   t3blackout update [--ref <tag|branch|sha>] [--channel nightly|preview|stable] [--allow-downgrade] [--force] [--stage-only] [--unpinned]
 //                     [--expect-sha SHA]   the app's download: build only if SHA is still the approved release
 //   t3blackout check  [--ref ...] [--build]   apply strip rules to the pinned release (--ref: any) without
 //                                      installing; --build also builds, scans and smoke-tests it
@@ -16,8 +16,9 @@
 //   t3blackout status                  installed version, schedule, build account, signing
 //   t3blackout rollback                swap back to the previously installed build
 //   t3blackout schedule [--day hourly|daily|monday] [--hour 4] | unschedule   hourly (default), daily or weekly
-//   t3blackout configure [--role ui|host|both]   save the install's role and locations (install.sh runs it;
-//                                      a changed role moves the scheduled job at the next `schedule`)
+//   t3blackout configure [--role ui|host|both] [--unisolated-build]   save the install's role and locations
+//                                      (install.sh runs it; a changed role moves the scheduled job at the next
+//                                      `schedule`); without --unisolated-build, only the build account builds
 //   t3blackout signing adopt|import|init|status [--vault V]   macOS: shared signing identity via 1Password
 //   t3blackout evaluate [--channel nightly] [--ref TAG] [--baseline TAG] [--build] [--write] [--report FILE] [--resolved DIR]
 //                       [--stage-from DIR]
@@ -34,7 +35,9 @@
 // --unpinned on a channel it doesn't pin, releases are built once they're
 // --soak-hours old (default 48), with none of the evaluator's gates; --unpinned
 // never bypasses a channel's pin.
-// Fetching and building run as the separate build account when install.sh set one up.
+// Fetching and building run as the separate build account install.sh sets up; an
+// install without one refuses to, unless install.sh --unisolated-build saved that it
+// may, and so does a checkout that isn't an install unless T3BLACKOUT_UNISOLATED_BUILD=1 (CI).
 //
 // A feature whose rules no longer match upstream is left out of the build
 // (lib/features.mjs) and the update goes ahead; a strict rule (privacy, identity,
@@ -49,20 +52,21 @@ import { parseArgs } from "node:util";
 
 // First: applies the install's saved locations before the modules below read them.
 import { installConfig, installConfigError } from "../lib/load-install-config.mjs";
-import { saveInstallConfig } from "../lib/install-config.mjs";
+import { UNISOLATED_ENV, buildAsYouProblem, saveInstallConfig } from "../lib/install-config.mjs";
 import { writeFileAtomic, writeJsonAtomic } from "../lib/atomic-file.mjs";
+import { githubTokenHandoff } from "../lib/github-token.mjs";
 import { HANDED_ENV, HANDED_FD, adoptLock, runHoldingLock, tryLock as takeFileLock } from "../lib/lock.mjs";
 import { installBuild, recoverActivation, rollBackBuild } from "../lib/platform/app.mjs";
 import { WEEKDAYS, cliShim, parseSchedule } from "../lib/platform/jobs.mjs";
 import { clearRequests } from "../lib/shared-dir.mjs";
-import { allowDeviceTools, buildArtifact, checkRules, isKnownHost, knownDeviceTools, resolveLockfile } from "../lib/build.mjs";
+import { allowDeviceTools, buildArtifact, checkRules, isKnownHost, knownDeviceTools, resolveLockfile, scanArtifact } from "../lib/build.mjs";
 import { advisoryReport, evaluateChannel, networkIo, newerReleases, openAdvisories } from "../lib/evaluate.mjs";
 import { MIN_AGE_DAYS, latestReviewed, npmMeta } from "../lib/gates.mjs";
 import { reviewToolClosure, splitPin } from "../lib/device-tools.mjs";
 import { toolClosurePackages } from "../lib/inventory.mjs";
 import { emptyPin, readPin, unreleasedPin, writePin } from "../lib/pin.mjs";
 import { verifyCandidate } from "../lib/pincheck.mjs";
-import { builderReachable, runAsBuilder } from "../lib/builder.mjs";
+import { builderHomeProblem, builderReachable, runAsBuilder } from "../lib/builder.mjs";
 import { channelPolicy, unpinnedProblem } from "../lib/channels.mjs";
 import { emptyDrift, renderDriftReport } from "../lib/drift.mjs";
 import { emit, enableEvents, progress } from "../lib/events.mjs";
@@ -70,12 +74,10 @@ import { expectedBuild, isExpectedBuild, pollOffer, staleRulesProblem, unexpecte
 import { featureByName, features } from "../lib/features.mjs";
 import { captureLooks, packagedEgress } from "../lib/looks.mjs";
 import { preview } from "../lib/preview.mjs";
-import { forbiddenInBuild } from "../lib/rules.mjs";
-import { selfUpdate } from "../lib/selfupdate.mjs";
+import { selfUpdate, verifyHead } from "../lib/selfupdate.mjs";
 import { smokeTest } from "../lib/smoke.mjs";
-import { scanForbidden } from "../lib/strip-engine.mjs";
 import { SOAK_HOURS, cliChannel, commitDetails, commitTime, fetchUpstreamHere, githubWebUrl, hasMirror, mirrorTags, parseCommitLines, previousTag, releaseNotes, resolveRef, revParse, soakedTags, upstreamCommits, upstreamWebUrl, versionOf } from "../lib/upstream.mjs";
-import { BUILDER_USER, IS_BUILDER, LAUNCHER, MIRROR, ROOT, STATE, T3B_HOME, USE_BUILDER, capture, log, mirrorGit, readJson, sleep, stableNodePath } from "../lib/util.mjs";
+import { BUILDER_MARKER, BUILDER_USER, IS_BUILDER, LAUNCHER, MIRROR, ROOT, STATE, T3B_HOME, USE_BUILDER, log, mirrorGit, readJson, sleep, stableNodePath } from "../lib/util.mjs";
 
 // The app never fetches this at runtime (rule server/litellm-rates-off). Each
 // update downloads it once and seeds the app's rate cache, so usage cost
@@ -112,15 +114,20 @@ const platform = await (async () => {
 })();
 
 // ------------------------------------------------- the upstream half -------
-// As the build account when there is one, otherwise right here.
+// As the build account when there is one, otherwise right here, only where
+// buildAsYouProblem (lib/install-config.mjs) allows it.
 
 function requireBuilder() {
-  if (USE_BUILDER && !builderReachable()) {
-    throw new Error(`the build account ${BUILDER_USER} exists but sudo can't switch to it; rerun ./install.sh`);
+  if (USE_BUILDER) {
+    if (!builderReachable()) throw new Error(`the build account ${BUILDER_USER} exists but sudo can't switch to it; rerun ./install.sh`);
+    return;
   }
+  const problem = buildAsYouProblem(installConfig);
+  if (problem) throw new Error(`there's no build account ${BUILDER_USER} (${BUILDER_MARKER}), and ${problem}`);
 }
 
 async function fetchUpstream() {
+  requireBuilder();
   if (USE_BUILDER) await runAsBuilder(["fetch"]);
   else fetchUpstreamHere();
 }
@@ -383,12 +390,6 @@ function target(opts, current) {
   return { ref, sha };
 }
 
-function verifyStaged(staged) {
-  log("scanning the packaged app for forbidden endpoints");
-  const hits = scanForbidden(platform.scanRoots(staged), forbiddenInBuild);
-  if (hits.length) throw new Error(`forbidden endpoints found in the app:\n${hits.map((h) => `  - ${h}`).join("\n")}`);
-}
-
 /** Downloads the pricing table and writes it in the cache format UsageService reads. */
 async function seedPricing() {
   try {
@@ -496,10 +497,22 @@ function recoverInterrupted() {
 /**
  * Runs this command again on the code self-update just took, handing it this
  * run's lock (lib/lock.mjs): the rerun holds and releases it, and it stays held
- * even if this process is killed while the rerun works.
+ * even if this process is killed while the rerun works. The GitHub API token
+ * this run was given goes along as a one-shot file (lib/github-token.mjs),
+ * never in the rerun's environment.
  */
 async function rerunHoldingLock(release) {
-  process.exitCode = await runHoldingLock(release, process.execPath, [LAUNCHER, ...process.argv.slice(2)]);
+  let token = null;
+  try {
+    token = githubTokenHandoff();
+  } catch (error) {
+    log(`the rerun asks GitHub's API without a token: ${error.message}`);
+  }
+  try {
+    process.exitCode = await runHoldingLock(release, process.execPath, [LAUNCHER, ...process.argv.slice(2)], { env: { ...process.env, ...(token?.env ?? {}) } });
+  } finally {
+    token?.remove();
+  }
 }
 
 function readPending() {
@@ -604,7 +617,6 @@ async function cmdUpdate(opts) {
 }
 
 async function update(opts) {
-  requireBuilder();
   await fetchUpstream();
   progress(10);
   const current = readJson(CURRENT, {});
@@ -627,6 +639,22 @@ async function update(opts) {
     log(`already on ${ref} (${sha.slice(0, 10)}); nothing to do`);
     return;
   }
+  // A pin that didn't come through self-update here (a fresh clone's evaluator commits, one pulled by hand)
+  // gets self-update's checks before anything is built or installed from it (lib/selfupdate.mjs verifyHead).
+  if (!opts.ref && pinnedFor(opts.channel ?? appChannel())) {
+    const verdict = await verifyHead();
+    if (verdict.result !== "verified") {
+      // install.sh schedules updates only after its first one is through: until then, nothing tries again.
+      const next = !platform.isScheduled?.() ? `; rerun ./install.sh --role ${installConfig?.role ?? "ui"} to try again` : verdict.result === "refused" ? "" : "; the scheduled update tries again";
+      const message = `not building ${ref}: pin.json here can't be verified yet (${verdict.message})${next}`;
+      log(message);
+      if (!opts.json) platform.notify(verdict.result === "refused" ? "T3 Blackout update refused" : "T3 Blackout update held", message);
+      emit({ type: "error", message });
+      process.exitCode = 1;
+      return;
+    }
+    log(`pin.json: ${verdict.message}`);
+  }
   if (isBuild(pending) && !opts.force) {
     if (stageOnly()) {
       log(`${ref} is already built and waiting for T3 Blackout to restart`);
@@ -643,7 +671,7 @@ async function update(opts) {
     build.baselines = nextBaselines(current, sha, skipped);
     const leftOut = skipped.length ? ` Left out: ${labelsOf(skipped).join(", ")} (t3blackout drift shows why).` : "";
     staged = platform.stage(artifact);
-    verifyStaged(staged);
+    scanArtifact(platform, staged);
     // Before/after screenshots against the installed build, for this build's report.
     const installed = fs.existsSync(platform.installedPath) ? platform.serverOf(platform.installedPath) : null;
     const looks = await captureLooks({ before: installed, after: platform.serverOf(staged) });
@@ -819,7 +847,6 @@ async function cmdLaunch() {
 async function cmdCheck(opts) {
   const release = await acquireLock();
   try {
-    requireBuilder();
     await fetchUpstream();
     const current = readJson(CURRENT, {});
     const ref = opts.ref ?? target(opts, current).sha;
@@ -908,6 +935,10 @@ const saveEvaluationIn = (dir) => {
  */
 async function cmdEvaluate(opts) {
   const channel = cliChannel(opts.channel ?? "nightly");
+  // CI's: it runs upstream's pnpm (and pnpmfile) to resolve, and with --build
+  // builds, right here as whoever runs it, never as the build account.
+  const problem = buildAsYouProblem(installConfig);
+  if (problem) throw new Error(`evaluate runs upstream's pnpm${opts.build ? " and build" : ""} as you, and ${problem}`);
   let result;
   try {
     fetchUpstreamHere();
@@ -944,8 +975,10 @@ async function cmdPinCheck(opts) {
   }
   if (!opts.channel) throw new Error("pass --channel <the channel the evaluate job evaluated>");
   fetchUpstreamHere();
+  // The job holding the signing key runs no upstream code: no pnpm (or its pnpmfile), no build.
+  const { resolveLock, build, ...checks } = evaluatorIo();
   const io = {
-    ...evaluatorIo(),
+    ...checks,
     unreleasedPin,
     resolvedLock: resolvedLockIn(opts.resolved),
   };
@@ -1142,12 +1175,20 @@ async function cmdSmoke() {
   else await smokeTest();
 }
 
+/** Who builds here, for status. */
+function buildsLine() {
+  if (USE_BUILDER) {
+    const open = builderHomeProblem();
+    return `as ${BUILDER_USER}${builderReachable() ? "" : " (sudo can't switch to it; rerun ./install.sh)"}${open ? ` (${open})` : ""}`;
+  }
+  const problem = buildAsYouProblem(installConfig);
+  if (problem) return `refused: ${problem}`;
+  return installConfig ? "as you (installed with --unisolated-build; ./install.sh with sudo sets up a build account)" : `as you (${UNISOLATED_ENV}=1; not an install)`;
+}
+
 function cmdStatus() {
   const current = readJson(CURRENT, null);
   const pending = readPending();
-  const builds = USE_BUILDER
-    ? `as ${BUILDER_USER}${builderReachable() ? "" : " (sudo can't switch to it; rerun ./install.sh)"}`
-    : "as you (./install.sh sets up a separate build account)";
   console.log(`installed: ${current?.sha ? `${current.ref} (${current.sha.slice(0, 10)}) at ${current.installedAt}` : "none"}`);
   if (current?.skipped?.length) console.log(`left out:  ${labelsOf(current.skipped).join(", ")} (t3blackout drift)`);
   if (pending) console.log(`staged:    ${pending.ref} (${pending.sha.slice(0, 10)}), installs when the app restarts`);
@@ -1159,7 +1200,7 @@ function cmdStatus() {
   console.log(`schedule:  ${scheduled ? `${schedule ? describeSchedule(schedule) : "daily"}${runs}` : "off"}`);
   console.log(`role:      ${installConfig?.role ?? "ui"}${installConfig ? "" : " (no state/install.json; ./install.sh saves it)"}`);
   if (fs.existsSync(ACTIVATION)) console.log("interrupted: an install or rollback didn't finish; the next update or rollback finishes it");
-  console.log(`builds:    ${builds}`);
+  console.log(`builds:    ${buildsLine()}`);
   console.log(`self-update: ${fs.existsSync(path.join(ROOT, ".allowed_signers")) ? "signed commits from origin/main" : "off (no .allowed_signers)"}`);
   for (const line of platform.statusLines()) console.log(line);
 }
@@ -1221,9 +1262,10 @@ function cmdConfigure(opts) {
       throw new Error(`--role ${role} installs the app in /Applications, where agent accounts find it; run ./install.sh from an admin account`);
     }
   }
-  const config = saveInstallConfig({ role: opts.role });
+  const config = saveInstallConfig({ role: opts.role, unisolatedBuild: opts["unisolated-build"] });
   const set = Object.entries(config.env).filter(([, value]) => value !== null);
-  log(`install config saved: role ${config.role}${set.length ? `, ${set.map(([key, value]) => `${key}=${value}`).join(", ")}` : ""}`);
+  const builds = config.unisolatedBuild ? ", builds may run as you (--unisolated-build)" : "";
+  log(`install config saved: role ${config.role}${builds}${set.length ? `, ${set.map(([key, value]) => `${key}=${value}`).join(", ")}` : ""}`);
 }
 
 const { positionals, values } = parseArgs({
@@ -1247,6 +1289,7 @@ const { positionals, values } = parseArgs({
     hour: { type: "string" },
     day: { type: "string" },
     role: { type: "string" },
+    "unisolated-build": { type: "boolean", default: false },
     vault: { type: "string" },
     installed: { type: "boolean", default: false },
     build: { type: "boolean", default: false },

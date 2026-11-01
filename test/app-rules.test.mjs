@@ -80,13 +80,30 @@ test("host update markers are unguessable and created exclusively", () => {
 test("provider and ACP Registry installs keep to the release age", () => {
   const age = file("blackoutReleaseAge.ts");
   assert.match(age, /export const MIN_RELEASE_AGE_DAYS = 3;/);
-  const provider = byId.get("provider/updates-minimum-age").edits.map((edit) => edit.replace).join("\n");
+  // An edit fitting several upstream shapes carries each shape's replacement (lib/rules.mjs shapes).
+  const provider = byId.get("provider/updates-minimum-age").edits.flatMap((edit) => edit.alternatives?.map((shape) => shape.replace) ?? [edit.replace]).join("\n");
   assert.match(provider, /--before=\$\{releaseAgeCutoff\(\)\}/);
   assert.match(provider, /--config\.minimum-release-age-strict=true/);
   assert.match(provider, /newestSettledVersion\(document\.value\)/);
   const acp = byId.get("acp-registry/installs-minimum-age").edits.map((edit) => edit.replace).join("\n");
   assert.match(acp, /--before=\$\{releaseAgeCutoff\(\)\}/);
   assert.match(acp, /"--exclude-newer", releaseAgeCutoff\(\)/);
+});
+
+test("installers that can't keep to the release age are manual, and ACP agents never run prebuilt binaries", () => {
+  const provider = byId.get("provider/updates-minimum-age").edits;
+  const ungated = provider.find((edit) => edit.find instanceof RegExp && edit.count === 4);
+  assert.ok(ungated, "the four installer branches are replaced, all or nothing");
+  const replaced = 'return makeProviderMaintenanceCapabilities({\n      provider: definition.provider,\n      packageName,\n      updateExecutable: "bun",\n      updateArgs: ["i", "-g", `${packageName}@latest`],\n      updateLockKey: "bun-global",\n    });\n';
+  assert.equal(`    ${replaced}`.replace(new RegExp(ungated.find.source, "g"), ungated.replace), '    return blackoutUngatedInstall(manual, "bun");\n');
+  const text = provider.map((edit) => (typeof edit.replace === "string" ? edit.replace : "")).join("\n");
+  assert.match(text, /Update this provider with npm or pnpm, or its own updater\./);
+  assert.match(text, /!\/\^\(\?:npm-global:\|pnpm-global\$\)\/\.test\(/, "only npm and pnpm take a targeted install");
+  assert.doesNotMatch(text, /bun-global|yarn-global|vite-plus-global/);
+  const acp = byId.get("acp-registry/no-prebuilt-binaries").edits.map((edit) => edit.replace).join("\n");
+  assert.match(acp, /input\.preference === "auto" \? \["npx", "uvx"\] : \[input\.preference\]/);
+  assert.match(acp, /const BLACKOUT_PREBUILT_BINARIES: boolean = false;/);
+  assert.match(acp, /if \(!BLACKOUT_PREBUILT_BINARIES\) \{\n\s+return yield\* new AcpRegistryError/);
 });
 
 test("the preview start waits for its window", () => {

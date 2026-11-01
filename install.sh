@@ -2,12 +2,12 @@
 # T3 Blackout installer for macOS and Linux. Safe to rerun: every step checks
 # before acting.
 #
-#   ./install.sh [--role ui|host|both]   # hourly update check (macOS: vault "Personal")
+#   ./install.sh [--role ui|host|both] [--unisolated-build]   # hourly update check (macOS: vault "Personal")
 #   T3BLACKOUT_UPDATE_DAY=daily T3BLACKOUT_UPDATE_HOUR=6 T3BLACKOUT_VAULT=Other ./install.sh
 #
 # Run it as yourself, not with sudo: it asks for sudo for the steps that need it.
 #
-# Roles (docs/two-mac-setup.md):
+# Roles (docs/getting-started/roles.md):
 #   ui    (default) the desktop app you work in.
 #   host  macOS only. Agents run here in their own accounts, reached over SSH;
 #         the app is installed for them in /Applications and not opened, and the
@@ -27,12 +27,19 @@
 #   app's signature.
 # Both: creates a separate, unprivileged build account (_t3blackout) so the
 #   scheduled build's dependency and build scripts can't read your home (which
-#   it makes private if they could). pnpm and, on Linux, rustup are pinned
-#   versions checked against the digests below. Needs sudo once; without it,
-#   builds run as you.
+#   it makes private if they could); on macOS its own home is closed to every
+#   account but it and yours. pnpm and, on Linux, rustup are pinned
+#   versions checked against the digests below. Needs sudo once; without it the
+#   install stops before any upstream code runs.
+#   --unisolated-build: where the build account can't be set up (no sudo),
+#   build as you instead. Upstream's dependency and build scripts then run with
+#   your files and credentials; every later update does too (bin/t3blackout
+#   status says so), until ./install.sh runs again with sudo.
 
 set -euo pipefail
 cd "$(dirname "$0")"
+# lib/pnpm.mjs: the pinned pnpm, and the checks of root's build tools and their lock.
+PNPM_CHECK="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/pnpm.mjs"
 
 die() { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 # Builds as root would run upstream's dependency and build scripts as root, and
@@ -40,11 +47,13 @@ die() { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 ((EUID != 0)) || die "run ./install.sh as yourself, not as root or with sudo; it asks for sudo when it needs it"
 
 ROLE=ui
+UNISOLATED=0
 while (($#)); do
   case "$1" in
     --role) ROLE="${2:-}"; shift 2 ;;
     --role=*) ROLE="${1#--role=}"; shift ;;
-    *) printf 'usage: ./install.sh [--role ui|host|both]\n' >&2; exit 2 ;;
+    --unisolated-build) UNISOLATED=1; shift ;;
+    *) printf 'usage: ./install.sh [--role ui|host|both] [--unisolated-build]\n' >&2; exit 2 ;;
   esac
 done
 case "$ROLE" in ui | host | both) ;; *) printf 'unknown role: %s (ui, host or both)\n' "$ROLE" >&2; exit 2 ;; esac
@@ -59,6 +68,7 @@ OP_ITEM="T3 Blackout code signing"
 NODE_MAJOR=24
 
 say() { printf '\033[1m==> %s\033[0m\n' "$*"; }
+warn() { printf '\033[33mwarning:\033[0m %s\n' "$*" >&2; }
 have() { command -v "$1" >/dev/null 2>&1; }
 # The oldest patched release on each line Node supports (Oct 2026 security release:
 # Brotli RCE CVE-2026-111497 and TLS hostname bypasses). Raise when Node ships a new one.
@@ -77,34 +87,43 @@ node_ok() {
   have "$node" && "$node" -e "$NODE_CHECK" "$NODE_PATCHED" "$NODE_MAJOR"
 }
 
-# git 2.45+: mirror reads pass --no-lazy-fetch (lib/util.mjs), new in 2.45.0.
-GIT_MIN=2.45
-git_ok() {
-  have git || return 1
-  local v
-  v=$(git --version | sed -E 's/^git version ([0-9]+)\.([0-9]+).*/\1 \2/')
-  read -r maj min <<<"$v"
-  [[ "$maj" =~ ^[0-9]+$ && "$min" =~ ^[0-9]+$ ]] || return 1
-  ((maj > 2 || (maj == 2 && min >= 45)))
+# git's floor, the same as lib/git.mjs checks before every git it runs: every fix
+# git's advisories (https://github.com/git/git/security/advisories) list, the last
+# CVE-2024-52005 (a server's terminal control codes passed through as "remote:"
+# output), filtered only from 2.55.0, on no older line. Raise it when git ships a
+# new fix. The version is all that's checked: Apple's git ("2.54.0 (Apple
+# Git-157)") counts as its upstream release (Apple's notes name fixed CVEs, not
+# backports, and Git-157 passes those control codes through), so macOS takes
+# Homebrew's. A distro that backports fixes without changing the number is
+# refused, never an unpatched git accepted.
+GIT_MIN=2.55.0
+
+# A version (2.47.3) as one number to compare.
+version_key() {
+  local maj min pat
+  IFS=. read -r maj min pat <<<"$1"
+  echo $((10#$maj * 1000000 + 10#$min * 1000 + 10#${pat:-0}))
 }
 
-# Bootstrap tools outside any package manager's age gate, pinned and checked
-# against these digests (raise them deliberately, and only to releases at least
-# 3 days old). pnpm matches upstream's packageManager; its wrapper package
-# carries node-gyp, and the native build for each platform replaces the
-# wrapper's placeholder, which is what pnpm's own install script does.
-PNPM_VERSION=12.14.0
-pnpm_sha512() {
-  case "$1" in
-    wrapper) echo c18ba6d87993d3d164cb5e8948f32b2c06ee854487e06cd8d86781342fb3e5bb4634367034711e86802baa9c37bea906ce1929ad08d70884c97d801df13389a6 ;;
-    darwin-arm64) echo b67add501f1e709a1e86e28aaa2d581c205597ad71b49f57546731e44be20ba7d63b80de188f06b57ae3bc9c4304cde7b958c97968acb60b14a7f375e36c78b3 ;;
-    darwin-x64) echo be505f1a4aeea9046c1074d6e3770fc2961ded095b209fff72fa4075bddb557908f128133e85e10a7734e66f993623ebac4901b17fedeca1f0f5a5e99333e6dd ;;
-    linux-x64) echo 17a2bc7bf8d6c62b84609690b514541bdca70524c41dafadecb7fce8c2ae38ee5403b59554c6e2fa807c9d8ea2296fbe9dc592db21ba4fd7da5d91b1a8db1fa1 ;;
-    linux-arm64) echo ee3a064a1678e0d9375a9354fbad09a0e3e3097960c61240ab5d52d94895b700940e04deaf5c933cf7f1196f29c5a0fad38e9a72d60b2180db64d96e6c75acd0 ;;
-    *) die "no pinned pnpm for $1" ;;
-  esac
+# Why the git that `$@ --version` runs (default: git on PATH) can't be used;
+# nothing, and status 0, when it can.
+git_problem() {
+  local cmd=("$@") out version re='^git version ([0-9]+)\.([0-9]+)(\.([0-9]+))?'
+  ((${#cmd[@]})) || cmd=(git)
+  out="$("${cmd[@]}" --version 2>/dev/null)" || { echo "no git found"; return 1; }
+  [[ "$out" =~ $re ]] || { echo "can't read git's version (${out:-nothing})"; return 1; }
+  version="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[4]:-0}"
+  if (($(version_key "$version") < $(version_key "$GIT_MIN"))); then
+    echo "git $version is too old: T3 Blackout needs $GIT_MIN or later, for security fixes (CVE-2024-52005)"
+    return 1
+  fi
 }
-# rustup-init (Linux; macOS takes Rust from Homebrew) and the toolchain it installs.
+git_ok() { git_problem >/dev/null; }
+
+# rustup-init (Linux; macOS takes Rust from Homebrew) and the toolchain it installs:
+# outside any package manager's age gate, so pinned and checked against these
+# digests (raise them deliberately, and only to releases at least 3 days old).
+# pnpm's pin is lib/pnpm.mjs's, which every build checks too.
 RUSTUP_VERSION=1.29.2
 RUST_TOOLCHAIN=1.99.1
 rustup_sha256() {
@@ -123,40 +142,234 @@ fetch_pinned() {
   [[ "${got%% *}" == "$want" ]] || die "$url doesn't match its pinned SHA-$bits digest"
 }
 
-# Installs pinned pnpm under prefix $1 (bin/ and lib/node_modules/, as npm -g
-# would), with no install scripts run. The rest ($2...) is how to run as the
-# account it's for (as_builder), or nothing for you.
+# The pinned pnpm (lib/pnpm.mjs fetch: its registry tarballs checked against their
+# pinned digests, no install script run) in $1/pnpm, laid out as npm -g would under
+# a prefix, and a Vite+ home holding the same binary in $1/vite-plus.
+pnpm_fetch() { node "$PNPM_CHECK" fetch "$1"; }
+
+# Whether the pnpm under prefix $1 is the pinned binary (lib/pnpm.mjs's check: its
+# sha-256, a regular file). Its version string alone could be any file's.
+pnpm_installed() { node "$PNPM_CHECK" check-pnpm "$1/lib/node_modules/pnpm/pnpm" 2>/dev/null; }
+
+# Installs the pinned pnpm under your own prefix $1 (bin/ and lib/node_modules/, as
+# npm -g would), over whatever is there.
 install_pnpm() {
-  local prefix="$1" target tmp bin
-  shift
-  case "$(uname -s)-$(uname -m)" in
-    Darwin-arm64) target=darwin-arm64 ;;
-    Darwin-x86_64) target=darwin-x64 ;;
-    Linux-x86_64) target=linux-x64 ;;
-    Linux-aarch64 | Linux-arm64) target=linux-arm64 ;;
-    *) die "no pinned pnpm for $(uname -sm)" ;;
-  esac
-  if [[ "$target" == linux-* ]] && ldd --version 2>&1 | grep -qi musl; then die "no pinned pnpm for musl Linux"; fi
-  say "Installing pnpm $PNPM_VERSION into $prefix"
+  local prefix="$1" tmp bin
+  say "Installing the pinned pnpm into $prefix"
   tmp="$(mktemp -d)"
-  fetch_pinned "https://registry.npmjs.org/pnpm/-/pnpm-$PNPM_VERSION.tgz" "$(pnpm_sha512 wrapper)" "$tmp/wrapper.tgz" 512
-  fetch_pinned "https://registry.npmjs.org/@pnpm/exe.$target/-/exe.$target-$PNPM_VERSION.tgz" "$(pnpm_sha512 "$target")" "$tmp/exe.tgz" 512
-  mkdir "$tmp/pnpm" "$tmp/exe"
-  tar -xzf "$tmp/wrapper.tgz" -C "$tmp/pnpm" --strip-components 1
-  tar -xzf "$tmp/exe.tgz" -C "$tmp/exe" --strip-components 1
-  for bin in pnpm pn pnpx pnx; do
-    cp "$tmp/exe/pnpm" "$tmp/pnpm/$bin"
-    chmod 755 "$tmp/pnpm/$bin"
-  done
-  # shellcheck disable=SC2016 # expanded by the inner sh
-  tar -C "$tmp" -cf - pnpm | "$@" /bin/sh -c '
-    set -e
-    mkdir -p "$1/lib/node_modules" "$1/bin"
-    rm -rf "$1/lib/node_modules/pnpm"
-    tar -C "$1/lib/node_modules" -xf -
-    for bin in pnpm pn pnpx pnx; do ln -sfn "../lib/node_modules/pnpm/$bin" "$1/bin/$bin"; done' sh "$prefix"
+  pnpm_fetch "$tmp" || die "couldn't get the pinned pnpm"
+  mkdir -p "$prefix/lib/node_modules" "$prefix/bin"
+  rm -rf "$prefix/lib/node_modules/pnpm"
+  cp -R "$tmp/pnpm/lib/node_modules/pnpm" "$prefix/lib/node_modules/pnpm"
+  for bin in pnpm pn pnpx pnx; do ln -sfn "../lib/node_modules/pnpm/$bin" "$prefix/bin/$bin"; done
   rm -rf "$tmp"
-  [[ "$("$@" "$prefix/bin/pnpm" --version)" == "$PNPM_VERSION" ]] || die "pnpm $PNPM_VERSION didn't install into $prefix"
+  pnpm_installed "$prefix" || die "the pnpm installed into $prefix isn't the pinned binary"
+}
+
+# The pnpm builds run as the build account, and the Vite+ home (VP_HOME) upstream's
+# build runs pnpm from, both root's and only root's to change: the build account
+# runs upstream's install scripts and build, which could otherwise replace the
+# binary between lib/pnpm.mjs's checks and its use. The Vite+ home holds the same
+# binary where Vite+ keeps a pnpm it downloaded, with launchers that run nothing
+# from PATH (lib/pnpm.mjs BUILD_TOOLS_ROOT, seedVitePlusHome). On macOS they
+# live outside /usr/local, which an Intel Mac's Homebrew owns; every directory up
+# to / must be root's, which the check below confirms here, not at a build.
+case "$(uname -s)" in
+  Darwin) BUILD_TOOLS="/Library/Application Support/t3blackout/tools" ;;
+  *) BUILD_TOOLS=/usr/local/libexec/t3blackout/tools ;;
+esac
+
+# Why the build tools in $1 aren't fit for the build account (printed; status 1),
+# or nothing: lib/pnpm.mjs's own check (root's all the way up, no ACL grants, the
+# pinned bytes, the Vite+ home exactly), then what the build account itself can
+# do with them: open and run all of it, and change none of it or what's above.
+build_tools_problem() {
+  local dir="$1" p entries=() above=()
+  node "$PNPM_CHECK" check-build-tools "$dir" || return 1
+  p="$dir/pnpm/lib/node_modules/pnpm/pnpm"
+  as_builder "$p" --version >/dev/null 2>&1 || { echo "$BUILDER can't run $p"; return 1; }
+  while IFS= read -r -d '' p; do entries+=("$p"); done < <(find "$dir" -print0)
+  p="$dir"
+  while [[ "$p" != / ]]; do p="$(dirname "$p")"; above+=("$p"); done
+  # shellcheck disable=SC2016 # expanded by the inner sh
+  p="$(as_builder /bin/sh -c 'for p do if [ -d "$p" ]; then [ -x "$p" ] || echo "$p"; else [ -r "$p" ] || echo "$p"; fi; done' sh "${entries[@]}")"
+  [[ -z "$p" ]] || { echo "$BUILDER can't open: $p"; return 1; }
+  # shellcheck disable=SC2016
+  p="$(as_builder /bin/sh -c 'for p do [ -w "$p" ] && echo "$p"; done; true' sh "${entries[@]}" "${above[@]}")"
+  [[ -z "$p" ]] || { echo "$BUILDER can change: $p"; return 1; }
+}
+
+# The tools' lock, $BUILD_TOOLS.lock (lib/pnpm.mjs buildToolsLock, toolsLockPolicy):
+# an install holds it exclusive, a build shared. Anyone who can open a file can
+# flock it, and so hold the others off, so only root, admins (you) and the build
+# account can open this one: on macOS root:admin 0640 with one ACL entry letting the
+# build account read it; agent accounts, standard ones, can't. (Linux has no agent
+# accounts, as for the build account's home: root's, 0644.) Why it isn't so
+# (printed; status 1), or nothing; with a descriptor number, also that this
+# shell's descriptor is on that very file. Status 2: the directories above it
+# aren't root's alone, so nothing there may be touched.
+tools_lock_problem() { node "$PNPM_CHECK" check-tools-lock "$BUILD_TOOLS.lock" "$BUILDER" "$@"; }
+
+# Root's owner and group, $3's mode and, on macOS, only the build account's ACL entry, on $2. $1: how to run as root.
+tools_lock_attributes() {
+  "$1" chown "root:$3" "$2"
+  "$1" chmod "$4" "$2"
+  if [[ "$(uname -s)" == Darwin ]]; then
+    "$1" chmod -N "$2"
+    "$1" chmod +a "user:$BUILDER allow read" "$2"
+  fi
+}
+
+# Makes the lock as tools_lock_problem wants it, or keeps it if it is. Never through
+# a symlink: one there (or anything but a regular file) stops this before any
+# privileged step. A missing one is made whole beside it and linked into place,
+# which link(2) does only if nothing's there and without following anything; one
+# that's there is fixed in place, never replaced (a build's lock is on that file,
+# and one beside it wouldn't keep the two apart). $1: how to run as root.
+provision_tools_lock() {
+  local root="$1" lock="$BUILD_TOOLS.lock" group mode tmp problem status=0
+  if [[ -L "$lock" ]] || { [[ -e "$lock" ]] && [[ ! -f "$lock" ]]; }; then
+    die "$lock isn't a regular file (a symlink?); remove it (sudo rm -i \"$lock\") and rerun ./install.sh"
+  fi
+  problem="$(tools_lock_problem 2>&1)" || status=$?
+  ((status == 0)) && return 0
+  ((status == 1)) || die "the build tools' lock can't be made in its place: $problem"
+  if [[ "$(uname -s)" == Darwin ]]; then group=admin mode=640; else group="$(id -gn root)" mode=644; fi
+  if [[ -e "$lock" ]]; then
+    tools_lock_attributes "$root" "$lock" "$group" "$mode"
+  else
+    tmp="$("$root" mktemp "$lock.new.XXXXXX")" || die "couldn't make $lock"
+    tools_lock_attributes "$root" "$tmp" "$group" "$mode"
+    # Another install's, made meanwhile, is kept.
+    "$root" ln "$tmp" "$lock" 2>/dev/null || true
+    "$root" rm -f "$tmp"
+  fi
+  problem="$(tools_lock_problem 2>&1)" || die "the build tools' lock isn't as it must be: $problem"
+}
+
+# One try at an exclusive flock(2) on this shell's fd 8, by a helper that exits:
+# macOS's own perl, util-linux flock(1) elsewhere. Status 0 taken; 75 held by
+# another, which only EWOULDBLOCK means; anything else failed (tools_flock_why).
+TOOLS_PERL=/usr/bin/perl
+tools_flock() {
+  local flock
+  if [[ "$(uname -s)" == Darwin ]]; then
+    [[ -x "$TOOLS_PERL" ]] || return 3
+    # shellcheck disable=SC2016 # perl's own variables
+    "$TOOLS_PERL" -MFcntl=:flock -MErrno -e 'open(my $f, "<&=", 8) or exit 4; flock($f, LOCK_EX | LOCK_NB) and exit 0; exit(($!{EWOULDBLOCK} || $!{EAGAIN}) ? 75 : 5)'
+    return
+  fi
+  for flock in /usr/bin/flock /bin/flock; do
+    if [[ -x "$flock" ]]; then
+      "$flock" -x -n -E 75 8
+      return
+    fi
+  done
+  return 3
+}
+tools_flock_why() {
+  case "$1" in
+    3) echo "neither $TOOLS_PERL (macOS) nor util-linux flock is there to take it with" ;;
+    4) echo "$TOOLS_PERL couldn't use this shell's descriptor on it" ;;
+    *) echo "flock failed (exit $1)" ;;
+  esac
+}
+
+# Holds the tools' lock exclusive on this shell's own descriptor of it, fd 8: the
+# lock belongs to that open file, so it's this shell's, whatever becomes of the
+# helper that took it, and lasts while this shell or anything it started meanwhile
+# keeps fd 8 open (sudo closes it in what it runs; nothing started here outlives
+# the install), until release_tools_lock, or their exits, however they end. Waits
+# while a build uses the tools or another install replaces them, up to
+# T3BLACKOUT_TOOLS_LOCK_WAIT_SECONDS (2 h), saying so once.
+hold_tools_lock() {
+  local lock="$BUILD_TOOLS.lock" wait="${T3BLACKOUT_TOOLS_LOCK_WAIT_SECONDS:-7200}" deadline problem status waiting=""
+  [[ "$wait" =~ ^[0-9]+$ ]] || wait=7200
+  exec 8<"$lock" || die "couldn't open the build tools' lock $lock"
+  problem="$(tools_lock_problem 8 2>&1)" || { exec 8<&-; die "the build tools' lock isn't as it must be: $problem"; }
+  deadline=$((SECONDS + wait))
+  while :; do
+    status=0
+    tools_flock || status=$?
+    ((status == 0)) && return 0
+    if ((status != 75)); then
+      exec 8<&-
+      die "couldn't take the build tools' lock $lock: $(tools_flock_why "$status")"
+    fi
+    if ((SECONDS >= deadline)); then
+      exec 8<&-
+      die "gave up after $wait s waiting for the build tools' lock $lock: a build is using the build tools, or another ./install.sh is replacing them (\`lsof $lock\` shows what holds it)"
+    fi
+    [[ -n "$waiting" ]] || echo "waiting: a build is using the build tools, or another ./install.sh is replacing them ($lock)" >&2
+    waiting=1
+    sleep 0.25
+  done
+}
+release_tools_lock() { exec 8<&-; }
+
+# Puts the tools moved aside to $2 back in $BUILD_TOOLS, if they aren't there. $1: how to run as root.
+restore_build_tools() {
+  if ! "$1" test -e "$BUILD_TOOLS" && "$1" test -e "$2"; then "$1" mv "$2" "$BUILD_TOOLS"; fi
+}
+
+# Installs them, or keeps them while they pass build_tools_problem, after making the
+# tools' lock as it must be. Under that lock, so no build uses them meanwhile and
+# no other install works on them, it clears what an install stopped part-way left;
+# then a new set is made in a stage of its own beside them and checked, then
+# swapped in and checked in place; the set before is kept until then, and put back
+# if anything fails or the install is stopped. Modes are set outright, not left to
+# the umask, and inherited ACLs cleared. $1: how to run as root (sudo; tests stub it).
+install_build_pnpm() {
+  local root="${1:-sudo}" group stage old tmp p part problem parts
+  group="$(id -gn root)"
+  # The directories on the way that aren't there yet: root's, 755.
+  IFS=/ read -r -a parts <<<"${BUILD_TOOLS#/}"
+  p=""
+  for part in "${parts[@]:0:${#parts[@]}-1}"; do
+    p="$p/$part"
+    if ! "$root" test -d "$p"; then "$root" mkdir "$p" && "$root" chown "root:$group" "$p" && "$root" chmod 755 "$p"; fi
+  done
+  provision_tools_lock "$root"
+  hold_tools_lock
+  # An install stopped part-way leaves its stage, or the set before; missing tools are made again.
+  "$root" rm -rf "$BUILD_TOOLS".new.* "$BUILD_TOOLS".old.*
+  # Fit ones, from before or from another install just now, are kept.
+  if build_tools_problem "$BUILD_TOOLS" >/dev/null 2>&1; then
+    release_tools_lock
+    return 0
+  fi
+  say "Installing the pinned pnpm for $BUILDER into $BUILD_TOOLS"
+  stage="$("$root" mktemp -d "$BUILD_TOOLS.new.XXXXXX")"
+  old="$BUILD_TOOLS.old.${stage##*.new.}"
+  tmp="$(mktemp -d)"
+  pnpm_fetch "$tmp" || { "$root" rm -rf "$stage"; die "couldn't get the pinned pnpm"; }
+  "$root" cp -R "$tmp/pnpm" "$tmp/vite-plus" "$stage/"
+  rm -rf "$tmp"
+  "$root" chown -R "root:$group" "$stage"
+  if [[ "$(uname -s)" == Darwin ]]; then "$root" chmod -R -N "$stage"; elif have setfacl; then "$root" setfacl -R -b "$stage"; fi
+  "$root" find "$stage" -type d -exec chmod 755 {} +
+  "$root" find "$stage" -type f -perm -u+x -exec chmod 755 {} +
+  "$root" find "$stage" -type f ! -perm -u+x -exec chmod 644 {} +
+  if ! problem="$(build_tools_problem "$stage")"; then
+    "$root" rm -rf "$stage"
+    die "the build tools made in $stage aren't fit for $BUILDER: $problem"
+  fi
+  # shellcheck disable=SC2064 # $root and $old as they are now
+  trap "restore_build_tools $(printf %q "$root") $(printf %q "$old"); exit 130" INT TERM HUP
+  if "$root" test -e "$BUILD_TOOLS"; then "$root" mv "$BUILD_TOOLS" "$old"; fi
+  if ! "$root" mv "$stage" "$BUILD_TOOLS"; then
+    restore_build_tools "$root" "$old"
+    "$root" rm -rf "$stage"
+    die "couldn't move the new build tools into $BUILD_TOOLS; the ones before are back"
+  fi
+  if ! problem="$(build_tools_problem "$BUILD_TOOLS")"; then
+    "$root" rm -rf "$BUILD_TOOLS"
+    restore_build_tools "$root" "$old"
+    die "the build tools put in $BUILD_TOOLS aren't fit for $BUILDER ($problem); the ones before, if any, are back"
+  fi
+  trap - INT TERM HUP
+  "$root" rm -rf "$old"
+  release_tools_lock
 }
 
 # Installs Rust $RUST_TOOLCHAIN with pinned rustup-init (Linux), as the account
@@ -178,6 +391,17 @@ install_rust() {
 }
 
 # --- macOS ----------------------------------------------------------------------
+# Homebrew's tools before macOS's (Apple's git is below the floor) for the rest of
+# this run, and so for everything it sets up: the scheduled job keeps this PATH,
+# the build account takes its folders outside your home in this order, and the
+# app's update button runs with the PATH the job builds with.
+homebrew_first() {
+  local bin
+  bin="$(brew --prefix)/bin"
+  [[ "${PATH%%:*}" == "$bin" ]] || export PATH="$bin:$PATH"
+  hash -r
+}
+
 mac_setup() {
   if ! xcode-select -p >/dev/null 2>&1; then
     xcode-select --install >/dev/null 2>&1 || true
@@ -187,9 +411,17 @@ mac_setup() {
     [[ -x /opt/homebrew/bin/brew ]] || die "Homebrew is required (https://brew.sh). Install it, then rerun ./install.sh"
     eval "$(/opt/homebrew/bin/brew shellenv)"
   fi
+  homebrew_first
 
-  local missing=()
-  git_ok || missing+=(git)
+  local missing=() problem
+  if ! git_ok; then
+    if brew list --formula git >/dev/null 2>&1; then
+      say "Upgrading Homebrew's git"
+      brew upgrade git
+    else
+      missing+=(git)
+    fi
+  fi
   node_ok || missing+=(node)
   # pnpm comes pinned (install_pnpm), not from Homebrew.
   have cargo || missing+=(rust)
@@ -199,7 +431,7 @@ mac_setup() {
   fi
   have op || { say "Installing the 1Password CLI"; brew install --cask 1password-cli; }
   hash -r
-  git_ok || die "git $GIT_MIN or newer is required (found $(git --version 2>/dev/null || echo none)). Run: brew install git, and put $(brew --prefix)/bin first on PATH"
+  problem="$(git_problem)" || die "$problem (git on PATH: $(command -v git || echo none)). Run: brew install git"
   node_ok || die "Node $NODE_MAJOR or newer with the Oct 2026 security fixes is required (24.22.1 or later on 24.x, or 26.12.1 or later; found $(node --version)). Run: brew upgrade node"
 
   if bin/t3blackout signing status | grep -q "not set up"; then
@@ -215,7 +447,7 @@ mac_setup() {
       bin/t3blackout signing adopt --vault "$VAULT"
     else
       say "No Apple Development certificate found; creating a self-signed one in \"$VAULT\""
-      say "Keychain will ask again after each update until you run: bin/t3blackout signing adopt --vault \"$VAULT\" (see README)"
+      say "Keychain will ask again after each update until you run: bin/t3blackout signing adopt --vault \"$VAULT\" (docs/install/signing-macos.md)"
       bin/t3blackout signing init --vault "$VAULT"
     fi
   else
@@ -298,7 +530,8 @@ linux_setup() {
 
   export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$NODE_HOME/bin:$PATH"
   node_ok || install_node
-  git_ok || die "git $GIT_MIN or newer is required (found $(git --version)). ${PRETTY_NAME:-This distro} ships an older one; install a newer git (e.g. Ubuntu: the git-core PPA), then rerun ./install.sh"
+  local problem
+  problem="$(git_problem)" || die "$problem (git on PATH: $(command -v git || echo none)). Install a newer git than ${PRETTY_NAME:-this distro} ships (e.g. Ubuntu: the git-core PPA), then rerun ./install.sh"
 
   # Ubuntu 23.10+ blocks unprivileged user namespaces, which Electron's own
   # (Chromium) sandbox needs. Allow them for exactly the installed binary; its
@@ -354,17 +587,44 @@ builder_user_linux() {
     --shell "$(command -v nologin || echo /bin/false)" --comment "T3 Blackout builder" "$BUILDER"
 }
 
-# Runs a command as the build account, with its own tools first on PATH.
-as_builder() {
-  sudo -n -u "$BUILDER" -H env HOME="$BUILDER_HOME" \
-    PATH="$BUILDER_HOME/node/bin:$BUILDER_HOME/.local/bin:$BUILDER_HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" "$@"
+# The build account's home. On macOS, mode 700 with one ACL entry, on the folder
+# itself, letting you list and pass through it: you read the builds it hands
+# back and its upstream mirror (both readable inside), and nobody else, agent
+# accounts included, can open it at all. (Linux has no agent accounts: there it
+# stays 755.)
+builder_home() {
+  if [[ "$(uname -s)" != Darwin ]]; then
+    sudo install -d -o "$BUILDER" -g "$(id -gn "$BUILDER")" -m 755 "$BUILDER_HOME"
+    return
+  fi
+  sudo install -d -o "$BUILDER" -g "$(id -gn "$BUILDER")" -m 700 "$BUILDER_HOME"
+  sudo chmod -N "$BUILDER_HOME"
+  sudo chmod +a "user:$(id -un) allow list,search,readattr,readextattr,readsecurity" "$BUILDER_HOME"
+  [[ -r "$BUILDER_HOME" && -x "$BUILDER_HOME" ]] || die "you can't open $BUILDER_HOME, where builds come back to you; see: ls -led $BUILDER_HOME"
 }
 
-# Whether the build account can be set up: it needs sudo once.
-can_sudo() {
-  have sudo || { say "sudo isn't installed, so builds run as you"; return 1; }
-  say "Setting up the build account $BUILDER (sudo asks for your password)"
-  sudo -v || { say "No sudo, so builds run as you"; return 1; }
+# Runs a command as the build account, with its own tools first on PATH, from /:
+# the folder you're in (the clone) is in your home, which it can't open.
+as_builder() {
+  (cd / && sudo -n -u "$BUILDER" -H env HOME="$BUILDER_HOME" \
+    PATH="$BUILDER_HOME/node/bin:$BUILDER_HOME/.local/bin:$BUILDER_HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" "$@")
+}
+
+# Whether the build account can be set up: it needs sudo once. Where it can't,
+# the install stops here, before any upstream code runs, unless
+# --unisolated-build said to build as you (status 1).
+builder_sudo() {
+  local why="sudo isn't installed"
+  if have sudo; then
+    say "Setting up the build account $BUILDER (sudo asks for your password)"
+    sudo -v && return 0
+    why="sudo didn't authorize you"
+  fi
+  if ((UNISOLATED)); then
+    warn "$why, so this install builds as you (--unisolated-build): upstream's dependency and build scripts run with your files and credentials"
+    return 1
+  fi
+  die "$why. T3 Blackout runs upstream's dependency and build scripts only as its build account $BUILDER, which needs sudo once to set up; rerun ./install.sh from an account that can use sudo. To build as you instead, with those scripts able to read your files and credentials: ./install.sh --unisolated-build"
 }
 
 # Called as a plain command, never in a condition, so `set -e` stops the
@@ -376,7 +636,7 @@ setup_builder() {
     Darwin) builder_user_mac ;;
     *) builder_user_linux ;;
   esac
-  sudo install -d -o "$BUILDER" -g "$(id -gn "$BUILDER")" -m 755 "$BUILDER_HOME"
+  builder_home
   # Lets you (and the scheduled job) act as the build account without a password.
   # Only in that direction: the build account gets no sudo at all.
   local rule
@@ -385,7 +645,7 @@ setup_builder() {
   sudo visudo -cf "$rule" >/dev/null || die "the sudo rule for $BUILDER didn't validate"
   sudo install -m 440 -o root -g "$(id -gn root)" "$rule" /etc/sudoers.d/t3blackout
   rm -f "$rule"
-  sudo -n -u "$BUILDER" true 2>/dev/null ||
+  as_builder true 2>/dev/null ||
     die "sudo can't switch to $BUILDER; make sure /etc/sudoers includes /etc/sudoers.d"
 
   # Its own toolchain where yours lives in your home (which it can't read). On
@@ -396,12 +656,12 @@ setup_builder() {
     fi
     [[ -x "$BUILDER_HOME/.cargo/bin/cargo" ]] || install_rust as_builder
   fi
-  if [[ "$(as_builder "$BUILDER_HOME/.local/bin/pnpm" --version 2>/dev/null || true)" != "$PNPM_VERSION" ]]; then
-    install_pnpm "$BUILDER_HOME/.local" as_builder
-  fi
+  install_build_pnpm
   as_builder node -e "$NODE_CHECK" "$NODE_PATCHED" "$NODE_MAJOR" ||
     die "$BUILDER's Node ($(as_builder node --version 2>&1)) isn't Node $NODE_MAJOR+ with the Oct 2026 security fixes"
   as_builder cargo --version >/dev/null || die "$BUILDER can't run cargo (on macOS it uses Homebrew's: brew install rust)"
+  local problem
+  problem="$(git_problem as_builder git)" || die "$BUILDER's git: $problem"
 
   # Builds run as this account so their scripts can't read your home; make sure
   # they can't (on macOS it shares your staff group, which can read a 0750 home).
@@ -422,11 +682,9 @@ setup_builder() {
   rm -rf upstream build
 }
 
-# Building as you needs pnpm and Rust here too.
+# Building as you (--unisolated-build) needs pnpm and Rust here too.
 setup_own_toolchain() {
-  if [[ "$(PATH="$HOME/.local/bin:$PATH" pnpm --version 2>/dev/null || true)" != "$PNPM_VERSION" ]]; then
-    install_pnpm "$HOME/.local"
-  fi
+  if ! pnpm_installed "$HOME/.local"; then install_pnpm "$HOME/.local"; fi
   export PATH="$HOME/.local/bin:$PATH"
   if ! have cargo; then
     if [[ "$(uname -s)" == Linux ]]; then install_rust; else brew install rust; fi
@@ -441,11 +699,18 @@ main() {
     *) die "unsupported OS: $(uname -s)" ;;
   esac
 
-  if can_sudo; then setup_builder; else setup_own_toolchain; fi
-
-  # The role and the locations this environment chose, for every later run
-  # (scheduled, from the app, by hand): lib/install-config.mjs.
-  bin/t3blackout configure --role "$ROLE"
+  # The role, the locations this environment chose and whether builds may run as
+  # you, for every later run (scheduled, from the app, by hand):
+  # lib/install-config.mjs. Saved without --unisolated-build, a run that finds no
+  # build account refuses to build.
+  if builder_sudo; then
+    setup_builder
+    bin/t3blackout configure --role "$ROLE"
+  else
+    setup_own_toolchain
+    bin/t3blackout configure --role "$ROLE" --unisolated-build
+    warn "Building as you (--unisolated-build): no build account keeps upstream's scripts away from your files"
+  fi
 
   say "Building and installing T3 Blackout (a few minutes on first run)"
   bin/t3blackout update
@@ -468,7 +733,7 @@ main() {
     host)
       cat <<'NEXT'
 
-Next, for each account agents run in (docs/two-mac-setup.md, section 3), e.g.:
+Next, for each account agents run in (docs/accounts/agent-accounts.md), e.g.:
   sudo scripts/add-agent-account.sh agent-claude --key ~/.ssh/t3blackout.pub
 then turn on Remote Login and run that command again. Signed in as the account
 (ssh agent-claude@localhost): install the provider CLIs on its own PATH, run
@@ -480,7 +745,7 @@ NEXT
       cat <<'NEXT'
 
 Open "T3 Blackout" from your app launcher, or run: bin/t3blackout launch
-For the local standby lane (docs/two-mac-setup.md, section 4.3), e.g.:
+For the local standby lane (docs/install/standby.md), e.g.:
   sudo scripts/add-agent-account.sh agent-standby --loopback-only --key ~/.ssh/t3blackout.pub
 NEXT
       ;;

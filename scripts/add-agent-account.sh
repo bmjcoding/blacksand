@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Sets up a macOS account that coding agents run in, reached from a T3 Blackout
-# desktop over SSH (docs/two-mac-setup.md). Run once per account, with sudo, from
+# desktop over SSH (docs/accounts/agent-accounts.md). Run once per account, with sudo, from
 # the admin account that ran install.sh; rerun it any time, it puts everything
 # back the way it describes:
 #
@@ -12,9 +12,15 @@
 # over SSH with your key only: root keeps the key in
 # /etc/ssh/t3blackout/authorized_keys/<account>, where the account can't add its
 # own. Every account logs in with keys only, never a password, and only agent
-# accounts may log in over SSH at all.
+# accounts may log in over SSH at all, and only from a tailnet address or this Mac.
 #   - Without --loopback-only, macOS's Remote Login is the listener (turn it on
-#     in System Settings; key-only SSH on your network).
+#     in System Settings). It listens on your network too, but refuses every
+#     login whose source address is outside Tailscale's address ranges and this
+#     Mac's loopback, unless --allow-lan. That's a check of the address a
+#     connection claims, not of the way it came: a LAN peer that gives itself a
+#     tailnet address and holds an authorized key isn't stopped (pf could tie
+#     SSH to Tailscale's interface, but a pf mistake can lock a remote host out
+#     of SSH for good). --allow-from narrows it to your desktop Mac's addresses.
 #   - With --loopback-only, a separate sshd (launchd job dev.t3blackout.sshd)
 #     listens on 127.0.0.1 and ::1 port 2222 only, for this Mac's own desktop;
 #     Remote Login stays off (its launchd socket can't be bound to loopback).
@@ -25,6 +31,23 @@
 #   --key FILE        public key to authorize (default: the first key your SSH agent
 #                     offers, e.g. 1Password's)
 #   --loopback-only   reached from this Mac only, through the separate loopback sshd
+#   --tailnet-only    the default: tailnet address ranges only. Remote Login's sshd
+#                     refuses logins whose source address isn't in Tailscale's
+#                     ranges (100.64.0.0/10, fd7a:115c:a1e0::/48) or this Mac's
+#                     loopback; key auth is still required, and a LAN peer forging
+#                     a tailnet address with a stolen key is not stopped. Given
+#                     explicitly, it also drops a saved --allow-from.
+#   --allow-from ADDRESSES
+#                     the strongest address check sshd has: only these tailnet
+#                     addresses (your desktop Mac's, from `tailscale ip` on it,
+#                     comma-separated) and this Mac's loopback, with the same limit
+#                     (a LAN peer forging one of them with a stolen key). Kept in
+#                     /etc/ssh/t3blackout/allow-from for later runs (a run with
+#                     none of these options keeps it); --tailnet-only goes back
+#                     to the whole ranges.
+#   --allow-lan       also from your local network (key-only), dropping any
+#                     --allow-from. Give it on every run: each run rewrites the
+#                     setting, and one without it goes back to tailnet addresses.
 
 set -euo pipefail
 
@@ -45,17 +68,30 @@ HELPER_DIR=/usr/local/libexec/t3blackout
 HELPER=$HELPER_DIR/set-claude-token
 SHARED_RATES=/Users/Shared/t3blackout/usage-model-rates.json
 KEY_RE='^(ssh-ed25519|ecdsa-sha2-nistp256|sk-ssh-ed25519@openssh\.com|ssh-rsa) [A-Za-z0-9+/]+=*( .*)?$'
+# Where --tailnet-only logins may come from: Tailscale's IPv4 (CGNAT) and IPv6
+# ranges, and this Mac's loopback.
+TAILNET_SOURCES=(100.64.0.0/10 fd7a:115c:a1e0::/48 127.0.0.0/8 ::1/128)
+# What the installed drop-in is checked with (sources_problem): your network and
+# the Internet, IPv4 and IPv6, link-local and IPv4-mapped too, and just outside
+# Tailscale's ranges, all refused; then sources that must stay allowed.
+REFUSED_PROBES=(192.168.1.50 10.0.0.2 172.16.0.1 169.254.10.20 203.0.113.7 100.63.255.255 100.128.0.1 2001:db8::5 fd00::1 fd7a:115c:a1e1::1 fe80::1%en0 fe80::aede:48ff:fe00:1122%en1 fe80::1%lo0 ::ffff:192.168.1.50 ::ffff:100.64.0.1)
+ALLOWED_PROBES=(100.64.0.1 100.101.1.1 100.127.255.254 100.100.100.100 fd7a:115c:a1e0::1 fd7a:115c:a1e0:ffff::1 127.0.0.1 127.0.0.2 ::1)
+ALLOW_LAN=0
+# --allow-from: the addresses logins may come from (with loopback), comma-separated; empty for the ranges.
+ALLOW_FROM=""
+ALLOW_FROM_FILE=$SSH_DIR/allow-from
 
 say() { printf '\033[1m==> %s\033[0m\n' "$*"; }
 warn() { printf '\033[33mwarning:\033[0m %s\n' "$*" >&2; }
 die() { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 
 # Runs a command as `user`, never as root: inside an account's home, root would
-# follow whatever symlinks that account planted there.
+# follow whatever symlinks that account planted there. From /: the folder sudo
+# was run in (your clone, in your home) is one an agent account can't open.
 as_user() {
   local user="$1"
   shift
-  sudo -u "$user" -H -- "$@"
+  (cd / && sudo -u "$user" -H -- "$@")
 }
 
 home_of() { dscl . -read "/Users/$1" NFSHomeDirectory | awk '{print $2}'; }
@@ -69,8 +105,19 @@ group_values() { { dscl . -read "/Groups/$1" "$2" 2>/dev/null || true; } | sed "
 # everyone; agent accounts get the root-owned keys and only what T3 Blackout's
 # SSH environments use (a shell, and forwards to this Mac's loopback). sshd ends
 # a Match block at the end of an included file, so macOS's settings after it stay
-# global.
+# global. Unless ALLOW_LAN=1, logins from any source address but TAILNET_SOURCES
+# (or ALLOW_FROM's and loopback) are refused, for every account: sshd applies
+# each Match block whose criteria hold, and adds up the DenyUsers they set. It's
+# the address a connection claims, not the interface it came in on. (The pre-boot
+# FileVault unlock over SSH is Apple's own server and reads none of this.)
 render_dropin() {
+  local source not_tailnet="" sources=("${TAILNET_SOURCES[@]}") what="tailnet address ranges"
+  if [[ -n "$ALLOW_FROM" ]]; then
+    IFS=, read -r -a sources <<<"$ALLOW_FROM"
+    sources+=(127.0.0.0/8 ::1/128)
+    what="--allow-from's addresses"
+  fi
+  for source in "${sources[@]}"; do not_tailnet+="!$source,"; done
   cat <<EOF
 # Written by t3blackout scripts/add-agent-account.sh; rewritten on each run.
 PasswordAuthentication no
@@ -88,6 +135,73 @@ Match Group $AGENT_GROUP
   GatewayPorts no
   PermitUserRC no
 EOF
+  ((ALLOW_LAN)) && return 0
+  # Apple's sshd (10.5p1) compares an address's zone too, so ::/0 doesn't match
+  # a scoped one (fe80::...%en0, link-local, which anything on your network can
+  # reach): *%* does.
+  cat <<EOF
+# Source addresses: $what and this Mac only. Key auth is still required; a LAN
+# peer forging one of these addresses with a stolen key is not stopped.
+Match Address ${not_tailnet}0.0.0.0/0,::/0,*%*
+  DenyUsers *
+EOF
+}
+
+# $1 written one way (fd7a:115c:a1e0:0:0:0:0:1 is fd7a:115c:a1e0::1, so the
+# self-check's comparisons match what sshd matches) when it's one tailnet address,
+# written out: IPv4 in 100.64.0.0/10 or IPv6 in fd7a:115c:a1e0::/48. Anything else
+# fails: sshd would read it in a Match Address list as a pattern, never an address.
+tailnet_address() {
+  [[ "$1" =~ ^[0-9a-f.:]+$ ]] || return 1
+  python3 -I -c '
+import ipaddress, sys
+try:
+    address = ipaddress.ip_address(sys.argv[1])
+except ValueError:
+    sys.exit(1)
+if not any(address in ipaddress.ip_network(net) for net in ("100.64.0.0/10", "fd7a:115c:a1e0::/48")):
+    sys.exit(1)
+print(address)' "$1"
+}
+
+# ALLOW_FROM for this run: `given` (--allow-from's value), checked; the whole
+# ranges with --tailnet-only or --allow-lan; else the saved list (ALLOW_FROM_FILE).
+choose_allow_from() {
+  local given="$1" ranges="${2:-0}" address saved="" canonical=()
+  if [[ -f "$ALLOW_FROM_FILE" && ! -L "$ALLOW_FROM_FILE" ]]; then saved="$(head -n 1 "$ALLOW_FROM_FILE")"; fi
+  if ((ranges || ALLOW_LAN)); then
+    ALLOW_FROM=""
+    if [[ -n "$saved" ]]; then
+      if ((ALLOW_LAN)); then say "Dropping the saved --allow-from $saved (--allow-lan)"; else say "Dropping the saved --allow-from $saved: the whole tailnet address ranges again (--tailnet-only)"; fi
+    fi
+  elif [[ -n "$given" ]]; then
+    ALLOW_FROM="$given"
+  elif [[ -n "$saved" ]]; then
+    ALLOW_FROM="$saved"
+    say "Keeping --allow-from $saved (saved in $ALLOW_FROM_FILE; --tailnet-only drops it)"
+  fi
+  [[ -n "$ALLOW_FROM" ]] || return 0
+  [[ "$ALLOW_FROM" =~ ^[0-9a-f.:,]+$ && "$ALLOW_FROM" != ,* && "$ALLOW_FROM" != *, && "$ALLOW_FROM" != *,,* ]] ||
+    die "--allow-from takes tailnet addresses separated by commas (100.x.y.z, fd7a:115c:a1e0::…), not \"$ALLOW_FROM\""
+  for address in ${ALLOW_FROM//,/ }; do
+    canonical+=("$(tailnet_address "$address")") ||
+      die "$address isn't a tailnet address (100.64.0.0/10 or fd7a:115c:a1e0::/48, written out); use your desktop Mac's, from: tailscale ip"
+  done
+  ALLOW_FROM="$(IFS=,; echo "${canonical[*]}")"
+}
+
+# Keeps this run's --allow-from for the next (root's, beside the keys), or drops it.
+save_allow_from() {
+  local tmp
+  if [[ -z "$ALLOW_FROM" ]]; then
+    rm -f "$ALLOW_FROM_FILE"
+    return 0
+  fi
+  tmp="$(mktemp "$SSH_DIR/.allow-from.XXXXXX")"
+  printf '%s\n' "$ALLOW_FROM" >"$tmp"
+  chown root:wheel "$tmp"
+  chmod 644 "$tmp"
+  mv -f "$tmp" "$ALLOW_FROM_FILE"
 }
 
 # The standby lane's own sshd, run by launchd as `sshd -D -f`: it binds its own
@@ -317,26 +431,58 @@ ensure_host_keys() {
   ssh-keygen -A >/dev/null
 }
 
+# Apple's sshd on its own configuration: whether it would start, and the
+# settings it would apply to a connection ($1: user=,host=,addr=).
+validate_config() { /usr/sbin/sshd -t; }
+effective_config() { /usr/sbin/sshd -T -C "$1"; }
+
+# Why Apple's sshd, reading the installed configuration, wouldn't refuse and
+# allow logins as render_dropin means to, for this account and yours: refused
+# from each REFUSED_PROBES address (unless --allow-lan), allowed from each
+# ALLOWED_PROBES one. Nothing, and status 0, when it would.
+sources_problem() {
+  local user addr want got out allowed=()
+  [[ -z "$ALLOW_FROM" ]] || IFS=, read -r -a allowed <<<"$ALLOW_FROM"
+  for user in "$NAME" "$SUDO_USER"; do
+    for addr in "${REFUSED_PROBES[@]}" "${ALLOWED_PROBES[@]}" ${allowed[@]+"${allowed[@]}"}; do
+      want=allow
+      if ((ALLOW_LAN)); then
+        :
+      elif [[ -n "$ALLOW_FROM" ]]; then
+        # Only the listed addresses and loopback: every other probe, tailnet ones included, is refused.
+        [[ ",$ALLOW_FROM," == *",$addr,"* || "$addr" == 127.* || "$addr" == ::1 ]] || want=refuse
+      elif [[ " ${REFUSED_PROBES[*]} " == *" $addr "* ]]; then
+        want=refuse
+      fi
+      out="$(effective_config "user=$user,host=t3blackout-check,addr=$addr" 2>&1)" || { echo "sshd -T failed for $user from $addr: $out"; return 1; }
+      got=allow
+      if grep -qix 'denyusers \*' <<<"$out"; then got=refuse; fi
+      [[ "$got" == "$want" ]] || { echo "sshd would $got $user from $addr"; return 1; }
+    done
+  done
+}
+
 # Validated in place (sshd reads every file in sshd_config.d), with the previous
-# version put back if sshd rejects the new one: never a config that stops
-# Remote Login starting.
+# version put back if sshd rejects the new one or wouldn't refuse and allow
+# logins as it should: never a config that stops Remote Login starting.
 install_dropin() {
   local new backup="" out
-  new="$(mktemp /etc/ssh/.t3blackout-dropin.XXXXXX)"
+  # Beside sshd_config.d, not in it: sshd reads every file there.
+  new="$(mktemp "${DROPIN%/*/*}/.t3blackout-dropin.XXXXXX")"
   render_dropin >"$new"
   chmod 644 "$new"
   if [[ -f "$DROPIN" ]]; then
-    backup="$(mktemp /etc/ssh/.t3blackout-dropin-old.XXXXXX)"
+    backup="$(mktemp "${DROPIN%/*/*}/.t3blackout-dropin-old.XXXXXX")"
     cp -p "$DROPIN" "$backup"
   fi
   mv -f "$new" "$DROPIN"
-  if out="$(/usr/sbin/sshd -t 2>&1)"; then
+  if out="$(validate_config 2>&1)" && out="$(sources_problem)"; then
     rm -f "$backup"
     return 0
   fi
   if [[ -n "$backup" ]]; then mv -f "$backup" "$DROPIN"; else rm -f "$DROPIN"; fi
   if grep -q 'no hostkeys available' <<<"$out"; then die "sshd has no host keys it can use (ssh-keygen -A didn't make them): $out"; fi
-  die "sshd rejected the new $DROPIN, so the previous one is back in place: $out"
+  die "sshd rejected the new $DROPIN, or wouldn't refuse and allow logins as it should, so the previous one is back in place: $out"
 }
 
 verify_loopback_listener() {
@@ -407,17 +553,30 @@ main() {
 
   NAME="${1:-}"
   shift || true
-  [[ "$NAME" =~ ^[a-z][a-z0-9-]{1,30}$ ]] || die "usage: sudo $0 <account-name> [--loopback-only] [--key FILE]"
+  [[ "$NAME" =~ ^[a-z][a-z0-9-]{1,30}$ ]] || die "usage: sudo $0 <account-name> [--loopback-only] [--tailnet-only | --allow-from ADDRESSES | --allow-lan] [--key FILE]"
   [[ "$NAME" != "$SUDO_USER" ]] || die "the agent account must be a separate account, not yours"
   LOOPBACK=0
   KEY_FILE=""
+  local tailnet_only=0 allow_from=""
   while (($#)); do
     case "$1" in
       --loopback-only) LOOPBACK=1; shift ;;
+      --tailnet-only) tailnet_only=1; shift ;;
+      --allow-from)
+        # An empty value (say, a failed `tailscale ip` lookup) must not quietly widen to the ranges.
+        [[ -n "${2:-}" ]] || die "--allow-from needs addresses: your desktop Mac's (tailscale ip, on it), comma-separated"
+        allow_from="$2"
+        shift 2
+        ;;
+      --allow-lan) ALLOW_LAN=1; shift ;;
       --key) KEY_FILE="${2:-}"; shift 2 ;;
       *) die "unknown option $1" ;;
     esac
   done
+  ((!(tailnet_only && ALLOW_LAN))) || die "--tailnet-only and --allow-lan contradict each other; --tailnet-only is the default"
+  [[ -z "$allow_from" ]] || ((!ALLOW_LAN)) || die "--allow-from and --allow-lan contradict each other"
+  [[ -z "$allow_from" ]] || ((!tailnet_only)) || die "--tailnet-only (the whole tailnet ranges) and --allow-from contradict each other"
+  choose_allow_from "$allow_from" "$tailnet_only"
 
   [[ -x "$APP/Contents/MacOS/T3 Blackout" ]] ||
     die "$APP is missing; run ./install.sh --role host (or both) as an admin first"
@@ -446,6 +605,14 @@ main() {
   ensure_host_keys
   say "sshd: keys only; agent accounts use $KEYS_DIR"
   install_dropin
+  save_allow_from
+  if ((ALLOW_LAN)); then
+    say "sshd: logins from your local network too (--allow-lan), as well as tailnet addresses and this Mac"
+  elif [[ -n "$ALLOW_FROM" ]]; then
+    say "sshd: logins only from ${ALLOW_FROM//,/, } and this Mac (--allow-from); key auth still required; a LAN peer forging one of these addresses with a stolen key is not stopped"
+  else
+    say "sshd: logins only from tailnet address ranges (100.64.0.0/10, fd7a:115c:a1e0::/48) and this Mac (--tailnet-only); key auth still required; a LAN peer forging a tailnet address with a stolen key is not stopped"
+  fi
 
   local target
   if ((LOOPBACK)); then
@@ -465,14 +632,14 @@ users" off. Then run this script again: turning Remote Login on can change that
 list, and each run sets it back to exactly the agent accounts.
 NEXT
     fi
-    target="$NAME@<this Mac>"
+    target="$NAME@<this Mac's Tailscale name>"
   fi
 
   cat <<NEXT
 
 Done. Next, as $NAME (ssh $( ((LOOPBACK)) && echo "-p $LOOPBACK_PORT ")$NAME@localhost, or log in at the screen):
   1. Install the provider CLIs it should run (Claude Code, Codex, ...) on its own PATH
-     (docs/two-mac-setup.md, section 3.5).
+     (docs/accounts/providers.md).
   2. codex login                       (Codex keeps its login in a file)
   3. claude setup-token                (SSH sessions can't unlock the Keychain)
   4. $HELPER   (stores it, owner only)

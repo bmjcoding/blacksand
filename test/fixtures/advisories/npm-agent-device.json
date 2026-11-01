@@ -1,0 +1,211 @@
+{
+  "recorded": {
+    "url": "https://registry.npmjs.org/agent-device",
+    "at": "2026-10-31T05:00:00Z",
+    "status": 200,
+    "note": "versions and times trimmed to those the tests use"
+  },
+  "body": {
+    "name": "agent-device",
+    "dist-tags": {
+      "latest": "0.21.35",
+      "nightly": "0.21.36-nightly.20261031.115"
+    },
+    "versions": {
+      "0.21.25": {
+        "name": "agent-device",
+        "version": "0.21.25",
+        "repository": {
+          "url": "git+https://github.com/callstack/agent-device.git",
+          "type": "git"
+        },
+        "_npmUser": {
+          "name": "GitHub Actions",
+          "email": "npm-oidc-no-reply@github.com",
+          "trustedPublisher": {
+            "id": "github",
+            "oidcConfigId": "f343844d-0d7c-49a1-a6ac-5ee3c542313e"
+          }
+        },
+        "dist": {
+          "shasum": "d72d5c473218d93d8dfc4a220b9c9f819d9130f4",
+          "tarball": "https://registry.npmjs.org/agent-device/-/agent-device-0.21.25.tgz",
+          "fileCount": 576,
+          "integrity": "sha512-JFmAD5AqM03dVU6BVQW1DQ2Kz+MThmbCYBbDxpGw2lka91LcoXHdrb4IjF9NNg4DEQUu41Pg8WnB/7crM3ig2w==",
+          "signatures": [
+            {
+              "sig": "MEYCIQCfI57frSdiZGE2JitgiIzN+VcqfEBYnpTU4RrSbqN3swIhAOHxlfQ7yyng1DmwazT3w/K22Cb2ma4CfRVEAi0bKpGy",
+              "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+            },
+            {
+              "sig": "MEUCICrtRnRARvaLFefpYlGapdgEF5qT7bDW+33snCMoH/FPAiEAp8OVvvr0dtfzVtq77IjDHKFGI6fZaXOH06LhNwsBIZE=",
+              "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+            }
+          ],
+          "attestations": {
+            "url": "https://registry.npmjs.org/-/npm/v1/attestations/agent-device@0.21.25",
+            "provenance": {
+              "predicateType": "https://slsa.dev/provenance/v1"
+            }
+          },
+          "unpackedSize": 5170803
+        },
+        "peerDependencies": {
+          "ai": "^6.0.0 || ^7.0.0"
+        },
+        "peerDependenciesMeta": {
+          "ai": {
+            "optional": true
+          }
+        }
+      },
+      "0.21.31": {
+        "name": "agent-device",
+        "version": "0.21.31",
+        "repository": {
+          "url": "git+https://github.com/callstack/agent-device.git",
+          "type": "git"
+        },
+        "_npmUser": {
+          "name": "GitHub Actions",
+          "email": "npm-oidc-no-reply@github.com",
+          "trustedPublisher": {
+            "id": "github",
+            "oidcConfigId": "f343844d-0d7c-49a1-a6ac-5ee3c542313e"
+          }
+        },
+        "dist": {
+          "shasum": "b669306cdc48bd11f3d5c39e4f4ddc3db5c7422a",
+          "tarball": "https://registry.npmjs.org/agent-device/-/agent-device-0.21.31.tgz",
+          "fileCount": 649,
+          "integrity": "sha512-541X/tXHqQS3Xg5PutPSek1nQFLgEJEXFdLPiZ9jTvSb+SMHr/Z4kzVCnBkGza59R+EHO1atLWx0ZAW5vK84IQ==",
+          "signatures": [
+            {
+              "sig": "MEUCIQDu9wrEUft6ZG8JAZV/3+rEp961VCLz8vpoL9BVR39s3QIgNU5G3xnuSmKOh3n/GZno8pHsNQrqGCWkC7JjKFOATwU=",
+              "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+            },
+            {
+              "sig": "MEYCIQC6AFUv0iUHl6nF4lY7aoMi1qvxaD4STtOc4HgNGH0QbQIhAODvO0rQ/olZJw1x0ILPGteB1xMI+NrUCy7L9KTraXcZ",
+              "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+            }
+          ],
+          "attestations": {
+            "url": "https://registry.npmjs.org/-/npm/v1/attestations/agent-device@0.21.31",
+            "provenance": {
+              "predicateType": "https://slsa.dev/provenance/v1"
+            }
+          },
+          "unpackedSize": 5553094
+        },
+        "peerDependencies": {
+          "ai": "^6.0.0 || ^7.0.0"
+        },
+        "peerDependenciesMeta": {
+          "ai": {
+            "optional": true
+          }
+        }
+      },
+      "0.21.34": {
+        "name": "agent-device",
+        "version": "0.21.34",
+        "repository": {
+          "url": "git+https://github.com/callstack/agent-device.git",
+          "type": "git"
+        },
+        "_npmUser": {
+          "name": "GitHub Actions",
+          "email": "npm-oidc-no-reply@github.com",
+          "trustedPublisher": {
+            "id": "github",
+            "oidcConfigId": "f343844d-0d7c-49a1-a6ac-5ee3c542313e"
+          }
+        },
+        "dist": {
+          "shasum": "b41b945dc252c24ae2df646cf5102265a1cf1467",
+          "tarball": "https://registry.npmjs.org/agent-device/-/agent-device-0.21.34.tgz",
+          "fileCount": 668,
+          "integrity": "sha512-D6HSO9gdunBfIkhGjCblS2/cY0bHM6u5+r5VwgNM94qJx26jqHg8H5AOhM7yzEi/Bn8V5GUIMaWL/PLb2k6yVQ==",
+          "signatures": [
+            {
+              "sig": "MEUCIQDuTHs1V1XhGN4FqAIZARq0X92C9Xj1Ae8qrHyuwwowVgIgfflEAnHLWVRDtwHe/Yk+hjeV4xa0a/X/M3JFfA0ufb8=",
+              "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+            },
+            {
+              "sig": "MEYCIQDPUiwSdWCgBIuESc75QRTh81shUzyRRA2uJmbFSZeitAIhAIeccUaFqsCG8nJiasIZKZ/XBB/CcYSNo9I6h0S23p0L",
+              "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+            }
+          ],
+          "attestations": {
+            "url": "https://registry.npmjs.org/-/npm/v1/attestations/agent-device@0.21.34",
+            "provenance": {
+              "predicateType": "https://slsa.dev/provenance/v1"
+            }
+          },
+          "unpackedSize": 5583718
+        },
+        "peerDependencies": {
+          "ai": "^6.0.0 || ^7.0.0"
+        },
+        "peerDependenciesMeta": {
+          "ai": {
+            "optional": true
+          }
+        }
+      },
+      "0.21.35": {
+        "name": "agent-device",
+        "version": "0.21.35",
+        "repository": {
+          "url": "git+https://github.com/callstack/agent-device.git",
+          "type": "git"
+        },
+        "_npmUser": {
+          "name": "GitHub Actions",
+          "email": "npm-oidc-no-reply@github.com",
+          "trustedPublisher": {
+            "id": "github",
+            "oidcConfigId": "f343844d-0d7c-49a1-a6ac-5ee3c542313e"
+          }
+        },
+        "dist": {
+          "shasum": "7d3a5598fb2c1d6fd824f911f004af8fb6264899",
+          "tarball": "https://registry.npmjs.org/agent-device/-/agent-device-0.21.35.tgz",
+          "fileCount": 668,
+          "integrity": "sha512-opESFEhZPCPzCKMOPsxNhlOvqb2+YMyL5ZmTKS/SlN9OfCCvUB9jX905QwkiEn1lUMO1Ua0RnggpdpVyOJi4KA==",
+          "signatures": [
+            {
+              "sig": "MEYCIQCg9Vt13sZqBmoR5sM8jomwmd7JUuWzPYyxsyeFOPKEegIhAKxMNAmSo4MGOXvGDCZySuXzbt826KrWOuL2N48y4mGZ",
+              "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+            },
+            {
+              "sig": "MEUCIBY/PZsjvP/elE+5QHK5bhhU65WaYBoA9EVLE/g7dDnMAiEAn5JY23jOU+7MpnR4SJUGH4ChwY8tsUeRdocWNwHAIg0=",
+              "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+            }
+          ],
+          "attestations": {
+            "url": "https://registry.npmjs.org/-/npm/v1/attestations/agent-device@0.21.35",
+            "provenance": {
+              "predicateType": "https://slsa.dev/provenance/v1"
+            }
+          },
+          "unpackedSize": 5608228
+        },
+        "peerDependencies": {
+          "ai": "^6.0.0 || ^7.0.0"
+        },
+        "peerDependenciesMeta": {
+          "ai": {
+            "optional": true
+          }
+        }
+      }
+    },
+    "time": {
+      "0.21.25": "2026-10-11T11:57:15.903Z",
+      "0.21.31": "2026-10-22T14:50:07.079Z",
+      "0.21.34": "2026-10-29T11:00:52.705Z",
+      "0.21.35": "2026-10-29T19:10:31.794Z"
+    }
+  }
+}

@@ -38,7 +38,7 @@ function unpack(archive) {
   return into;
 }
 
-test("SUPPLY-08: the build account's code carries pin.json, bound to the build's commit", () => {
+test("the build account's code carries pin.json, bound to the build's commit", () => {
   const clone = fakeClone();
   const code = unpack(snapshotArchive({ root: clone, sha: SHA }));
   assert.deepEqual(fs.readdirSync(code).sort(), ["bin", "lib", "pin.json", SNAPSHOT_FILE].sort());
@@ -64,7 +64,7 @@ test("no pin, an unpinned commit, or a check: still a snapshot; an invalid pin i
   assert.throws(() => verifySnapshot({ root: empty }), /no snapshot.json/);
 });
 
-test("HOST-16: a failing command's error never shows a secret argument", () => {
+test("a failing command's error never shows a secret argument", () => {
   const secret = "s3cret-keychain-pass";
   assert.throws(
     () => run("/bin/sh", ["-c", "exit 3", "sh", "-p", secret], { secrets: [secret], stdio: "ignore" }),
@@ -77,7 +77,7 @@ test("HOST-16: a failing command's error never shows a secret argument", () => {
   assert.equal(redact("a s3 b s3", ["s3", "", null]), "a *** b ***");
 });
 
-test("HOST-21: a build's stage folders are its own; another build's in the shared temp folder are left alone", () => {
+test("a build's stage folders are its own; another build's in the shared temp folder are left alone", () => {
   const theirs = fs.mkdtempSync(path.join(os.tmpdir(), "t3code-desktop-mac-stage-"));
   const stages = trackStageDirs("mac");
   assert.ok(stages.tmpdir.startsWith(fs.realpathSync(os.tmpdir())) || stages.tmpdir.startsWith(os.tmpdir()));
@@ -91,7 +91,7 @@ test("HOST-21: a build's stage folders are its own; another build's in the share
   fs.rmSync(theirs, { recursive: true, force: true });
 });
 
-test("HOST-22: the CLI's root resolves from a clone whose path has a space and a percent sign", () => {
+test("the CLI's root resolves from a clone whose path has a space and a percent sign", () => {
   const parent = fs.mkdtempSync(path.join(os.tmpdir(), "t3b build %20 clone-"));
   fs.mkdirSync(path.join(parent, "lib"));
   for (const name of ["util.mjs", "events.mjs", "git.mjs"]) {

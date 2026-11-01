@@ -97,6 +97,34 @@ t3b_stop() {
   done
   ! t3b_is_server "$1" "$2" "$3" "$4"
 }
+# A server launchd keeps running for this account, for the phone
+# (scripts/add-phone-service.sh, scripts/phone-server.sh). Its supervisor
+# records its servers here like this runner does, and writes $T3B_DAEMON: its
+# own pid, start time and command line, its state (starting, running, or
+# blocked: another server holds this home) and its server's pid and build.
+T3B_DAEMON="$T3B_SERVERS/daemon"
+# Whether a connection has nothing to wait for: no live supervisor, one that's
+# locked out, or one whose server runs the installed build.
+t3b_daemon_settled() {
+  [ -f "$T3B_DAEMON" ] || return 0
+  T3B_D_PID=""
+  T3B_D_STARTED=""
+  T3B_D_ARGS=""
+  T3B_D_STATE=""
+  T3B_D_SERVER=""
+  T3B_D_BUILD=""
+  { IFS= read -r T3B_D_PID && IFS= read -r T3B_D_STARTED && IFS= read -r T3B_D_ARGS && IFS= read -r T3B_D_STATE && IFS= read -r T3B_D_SERVER && IFS= read -r T3B_D_BUILD; } <"$T3B_DAEMON" || true
+  case "$T3B_D_PID" in
+    "" | *[!0-9]*) return 0 ;;
+  esac
+  t3b_is_server "$T3B_D_PID" "$T3B_D_STARTED" "$T3B_D_ARGS" "" || return 0
+  [ "$T3B_D_STATE" != blocked ] || return 0
+  [ "$T3B_D_STATE" = running ] && [ "$T3B_D_BUILD" = "$T3B_BUILD" ] || return 1
+  case "$T3B_D_SERVER" in
+    "" | *[!0-9]*) return 1 ;;
+  esac
+  t3b_alive "$T3B_D_SERVER"
+}
 
 case "\${1:-}" in
   __blackout-stop-stale-server)
@@ -130,6 +158,24 @@ case "\${1:-}" in
           T3B_FAILED=1
         fi
       fi
+    done
+    # A launchd-run server (above) comes back by itself on the installed build,
+    # once it's stopped here or its supervisor sees the new build. Up to 90 s by
+    # the clock (T3BLACKOUT_DAEMON_WAIT seconds) for it, so this connection finds
+    # and shares it instead of starting a second server, which would then lock
+    # it out of this home. A supervisor still not ready by then fails the
+    # connection, to be retried: starting a server beside it would race it.
+    T3B_DAEMON_WAIT="\${T3BLACKOUT_DAEMON_WAIT:-90}"
+    case "$T3B_DAEMON_WAIT" in
+      "" | *[!0-9]*) T3B_DAEMON_WAIT=90 ;;
+    esac
+    T3B_DEADLINE=$(($(date +%s) + T3B_DAEMON_WAIT))
+    while ! t3b_daemon_settled; do
+      if [ "$(date +%s)" -ge "$T3B_DEADLINE" ]; then
+        printf 'The T3 Blackout server launchd runs for this account (scripts/add-phone-service.sh) is still starting; connect again in a minute. Its log: %s/phone/server.log\\n' "$T3B_HOME" >&2
+        exit 75
+      fi
+      sleep 0.2
     done
     exit "$T3B_FAILED"
     ;;

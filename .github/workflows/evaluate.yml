@@ -10,8 +10,8 @@
 #             each release it built, lib/inventory.mjs) are artifacts, and only
 #             ever a proposal
 #   commit    fresh runner that runs no upstream or npm code: re-derives every gate
-#             it can from git, npm and OSV (bin/t3blackout pin-check,
-#             lib/pincheck.mjs), then signs and pushes the pin
+#             it can from git, npm and the advisory sources (OSV, GitHub's;
+#             bin/t3blackout pin-check, lib/pincheck.mjs), then signs and pushes the pin
 #   alerts    after commit: advisories against the pin actually on main
 #             (bin/t3blackout advisories), then issues only. It runs when the
 #             evaluate job failed or timed out too: what that job didn't leave is
@@ -47,7 +47,7 @@ env:
 jobs:
   evaluate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 125
     permissions:
       contents: read
       actions: read # the last evaluation's artifact
@@ -64,8 +64,14 @@ jobs:
         with:
           node-version: 24
 
-      # Upstream's packageManager field picks the pnpm version for each release.
-      - run: corepack enable
+      # install.sh's pnpm, from the registry tarballs it pins by SHA-512 (lib/pnpm.mjs
+      # checks the binary before each run). Not Corepack: that takes the version, its
+      # registry and its signing keys from the checkout (packageManager, .corepack.env).
+      - name: Pinned pnpm
+        timeout-minutes: 5
+        run: |
+          bash -c 'source ./install.sh && install_pnpm "$HOME/.local"'
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       # Upstream's Linux packager checks for these first (scripts/
       # build-desktop-artifact.ts LINUX_DESKTOP_BUILD_PREREQUISITES); the runner
@@ -100,10 +106,20 @@ jobs:
           fi
 
       # Lockfiles and stage records are written as they're made, so a failed or
-      # timed-out evaluation still uploads what it had.
+      # timed-out evaluation still uploads what it had. The job's own token, for
+      # GitHub's advisory API only (lib/advisories.mjs): unauthenticated, a
+      # runner's shared address has 60 requests an hour. It's read-only here
+      # (contents, actions), the code this job runs could reach it on the runner
+      # anyway, and the evaluator takes it out of the environment before it
+      # starts anything, so upstream's install and build don't inherit it. A
+      # runner is no install: it resolves and builds as itself, said so
+      # explicitly (lib/install-config.mjs buildAsYouProblem).
       - name: Evaluate
         id: evaluate
         timeout-minutes: 90
+        env:
+          T3BLACKOUT_GITHUB_TOKEN: ${{ github.token }}
+          T3BLACKOUT_UNISOLATED_BUILD: "1"
         run: |
           set +e
           mkdir -p "$RUNNER_TEMP/out"
@@ -145,11 +161,15 @@ jobs:
           name: evaluation
           path: ${{ runner.temp }}/evaluation
 
-      # No upstream or npm code runs here, and no secret is in reach: pin-check
-      # reads upstream with git, npm and OSV over HTTPS and applies the strip
-      # rules to upstream's source as text. It writes pin.json when it passes.
+      # No upstream or npm code runs here, and the signing key isn't in reach:
+      # pin-check reads upstream with git, npm and the advisory sources (OSV,
+      # GitHub's) over HTTPS and applies the strip rules to upstream's source as
+      # text. It writes pin.json when it passes. The job's token goes to GitHub's
+      # advisory API alone (lib/advisories.mjs), for its rate limit.
       - name: Re-derive the gates
         id: check
+        env:
+          T3BLACKOUT_GITHUB_TOKEN: ${{ github.token }}
         run: |
           node bin/t3blackout pin-check --channel "$CHANNEL" --candidate "$RUNNER_TEMP/evaluation/pin.json" \
             --resolved "$RUNNER_TEMP/evaluation/resolved" --result "$RUNNER_TEMP/verdict"
@@ -206,6 +226,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          T3BLACKOUT_GITHUB_TOKEN: ${{ github.token }}
         run: |
           node bin/t3blackout advisories --channel "$CHANNEL" --resolved "$RUNNER_TEMP/evaluation/resolved" --out "$RUNNER_TEMP/advisories.json"
           node .github/scripts/security-issues.mjs advisories "$RUNNER_TEMP/advisories.json"

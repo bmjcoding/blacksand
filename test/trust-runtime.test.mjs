@@ -1,6 +1,6 @@
 // node --test test/: a release index the runtime scan needs that answers 404 fails
-// the scan instead of reading as "no Node security releases" (PIPE-03). Its own
-// file: lib/fastlane.mjs caches the index for the run.
+// the scan instead of reading as "no Node security releases". Its own file:
+// lib/fastlane.mjs caches each index, a failed fetch included, for the process.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 

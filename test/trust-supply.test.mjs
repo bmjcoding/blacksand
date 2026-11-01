@@ -1,8 +1,8 @@
 // node --test test/: the evaluator's network-facing gates against a mocked npm,
-// OSV and release index: bounded fetches (SUPPLY-21, PIPE-20), dependency ages
-// (SUPPLY-19/20, PIPE-02/19), the fast lane's publisher, provenance and 0.x rules
-// (SUPPLY-06/07/18), device-tool re-review, and OSV paging and severity
-// (SUPPLY-14/23, PIPE-04).
+// OSV and release index: bounded fetches, dependency ages, device-tool re-review,
+// the security fast lane's publisher, provenance and 0.x rules (unverified npm
+// provenance never earns trust: a registry can claim anything in it), and OSV
+// paging and severity. Every gate fails closed: what it can't read holds the update.
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import * as fs from "node:fs";
@@ -14,7 +14,7 @@ import assert from "node:assert/strict";
 import * as advisories from "../lib/advisories.mjs";
 import { findAdvisories, fixedVersions, isAlerting, severityOf } from "../lib/advisories.mjs";
 import { electronSecurityReason, makeFastLane, publisherContinuity, repoOf, runtimeAdvisories } from "../lib/fastlane.mjs";
-import { ageSetting, dependencyAgeGate, reviewAddedDeviceTools, reviewDeviceTool } from "../lib/gates.mjs";
+import { dependencyAgeGate, reviewAddedDeviceTools, reviewDeviceTool } from "../lib/gates.mjs";
 import { request } from "../lib/http.mjs";
 
 const DAY = 86_400_000;
@@ -34,6 +34,9 @@ function mockFetch(handlers) {
 }
 
 const registry = (name) => `https://registry.npmjs.org/${name.replace("/", "%2f")}`;
+/** GitHub Advisory Database routes answering "none" for `pkgs` (lib/advisories.mjs asks once by default, once for malware). */
+const noGithubAdvisories = (...pkgs) =>
+  Object.fromEntries(["", "&type=malware"].map((type) => [`https://api.github.com/advisories?ecosystem=npm&per_page=100${type}&affects=${pkgs.map(encodeURIComponent).join(",")}`, () => json([])]));
 
 /** A gzipped npm tarball of `files` (under package/) and its sha512 integrity. */
 function tarball(files) {
@@ -114,9 +117,6 @@ test("dependency ages: invalid or missing publish times are unknown, never old",
   assert.deepEqual(gate.unknown, ["trust-dates@1.1.0", "trust-dates@1.3.0", "trust-dates@1.4.0", "trust-dates@1.5.0"]);
   assert.deepEqual(gate.young.map((y) => y.pkg), ["trust-dates@1.2.0"]);
   await assert.rejects(dependencyAgeGate([], [], { minDays: Number.NaN }), /non-negative number/);
-  assert.throws(() => ageSetting("three"), /non-negative number/);
-  assert.throws(() => ageSetting(-1), /non-negative number/);
-  assert.equal(ageSetting("3"), 3);
 });
 
 test("a dependency under a commented packages header is still age-checked", async () => {
@@ -232,7 +232,7 @@ test("provenance must come from the accepted versions' repository and name this 
   assert.match((await check("2.0.1")).summary, /declares repository https:\/\/github.com\/attacker\/repo/);
   assert.match((await check("2.0.2")).summary, /provenance from https:\/\/github.com\/attacker\/repo, not https:\/\/github.com\/original\/repo/);
   assert.deepEqual(await check("2.0.3"), { ok: true, summary: "publisher maint, provenance (unverified) names https://github.com/original/repo refs/tags/v2.0.3" });
-  // Unverified provenance never earns trust (SUPPLY3-02): a switch to trusted publishing waits out the minimum age.
+  // Unverified provenance never earns trust: a switch to trusted publishing waits out the minimum age.
   assert.match((await check("2.0.4")).summary, /published by GitHub Actions, not by maint/);
   assert.match((await check("2.0.5")).summary, /doesn't name this tarball/);
   assert.equal(repoOf("git@github.com:Owner/Repo.git"), "https://github.com/owner/repo");
@@ -240,9 +240,33 @@ test("provenance must come from the accepted versions' repository and name this 
   assert.equal(repoOf({ url: "git+ssh://git@github.com/owner/repo.git" }), "https://github.com/owner/repo");
 });
 
+test("a fix from a new publisher gets no fast lane, though its unverified provenance names the usual repository", async () => {
+  const repo = "https://github.com/original/trusted";
+  const waive = (name, publisher) => {
+    const bytes = `${name} tarball`;
+    mockFetch({
+      [registry(name)]: () =>
+        json({
+          versions: {
+            "1.0.0": { _npmUser: MAINTAINER, repository: repo, dist: { attestations: {} } },
+            "1.0.1": { _npmUser: publisher, repository: repo, dist: { integrity: `sha512-${createHash("sha512").update(bytes).digest("base64")}`, attestations: {} } },
+          },
+          time: { "1.0.0": ago(30), "1.0.1": ago(1 / 24) },
+        }),
+      // No signature, certificate, signed checkpoint, inclusion proof or log entry.
+      [`https://registry.npmjs.org/-/npm/v1/attestations/${name}@1.0.1`]: () => json(attestation(name, "1.0.1", createHash("sha512").update(bytes).digest("hex"), repo, "refs/heads/main")),
+    });
+    const lane = makeFastLane({ basePackages: [`${name}@1.0.0`], openAdvisories: [{ id: "GHSA-known-fix", packages: [{ pkg: `${name}@1.0.0`, fixed: ["1.0.1"] }] }], advisories: async () => [], now: NOW });
+    return lane(`${name}@1.0.1`);
+  };
+  assert.equal(await waive("trust-new-publisher", { name: "GitHub Actions" }), null, "the hour-old fix waits out the minimum age");
+  assert.match(await waive("trust-usual-publisher", MAINTAINER), /^fixes GHSA-known-fix \(publisher maint, provenance \(unverified\) names https:\/\/github\.com\/original\/trusted refs\/heads\/main/);
+});
+
 test("the fast lane stays in the vulnerable version's 0.x line", async () => {
   const calls = mockFetch({
     "https://api.osv.dev/v1/querybatch": () => json({ results: [{}] }),
+    ...noGithubAdvisories("trust-zero@0.35.5"),
     [registry("trust-zero")]: () =>
       json({
         versions: { "0.35.4": { _npmUser: MAINTAINER }, "0.35.5": { _npmUser: MAINTAINER }, "0.99.0": { _npmUser: MAINTAINER } },
@@ -284,6 +308,7 @@ test("OSV continuations are followed and a short answer fails the scan", async (
     },
     "https://api.osv.dev/v1/vulns/GHSA-low": () => json({ id: "GHSA-low", database_specific: { severity: "LOW" }, affected: [] }),
     "https://api.osv.dev/v1/vulns/GHSA-crit": () => json({ id: "GHSA-crit", severity: [{ type: "CVSS_V3", score: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H" }], affected: [] }),
+    ...noGithubAdvisories("trust-a@1.0.0", "trust-b@1.0.0"),
   });
   const found = await findAdvisories(["trust-a@1.0.0", "trust-b@1.0.0"]);
   assert.deepEqual(found.map((a) => [a.id, a.severity, a.packages.map((p) => p.pkg).join()]), [["GHSA-crit", "CRITICAL", "trust-a@1.0.0"], ["GHSA-low", "LOW", "trust-a@1.0.0"]]);

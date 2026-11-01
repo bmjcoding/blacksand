@@ -27,15 +27,23 @@ function machine(id: string, capabilities: Record<string, unknown>): UpdateEvery
   };
 }
 
+// Up to 0.1.6-nightly.20261030.3940 the collector takes whether release archives are out and
+// lists the servers that wait for npm; since 3956 it takes neither and nothing waits.
+const collect = collectServerUpdateTargets as unknown as (
+  machines: ReadonlyArray<UpdateEverythingMachine>,
+  targetVersion: string,
+  releaseArchivesPublished: boolean,
+) => ReturnType<typeof collectServerUpdateTargets> & { readonly waitForNpm?: ReadonlyArray<unknown> };
+
 describe("blackout host updates", () => {
   it("updates a host whose T3 Blackout updater takes requests, without waiting for npm", () => {
-    const { targets, skipped, waitForNpm } = collectServerUpdateTargets(
+    const { targets, skipped, waitForNpm } = collect(
       [machine("build-host", { blackoutHostUpdate: true }), machine("manual", {})],
       "0.1.6-nightly.20261031.4000",
       false,
     );
     expect(targets.map((target) => [target.serverLabel, target.selfUpdate])).toEqual([["build-host", "blackout-host"]]);
-    expect(waitForNpm).toEqual([]);
+    expect(waitForNpm ?? []).toEqual([]);
     expect(skipped.map((entry) => [entry.label, entry.reason])).toEqual([["manual", "needs a manual update"]]);
   });
   it("keeps upstream's capability when a server has one", () => {

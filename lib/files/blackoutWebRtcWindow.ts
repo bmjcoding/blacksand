@@ -25,7 +25,7 @@ export function blackoutWebRtcWindows(electron: Pick<typeof Electron, "app" | "W
   let listening = false;
 
   // Runs right after boot-env.ts gave the new contents the app's policy.
-  const created =(_event: Electron.Event, contents: Electron.WebContents) => {
+  const created = (_event: Electron.Event, contents: Electron.WebContents) => {
     const opener = asking;
     if (opener === null || contents.getType() !== "window") return;
     asking = null;

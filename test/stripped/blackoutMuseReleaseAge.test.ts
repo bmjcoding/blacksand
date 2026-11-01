@@ -1,7 +1,7 @@
 // Copied to packages/provider-muse/src/server/ in a stripped upstream checkout and run there
 // (rules provider/muse-updates-minimum-age, provider/muse-updates-first-seen-file,
 // provider/release-age-file): Muse's automatic version check, an accepted exception, reports its
-// channel's version only after this server has seen it there for 3 days (APP3-04); the channel
+// channel's version only after this server has seen it there for 3 days; the channel
 // publishes no release dates.
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";

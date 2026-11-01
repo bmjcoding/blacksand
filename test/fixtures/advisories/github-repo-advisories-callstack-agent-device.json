@@ -1,0 +1,177 @@
+{
+  "recorded": {
+    "url": "https://api.github.com/repos/callstack/agent-device/security-advisories?state=published&per_page=100",
+    "at": "2026-10-31T05:08:00Z",
+    "status": 200,
+    "note": "descriptions and credits dropped; every other field as GitHub sent it"
+  },
+  "body": [
+    {
+      "ghsa_id": "GHSA-6845-fcpx-jc45",
+      "cve_id": null,
+      "url": "https://api.github.com/repos/callstack/agent-device/security-advisories/GHSA-6845-fcpx-jc45",
+      "html_url": "https://github.com/callstack/agent-device/security/advisories/GHSA-6845-fcpx-jc45",
+      "summary": "Maestro runScript bypasses the trustedScripts gate on remote flows and passes script paths through unchecked, allowing arbitrary host file reads and execution of host file contents in node:vm",
+      "severity": "high",
+      "identifiers": [
+        {
+          "value": "GHSA-6845-fcpx-jc45",
+          "type": "GHSA"
+        }
+      ],
+      "state": "published",
+      "published_at": "2026-10-30T06:57:07Z",
+      "updated_at": "2026-10-30T06:57:08Z",
+      "withdrawn_at": null,
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "agent-device"
+          },
+          "vulnerable_version_range": "<=0.21.34",
+          "patched_versions": "0.21.35",
+          "vulnerable_functions": []
+        }
+      ],
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:H/PR:L/UI:N/S:U/C:H/I:H/A:H",
+          "score": 7.5
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      },
+      "cwe_ids": [
+        "CWE-94",
+        "CWE-941"
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-xr68-vpwv-cgg9",
+      "cve_id": null,
+      "url": "https://api.github.com/repos/callstack/agent-device/security-advisories/GHSA-xr68-vpwv-cgg9",
+      "html_url": "https://github.com/callstack/agent-device/security/advisories/GHSA-xr68-vpwv-cgg9",
+      "summary": "screenshot/record/perf output paths are not restricted for remote callers, allowing arbitrary file writes of PNG/video/trace content on the daemon host",
+      "severity": "high",
+      "identifiers": [
+        {
+          "value": "GHSA-xr68-vpwv-cgg9",
+          "type": "GHSA"
+        }
+      ],
+      "state": "published",
+      "published_at": "2026-10-30T06:57:30Z",
+      "updated_at": "2026-10-30T06:57:30Z",
+      "withdrawn_at": null,
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "agent-device"
+          },
+          "vulnerable_version_range": "<= 0.21.34",
+          "patched_versions": "0.21.35",
+          "vulnerable_functions": []
+        }
+      ],
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:H/A:H",
+          "score": 8.1
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      },
+      "cwe_ids": [
+        "CWE-73"
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-f98f-hj3g-xmp4",
+      "cve_id": null,
+      "url": "https://api.github.com/repos/callstack/agent-device/security-advisories/GHSA-f98f-hj3g-xmp4",
+      "html_url": "https://github.com/callstack/agent-device/security/advisories/GHSA-f98f-hj3g-xmp4",
+      "summary": "iOS physical-device runner listens on all interfaces without authentication (reachable over Wi-Fi)",
+      "severity": "high",
+      "identifiers": [
+        {
+          "value": "GHSA-f98f-hj3g-xmp4",
+          "type": "GHSA"
+        }
+      ],
+      "state": "published",
+      "published_at": "2026-10-11T17:36:42Z",
+      "updated_at": "2026-10-11T17:36:42Z",
+      "withdrawn_at": null,
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "agent-device"
+          },
+          "vulnerable_version_range": "< 0.21.25",
+          "patched_versions": "0.21.25",
+          "vulnerable_functions": []
+        }
+      ],
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": null,
+          "score": null
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      },
+      "cwe_ids": []
+    },
+    {
+      "ghsa_id": "GHSA-m7q5-6423-2mwq",
+      "cve_id": null,
+      "url": "https://api.github.com/repos/callstack/agent-device/security-advisories/GHSA-m7q5-6423-2mwq",
+      "html_url": "https://github.com/callstack/agent-device/security/advisories/GHSA-m7q5-6423-2mwq",
+      "summary": "agent-device Project Config Redirects Remote Daemon Credentials",
+      "severity": "medium",
+      "identifiers": [
+        {
+          "value": "GHSA-m7q5-6423-2mwq",
+          "type": "GHSA"
+        }
+      ],
+      "state": "published",
+      "published_at": "2026-08-03T15:01:12Z",
+      "updated_at": "2026-08-03T15:01:13Z",
+      "withdrawn_at": null,
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "agent-device"
+          },
+          "vulnerable_version_range": ">= 0.8.0, <= 0.20.3",
+          "patched_versions": ">= 0.20.4",
+          "vulnerable_functions": []
+        }
+      ],
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": null,
+          "score": null
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      },
+      "cwe_ids": [
+        "CWE-200"
+      ]
+    }
+  ]
+}

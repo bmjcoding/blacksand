@@ -1,7 +1,7 @@
 // node --test test/: the smoke test's process handling (lib/smoke.mjs
 // observeServer), against small fixture servers: a server that dies, by an exit
-// code or by a signal, after answering fails the check (BUILD-03), and a server
-// that ignores SIGTERM is still stopped.
+// code or by a signal, after answering fails the check, and a server that
+// ignores SIGTERM is still stopped. Independent servers run at once.
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -37,36 +37,28 @@ async function observe(options) {
   }
 }
 
-test("a server that answers and keeps running passes, and is stopped", async () => {
-  const html = await observe({});
-  assert.match(html, /Content-Security-Policy/);
-});
-
-test("BUILD-03: a server killed by a signal after its first answer fails the smoke test", async () => {
-  for (const signal of ["SIGTERM", "SIGKILL", "SIGSEGV"]) {
-    // Dies after its first answer (polled about once a second), while it's watched.
-    await assert.rejects(observe({ delay: 1600, after: `process.kill(process.pid, "${signal}")` }), new RegExp(`was killed by ${signal} after it answered`), signal);
-  }
-});
-
-test("a server that exits on its own, before or after answering, fails", async () => {
-  await assert.rejects(observe({ delay: 1600, after: "process.exit(3)" }), /exited with 3 after it answered/);
-  await assert.rejects(observe({ after: "", delay: 0, observe: { args: ["-e", "process.exit(4)"] } }), /exited with 4 during the smoke test/);
-});
-
-test("a server that never answers fails at the startup deadline", async () => {
-  await assert.rejects(observe({ observe: { args: ["-e", "setInterval(() => {}, 1000)"], startupMs: 1500 } }), /never answered/);
-});
-
-test("a server that stops answering while watched fails", async () => {
-  await assert.rejects(observe({ after: "process.removeAllListeners(); require('node:http').globalAgent; for (const h of process._getActiveHandles()) if (h.close) h.close();" }), /stopped answering|exited with 0/);
-});
-
-test("the check runs on the first answer, and a server ignoring SIGTERM is still stopped", async () => {
-  await assert.rejects(observe({ html: "no csp", observe: { check: (html) => assert.ok(html.includes("Content-Security-Policy"), "missing CSP") } }), /missing CSP/);
+test("a server that answers and keeps running passes and is stopped, even one ignoring SIGTERM", async () => {
   const started = Date.now();
-  await observe({ after: "process.on('SIGTERM', () => {})" });
+  const [html] = await Promise.all([observe({}), observe({ after: "process.on('SIGTERM', () => {})" })]);
+  assert.match(html, /Content-Security-Policy/);
   assert.ok(Date.now() - started < 15_000);
+});
+
+test("a server killed by a signal, or exiting on its own, after its first answer fails the smoke test", async () => {
+  // Each dies after its first answer (polled about once a second), while it's watched.
+  await Promise.all([
+    ...["SIGTERM", "SIGKILL", "SIGSEGV"].map((signal) => assert.rejects(observe({ delay: 1600, after: `process.kill(process.pid, "${signal}")` }), new RegExp(`was killed by ${signal} after it answered`), signal)),
+    assert.rejects(observe({ delay: 1600, after: "process.exit(3)" }), /exited with 3 after it answered/),
+    assert.rejects(observe({ after: "", delay: 0, observe: { args: ["-e", "process.exit(4)"] } }), /exited with 4 during the smoke test/),
+  ]);
+});
+
+test("a server that never answers, stops answering while watched, or fails the check on its first answer fails", async () => {
+  await Promise.all([
+    assert.rejects(observe({ observe: { args: ["-e", "setInterval(() => {}, 1000)"], startupMs: 1500 } }), /never answered/),
+    assert.rejects(observe({ after: "process.removeAllListeners(); require('node:http').globalAgent; for (const h of process._getActiveHandles()) if (h.close) h.close();" }), /stopped answering|exited with 0/),
+    assert.rejects(observe({ html: "no csp", observe: { check: (html) => assert.ok(html.includes("Content-Security-Policy"), "missing CSP") } }), /missing CSP/),
+  ]);
 });
 
 test("helpers: exits are described, attempts read, the tripwire path is quoted", () => {

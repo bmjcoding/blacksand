@@ -92,8 +92,14 @@ jobs:
         with:
           node-version: 24
 
-      # Upstream's packageManager field picks the pnpm version.
-      - run: corepack enable
+      # install.sh's pnpm, from the registry tarballs it pins by SHA-512 (lib/pnpm.mjs
+      # checks the binary before each run). Not Corepack: that takes the version, its
+      # registry and its signing keys from the checkout (packageManager, .corepack.env).
+      - name: Pinned pnpm
+        timeout-minutes: 5
+        run: |
+          bash -c 'source ./install.sh && install_pnpm "$HOME/.local"'
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       # Upstream's Linux packager checks for these first (scripts/
       # build-desktop-artifact.ts LINUX_DESKTOP_BUILD_PREREQUISITES); the runner
@@ -104,8 +110,17 @@ jobs:
           sudo apt-get update -qq
           sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends libsecret-1-dev imagemagick
 
-      # The pinned commit itself, not its tag (a tag can move).
+      # The pinned commit itself, not its tag (a tag can move). A runner is no
+      # install: it builds as itself, said so explicitly (lib/install-config.mjs).
+      # The job's read-only token, for GitHub's advisory API alone (a young
+      # device tool's fast lane, lib/device-tools.mjs): unauthenticated, a
+      # runner's shared address has 60 requests an hour. The build takes it
+      # out of its environment before it starts anything (lib/github-token.mjs);
+      # the code it builds could reach the runner's own copy anyway.
       - name: Build the pinned release
+        env:
+          T3BLACKOUT_UNISOLATED_BUILD: "1"
+          T3BLACKOUT_GITHUB_TOKEN: ${{ github.token }}
         run: |
           sha=$(node -p "require('./pin.json').channels[process.env.CHANNEL].sha")
           node bin/t3blackout check --ref "$sha" --build

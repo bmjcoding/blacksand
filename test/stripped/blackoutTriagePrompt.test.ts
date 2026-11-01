@@ -1,7 +1,7 @@
 // Copied to apps/server/src/triage/ in a stripped upstream checkout and run there
 // (rule server/no-stock-commands-triage-prompt): the playbook and prompts a triage agent gets, as the
 // server builds them, never send the user to stock T3 or tell the agent to follow another playbook
-// (upstream's, which is stock T3's) in place of this one (decision M).
+// (upstream's, which is stock T3's) in place of this one.
 import { describe, expect, it } from "vite-plus/test";
 
 import { buildTriageAppPrompt, buildTriageLaunchPrompt, buildTriageSeedPrompt, TRIAGE_PLAYBOOK } from "./triagePrompt.ts";

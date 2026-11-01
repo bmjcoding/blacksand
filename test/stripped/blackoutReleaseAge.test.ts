@@ -15,6 +15,7 @@ import {
   resolveLatestProviderUpdateAction,
   resolveLatestProviderVersion,
   resolvePackageManagedProviderMaintenance,
+  resolveProviderMaintenanceCapabilitiesEffect,
 } from "./maintenanceResolver.ts";
 import * as ProviderLatestVersions from "./ProviderLatestVersions.ts";
 
@@ -151,6 +152,16 @@ it.layer(NodeServices.layer)("blackout installers without a minimum age", (it) =
       expect(capabilities.update?.lockKey).toBe("npm-global:/usr/local");
       expect(capabilities.update?.args.filter((arg) => /^--before=\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(arg))).toHaveLength(1);
       expect(capabilities.manualReason).toBeUndefined();
+    }),
+  );
+  // Since 0.1.6-nightly.20261031.3956 upstream answers with `npm view <package>@latest` (the
+  // latest tag, however young: npm view ignores --before) whenever npm is on PATH.
+  it.effect("keeps its own 3-day check with npm on PATH, never npm's latest tag", () =>
+    Effect.gen(function* () {
+      const npm = codex("npm", ["install", "-g", "@openai/codex@latest"], "npm-global:/usr/local");
+      const capabilities = yield* resolveProviderMaintenanceCapabilitiesEffect({ resolve: () => Effect.succeed(npm) });
+      expect(capabilities.latestVersion).toBeUndefined();
+      expect(capabilities.lookupLatestVersion).toBeUndefined();
     }),
   );
 });

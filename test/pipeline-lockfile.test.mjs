@@ -32,7 +32,7 @@ test("reachablePackages stops at a cut package and doesn't count what only it br
   assert.ok(cut.has("shared@1.0.0"), "still reachable without the overridden package");
 });
 
-test("the inventory is the resolved graph: override-added packages in, dropped ones out (PIPE-05)", () => {
+test("the inventory is the resolved graph: override-added packages in, dropped ones out", () => {
   const { packages, problems } = checkResolvedLock({ upstreamLock: UPSTREAM, resolvedLock: RESOLVED, overrides: OVERRIDES });
   assert.deepEqual(problems, []);
   assert.ok(packages.includes("newdep@3.0.0"), "a dependency the override brought in is scanned");
@@ -55,12 +55,12 @@ test("a resolved lockfile that dropped a package no override explains, or kept a
   assert.match((await checkedResolvedLock({ upstreamLock: UPSTREAM, resolvedLock: "lockfileVersion: '5.4'\n", overrides: OVERRIDES }, { meta: npmMeta })).problems.join(), /isn't supported/);
 });
 
-test("device tools in the inventory are the release's own, not every approval (PIPE-06)", async () => {
+test("device tools in the inventory are the release's own, not every approval", async () => {
   const pins = JSON.stringify({ "agent-device": "0.21.31", "expo-device-hub": "0.19.0-canary-20261023-1357114" });
-  const tools = deviceToolsInUse(pins);
+  const tools = deviceToolsInUse(pins, []);
   assert.deepEqual(tools, ["agent-device@0.21.31", "expo-device-hub@0.19.0-canary-20261023-1357114"]);
   const show = (at, file) => (file === "pnpm-lock.yaml" ? UPSTREAM : pins);
-  const { packages } = await alertInventory({ sha: "0".repeat(40), show, resolvedLock: RESOLVED, toolPackages: (tool) => [tool], stage: null, overrides: OVERRIDES, blackout: "b" }, { meta: npmMeta });
+  const { packages } = await alertInventory({ sha: "0".repeat(40), show, resolvedLock: RESOLVED, toolPackages: (tool) => [tool], stage: null, overrides: OVERRIDES, toolOverrides: [], blackout: "b" }, { meta: npmMeta });
   assert.ok(packages.includes("agent-device@0.21.31") && !packages.includes("agent-device@0.21.25"));
   assert.throws(() => deviceToolsInUse(null), /no longer pins device tools/);
   assert.throws(() => deviceToolsInUse('{"agent-device": "^1.0.0"}'), /no exact version/);

@@ -1,6 +1,6 @@
 // Copied to apps/web/src/components/ in a stripped upstream checkout and run there
 // (rule web/no-stock-release-links): the updater's "Read more" and release-history links, as the app
-// computes them, show upstream's commits, never a release page with stock T3 downloads (decision M).
+// computes them, show upstream's commits, never a release page with stock T3 downloads.
 import { describe, expect, it } from "vite-plus/test";
 
 import { getDesktopUpdateReleaseHistoryUrl, getDesktopUpdateReleaseUrl } from "./desktopUpdate.logic.ts";

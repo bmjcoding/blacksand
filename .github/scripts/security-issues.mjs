@@ -37,8 +37,11 @@ function readNewer(file, channel) {
   }
 }
 
+/** This run's page (GitHub Actions sets these), where its log lists every advisory a cut issue list leaves out. */
+const run = process.env.GITHUB_SERVER_URL && process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}` : null;
+
 if (positionals[0] === "advisories" && positionals[1]) {
-  await reconcileAdvisories(JSON.parse(fs.readFileSync(positionals[1], "utf8")), gh);
+  await reconcileAdvisories(JSON.parse(fs.readFileSync(positionals[1], "utf8")), gh, { run });
 } else if (positionals[0] === "held") {
   const report = readIfThere(values.report);
   // A failed evaluation fails this step too (reconcileHeld throws); its report goes to the log first.

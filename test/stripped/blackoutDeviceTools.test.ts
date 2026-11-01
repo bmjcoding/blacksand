@@ -1,9 +1,8 @@
 // Copied to apps/server/src/device/ in a stripped upstream checkout and run there
 // (rules server/device-tools-frozen, server/device-tools-native-assets-file):
 // an install's completion marker names the exact closure reviewed for it, so a
-// legacy or different install is redone (BUILD2-05), and installs run npm ci
-// with no install scripts, then place native files from lib/native-assets.json
-// (BUILD2-03).
+// legacy or different install is redone, and installs run npm ci with no
+// install scripts, then place native files from lib/native-assets.json.
 import { expect, it } from "@effect/vitest";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";

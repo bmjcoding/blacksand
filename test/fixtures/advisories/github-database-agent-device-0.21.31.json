@@ -1,0 +1,9 @@
+{
+  "recorded": {
+    "url": "https://api.github.com/advisories?affects=agent-device@0.21.31&ecosystem=npm&per_page=100",
+    "at": "2026-10-31T04:56:08Z",
+    "status": 200,
+    "note": "also empty with type=reviewed, unreviewed and malware; /advisories/GHSA-6845-fcpx-jc45 and /advisories/GHSA-xr68-vpwv-cgg9 answered 404"
+  },
+  "body": []
+}

@@ -1,5 +1,5 @@
 // Copied to apps/desktop/src/window/ in a stripped upstream checkout and run there (rule
-// desktop/context-menu-image-session, APP4-02): Copy Image on a subframe's image fetches it
+// desktop/context-menu-image-session): Copy Image on a subframe's image fetches it
 // through the session that showed it (a preview guest's own; the app's for the app's window),
 // never always the app's, with upstream's credential, redirect and timeout limits.
 import { beforeEach, expect, it, vi } from "vite-plus/test";

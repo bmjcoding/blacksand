@@ -1,5 +1,5 @@
 {
-  "note": "Security overrides applied to every build (rule deps/security-overrides). Each replaces one exact vulnerable version with the lowest same-major version that fixes every advisory against it, chosen 2026-10-30 from OSV.dev and checked for publisher and provenance continuity (lib/fastlane.mjs). Changing this file needs a commit the repository owner signs. Remove an entry once upstream ships the fix.",
+  "note": "Security overrides applied to every build. `overrides` (rule deps/security-overrides): each replaces one exact vulnerable version with the lowest same-major version that fixes every advisory against it, chosen 2026-10-30 from OSV.dev (agent-device, 2026-10-31, from its repository's own advisories) and checked for publisher and provenance continuity (lib/fastlane.mjs). `deviceTools` (rule server/device-tool-overrides): the same for a device tool version upstream pins in apps/server/src/device/deviceToolVersions.json, raised within its line (0.x: its minor) to the fix, which pin.json must keep a reviewed lock for (t3blackout device-tool-lock). Changing this file needs a commit the repository owner signs. Remove an entry once upstream ships the fix and the fix is at least 3 days old.",
   "overrides": [
     {
       "selector": "@modelcontextprotocol/sdk@1.29.0",
@@ -11,6 +11,14 @@
         "GHSA-f897-62hf-6gxq",
         "GHSA-6prh-2h8m-c8cw",
         "GHSA-rvq5-wwqv-78pq"
+      ]
+    },
+    {
+      "selector": "agent-device@0.21.32",
+      "version": "0.21.35",
+      "advisories": [
+        "GHSA-6845-fcpx-jc45",
+        "GHSA-xr68-vpwv-cgg9"
       ]
     },
     {
@@ -166,6 +174,16 @@
       "version": "4.6.6",
       "advisories": [
         "GHSA-mrhx-c7xc-m3w5"
+      ]
+    }
+  ],
+  "deviceTools": [
+    {
+      "selector": "agent-device@0.21.31",
+      "version": "0.21.35",
+      "advisories": [
+        "GHSA-6845-fcpx-jc45",
+        "GHSA-xr68-vpwv-cgg9"
       ]
     }
   ]

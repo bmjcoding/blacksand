@@ -1,0 +1,15 @@
+{
+  "recorded": {
+    "url": "https://api.osv.dev/v1/query",
+    "request": {
+      "package": {
+        "ecosystem": "npm",
+        "name": "agent-device"
+      },
+      "version": "0.21.31"
+    },
+    "at": "2026-10-31T05:12:00Z",
+    "status": 200
+  },
+  "body": {}
+}

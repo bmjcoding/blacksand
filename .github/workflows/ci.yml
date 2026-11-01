@@ -70,12 +70,15 @@ jobs:
       - name: pin.json and lib/overrides.json are valid, and every pinned tag names its commit upstream
         run: |
           node -e 'import("./lib/pin.mjs").then((m) => m.readPin()).then((p) => console.log(JSON.stringify(p.channels)))'
-          node -e 'import("./lib/overrides.mjs").then((m) => console.log(m.readOverrides().length, "security overrides"))'
+          node -e 'import("./lib/overrides.mjs").then((m) => console.log(m.readOverrides().length, "security overrides,", m.readToolOverrides().length, "device tool overrides"))'
           node bin/t3blackout pin-check
 
       # The pinned commit itself, not its tag (a tag can move; the step above
-      # catches that).
+      # catches that). A runner is no install: it checks as itself, said so
+      # explicitly (lib/install-config.mjs buildAsYouProblem).
       - name: Strip rules apply to the pinned commit
+        env:
+          T3BLACKOUT_UNISOLATED_BUILD: "1"
         run: |
           sha=$(node -p "require('./pin.json').channels.nightly.sha")
           node bin/t3blackout check --ref "$sha"

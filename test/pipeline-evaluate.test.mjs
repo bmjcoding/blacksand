@@ -34,6 +34,7 @@ function fakeIo({ files = {}, checks = {}, gate = async () => clean, builds = {}
     revParse: (ref) => SHAS[ref] ?? sha("f"),
     tags: () => Object.keys(SHAS),
     knownDeviceTools: () => new Set(["agent-device@0.21.25"]),
+    toolOverrides: [],
     reviewAddedDeviceTools: async (previous, next, known) => {
       const reviewed = new Set([...known, ...previous]);
       const added = [...new Set(next)].filter((tool) => !reviewed.has(tool));
@@ -69,14 +70,14 @@ function fakeIo({ files = {}, checks = {}, gate = async () => clean, builds = {}
   return { io, calls };
 }
 
-test("candidates: canonical tags on the channel, newer than the pin, newest release first (PIPE-13, SUPPLY-17)", () => {
+test("candidates: canonical tags on the channel, newer than the pin, newest release first", () => {
   const tags = ["v0.1.7-nightly.20261031.4000", "v0.1.7-nightly.badformat", "v0.1.6-nightly.20261030.3917", "v0.1.10-nightly.20261101.1", "v0.1.7-nightly.20261031.4001", "v0.1.8", "v00.1.9-nightly.20261101.2", "v0.1.7-preview.20261031.1"];
   assert.deepEqual(releaseCandidates(tags, "nightly", PINNED), ["v0.1.10-nightly.20261101.1", "v0.1.7-nightly.20261031.4001", "v0.1.7-nightly.20261031.4000"]);
   assert.deepEqual(releaseCandidates(tags, "nightly", PINNED, 1), ["v0.1.10-nightly.20261101.1"]);
   assert.deepEqual(releaseCandidates(tags, "stable", null), ["v0.1.8"]);
 });
 
-test("a held candidate's device tool approval doesn't carry over: the one pinned approves its own (SUPPLY-12)", async () => {
+test("a held candidate's device tool approval doesn't carry over: the one pinned approves its own", async () => {
   const files = { [sha("a")]: { "apps/server/src/device/deviceToolVersions.json": TOOLS("0.21.40") }, [sha("b")]: { "apps/server/src/device/deviceToolVersions.json": TOOLS("0.21.40") } };
   const { io, calls } = fakeIo({ files, checks: { [sha("a")]: { ok: false, message: "1 strict rule(s) no longer match upstream. Nothing was installed." } } });
   const result = await evaluateChannel({ channel: "nightly", pin: PIN }, io);
@@ -87,13 +88,13 @@ test("a held candidate's device tool approval doesn't carry over: the one pinned
   assert.deepEqual(
     calls.checkRules.map(({ sha: at, approvals }) => [at[0], approvals]),
     [["0", []], ["a", ["agent-device@0.21.40"]], ["b", ["agent-device@0.21.40"]]],
-    "one strip check for the pinned release and one per candidate, each with only its own approvals (SUPPLY-23)",
+    "one strip check for the pinned release and one per candidate, each with only its own approvals",
   );
   assert.match(result.report, /Passed over v0\.1\.7-nightly\.20261031\.4001:\n- 1 strict rule/);
   assert.deepEqual([...result.resolved.keys()], [sha("0"), sha("b")], "resolved lockfiles for the pinned release and the new pin");
 });
 
-test("a candidate that fails to evaluate is held, the next is still evaluated, and the report is written (PIPE-13)", async () => {
+test("a candidate that fails to evaluate is held, the next is still evaluated, and the report is written", async () => {
   const gate = async (base, lock, opts) => {
     if (opts?.waive !== undefined && lock === "broken") throw new Error("npm registry answered 500 for left-pad");
     return clean;
@@ -135,7 +136,7 @@ test("with --build: built once per passing candidate, what it left out pinned; a
   assert.match(result.report, /built and smoke-tested/);
 });
 
-test("the pinned release can't be resolved: candidates are still evaluated, the fast lane built from git alone (SUPPLY2-01)", async () => {
+test("the pinned release can't be resolved: candidates are still evaluated, the fast lane built from git alone", async () => {
   const { io } = fakeIo({ checks: { [sha("0")]: { ok: false, message: "1 strict rule(s) no longer match upstream." } } });
   let lanes = 0;
   io.makeFastLane = () => {
@@ -149,16 +150,17 @@ test("the pinned release can't be resolved: candidates are still evaluated, the 
   assert.ok(!result.resolved.has(sha("0")));
 });
 
-test("the alert inventory is the resolved graph plus the release's own device tools (PIPE-05, PIPE-06, SUPPLY-13)", async () => {
+test("the alert inventory is the resolved graph plus the release's own device tools", async () => {
   const pin = { ...PIN, deviceTools: ["agent-device@0.21.20", "agent-device@0.21.31"] };
   const seen = [];
   const io = {
     show: (at, file) => (file === "pnpm-lock.yaml" ? UPSTREAM : TOOLS("0.21.31")),
     resolvedLock: (at) => (at === sha("0") ? RESOLVED : null),
-    // Device tool closures and the staged install: test/pipeline-r2-inventory.test.mjs.
+    // Device tool closures and the staged install: test/pipeline-inventory.test.mjs.
     toolPackages: (tool) => [tool],
     stageRecord: () => null,
     npmMeta,
+    toolOverrides: [],
     openAdvisories: async (packages) => {
       seen.push(packages);
       return [{ id: "GHSA-x", severity: "HIGH", packages: [{ pkg: "newdep@3.0.0", fixed: [] }] }];
@@ -166,10 +168,10 @@ test("the alert inventory is the resolved graph plus the release's own device to
   };
   const report = await advisoryReport({ pin, channel: "nightly", overrides: OVERRIDES, now: () => new Date("2026-10-30T20:00:00Z") }, io);
   const gaps = [`the staged production install: the evaluate job left no stage record for ${sha("0").slice(0, 10)}`];
-  assert.deepEqual(report, { checkedAt: "2026-10-30T20:00:00.000Z", channel: "nightly", release: PINNED, sha: sha("0"), packages: seen[0].length, gaps, open: [{ id: "GHSA-x", severity: "HIGH", packages: [{ pkg: "newdep@3.0.0", fixed: [] }] }] });
+  assert.deepEqual(report, { checkedAt: "2026-10-30T20:00:00.000Z", channel: "nightly", release: PINNED, sha: sha("0"), packages: seen[0].length, sources: [], gaps, open: [{ id: "GHSA-x", severity: "HIGH", packages: [{ pkg: "newdep@3.0.0", fixed: [] }] }] });
   assert.ok(seen[0].includes("newdep@3.0.0") && !seen[0].includes("only-via-vuln@1.0.0"));
   assert.ok(seen[0].includes("agent-device@0.21.31") && !seen[0].includes("agent-device@0.21.20"), "an old approval isn't installed");
-  // No resolved lockfile (a failed evaluation): still checked, upstream's lockfile standing in, with a gap (PIPE3-03).
+  // No resolved lockfile (a failed evaluation): still checked, upstream's lockfile standing in, with a gap.
   const fallback = await advisoryReport({ pin: { ...pin, channels: { nightly: { ...pin.channels.nightly, sha: sha("9") } } }, channel: "nightly", overrides: OVERRIDES }, io);
   assert.match(fallback.gaps[0], /left no resolved lockfile for 9999999999; upstream's lockfile with the overrides applied stands in/);
   await assert.rejects(advisoryReport({ pin, channel: "stable", overrides: OVERRIDES }, io), /no stable pin/);

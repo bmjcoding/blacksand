@@ -21,3 +21,16 @@ expo-device-hub@0.15.3
 # skips non-TTY shells. Cloud providers (BrowserStack, Limrun, AWS Device Farm,
 # cloud.agent-device.dev) are reached only after `agent-device connect <provider>`.
 agent-device@0.21.25
+
+# The fix lib/overrides.json's deviceTools raises agent-device@0.21.31 to, for
+# GHSA-6845-fcpx-jc45 (Maestro runScript reads/runs host files on a remote flow)
+# and GHSA-xr68-vpwv-cgg9 (remote screenshot/record/perf paths write host files),
+# both <=0.21.34, published in callstack/agent-device's own advisories only.
+# Read 2026-10-31 against 0.21.31: the same 12 hosts and analytics names, the
+# same update-notifier opt-out and install scripts (none); the fix is
+# restrictRemoteHostInputs on remote HTTP requests and the runScript trust gate.
+# Both apply only to requests agent-device treats as remote (an
+# AGENT_DEVICE_HTTP_AUTH_HOOK, or its proxy); T3 runs it as a local HTTP daemon.
+# CLI: 0.21.31's commands and flags, plus --pick, --os, --image-tag and
+# --provider-network-hosts (proxy leases; refused by a local daemon).
+agent-device@0.21.35

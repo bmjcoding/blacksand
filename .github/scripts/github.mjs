@@ -5,7 +5,7 @@
 // comment isn't idempotent: after a failure that may have landed anyway (a lost
 // response, a 5xx) it's retried only once the caller's `landed` check (its
 // marker, reconcile.mjs) finds it isn't there, and never blindly. Injectable
-// fetch and sleep for tests (test/pipeline-issues.test.mjs).
+// fetch and sleep for tests (test/alerts-client.test.mjs).
 
 import { retryAfterMs } from "../../lib/http.mjs";
 

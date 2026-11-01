@@ -10,6 +10,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { PNPM_ENV, seedVitePlusHome, verifiedPnpm } from "../../lib/pnpm.mjs";
 import { STOCK_GUIDANCE } from "../../lib/rules.mjs";
 import { isMain } from "./is-main.mjs";
 
@@ -43,9 +44,12 @@ if (isMain(import.meta.url)) {
   });
   console.log(`running ${targets.join(", ")}`);
   // Never let the test run install anything (pnpm's verify-deps-before-run would, scripts and all).
-  const env = { ...process.env, npm_config_verify_deps_before_run: "false", pnpm_config_verify_deps_before_run: "false" };
+  const env = { ...process.env, ...PNPM_ENV, npm_config_verify_deps_before_run: "false", pnpm_config_verify_deps_before_run: "false" };
+  // Vite+ runs install.sh's pnpm too, never one it downloads (lib/pnpm.mjs seedVitePlusHome).
+  Object.assign(env, seedVitePlusHome(path.join(work, "..", "vite-plus-tests")));
   // The stock-guidance patterns, for the tests that check the links and prompts the app builds at run time.
   env.T3BLACKOUT_STOCK_GUIDANCE = JSON.stringify(stockGuidanceJson());
-  const result = spawnSync("pnpm", ["exec", "vp", "test", "run", ...targets], { cwd: work, stdio: "inherit", env });
+  // install.sh's pnpm by absolute path, its bytes checked (lib/pnpm.mjs), never one PATH finds in the checkout.
+  const result = spawnSync(verifiedPnpm(), ["exec", "vp", "test", "run", ...targets], { cwd: work, stdio: "inherit", env });
   process.exit(result.status ?? 1);
 }

@@ -1,6 +1,6 @@
 // Shared by test/trust-*.test.mjs: throwaway upstream, origin and clone
-// repositories with throwaway SSH keys, for self-update (lib/selfupdate.mjs), and a
-// mocked npm. Nothing here touches this clone or ~/.ssh.
+// repositories with throwaway SSH keys, for self-update and a fresh clone's check
+// (lib/selfupdate.mjs), and a mocked npm. Nothing here touches this clone or ~/.ssh.
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import * as fs from "node:fs";
@@ -13,7 +13,7 @@ import assert from "node:assert/strict";
 process.env.GIT_CONFIG_GLOBAL = "/dev/null";
 process.env.GIT_CONFIG_NOSYSTEM = "1";
 
-const { BOT_PRINCIPAL, selfUpdate } = await import("../lib/selfupdate.mjs");
+const { BOT_PRINCIPAL, selfUpdate, verifyHead } = await import("../lib/selfupdate.mjs");
 
 export const DAY = 86_400_000;
 export const scratch = [];
@@ -51,7 +51,7 @@ export const OLD_DEPS = { "trust-su-dep@1.0.0": "sha512-b2xk" };
 
 /** Upstream with three nightly tags (the middle one annotated), a branch that only looks like a tag, an owner and an evaluator key, origin, and a clone of it. `locks[n]`: release n's dependencies. */
 export function fixture({ knownHosts = "", knownTools = "", locks = [OLD_DEPS, OLD_DEPS, OLD_DEPS] } = {}) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "t3b-trust-selfupdate-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "t3b-trust-"));
   scratch.push(dir);
   const key = (name) => {
     const file = path.join(dir, name);
@@ -113,8 +113,57 @@ export function fixture({ knownHosts = "", knownTools = "", locks = [OLD_DEPS, O
   const logs = [];
   // The dependency-closure review runs npm; lib/device-tools.mjs's own tests cover it, so it passes here unless a test says otherwise.
   // Self-update fetches only from GitHub unless told where (`remote`): here, the local origin.
-  const update = (opts = {}) => selfUpdate({ repo: clone, remote: origin, upstream, report: (line) => logs.push(line), reviewClosure: async (pin) => ({ ok: true, pin, reasons: [], notes: [] }), ...opts });
-  return { dir, upstream, origin, clone, shas, owner, bot, stranger, commit, update, logs, head: () => run(clone, ["rev-parse", "HEAD"]) };
+  // The registry's clock agrees with the test's `now` unless a test says otherwise (lib/selfupdate.mjs clockProblem).
+  const update = (opts = {}) => selfUpdate({ repo: clone, remote: origin, upstream, report: (line) => logs.push(line), reviewClosure: passClosure, clock: async () => opts.now ?? Date.now(), ...opts });
+  /** verifyHead on `repo`, as bin/t3blackout's update runs it, with no advisories open. */
+  const verify = (repo, opts = {}) => verifyHead({ repo, upstream, report: (line) => logs.push(line), reviewClosure: passClosure, advisories: async () => [], clock: async () => opts.now ?? Date.now(), ...opts });
+  /** A new clone of origin as it is now (what install.sh's first build builds); `args` such as --depth go to git clone. */
+  const fresh = (name = "fresh", args = []) => {
+    const target = path.join(dir, name);
+    run(dir, ["clone", "-q", ...args, args.length ? `file://${origin}` : origin, target]);
+    return target;
+  };
+  /** A merge of `parents` (first parent first) with `tree`, signed by `who`, made origin's main. */
+  const merge = (parents, tree, who = owner) => {
+    const sha = run(origin, ["-c", "gpg.format=ssh", "-c", "gpg.ssh.program=ssh-keygen", "-c", `user.signingkey=${who.file}`, "commit-tree", tree, ...parents.flatMap((p) => ["-p", p]), "-S", "-m", "merge"]);
+    run(origin, ["reset", "-q", "--hard", sha]);
+    return sha;
+  };
+  return { dir, upstream, origin, clone, shas, owner, bot, stranger, commit, update, verify, fresh, merge, logs, head: () => run(clone, ["rev-parse", "HEAD"]) };
+}
+
+const passClosure = async (pin) => ({ ok: true, pin, reasons: [], notes: [] });
+
+/** The commit recorded as verified in `repo` (the record is "<sha> <when>"), or null. */
+export function recorded(repo) {
+  try {
+    return fs.readFileSync(path.join(repo, ".git", "t3blackout-verified"), "utf8").split(" ")[0];
+  } catch {
+    return null;
+  }
+}
+
+/** npm metadata (no tarballs) for { name: { version: { publishedAt, integrity, user, repository } } }, as fetch handlers by URL. */
+export function npmRoutes(packages) {
+  const routes = {};
+  for (const [name, versions] of Object.entries(packages)) {
+    const meta = { versions: {}, time: {} };
+    for (const [version, { publishedAt, integrity, user = "maintainer", repository = "github:example/dep" }] of Object.entries(versions)) {
+      meta.versions[version] = { name, version, _npmUser: { name: user }, repository, dist: { integrity, tarball: `https://registry.npmjs.org/${name}/-/${name}-${version}.tgz` } };
+      meta.time[version] = publishedAt;
+    }
+    routes[`https://registry.npmjs.org/${name}`] = () => new Response(JSON.stringify(meta), { status: 200 });
+  }
+  return routes;
+}
+
+export const YOUNG = "sha512-eW91bmc=";
+
+/** A fixture whose 3917 release adds `name`@1.0.0 (integrity YOUNG), and an evaluator commit pinning it; `routes` has npm publish it an hour before `now`. */
+export function youngPin(name, now = Date.now()) {
+  const f = fixture({ locks: [OLD_DEPS, { ...OLD_DEPS, [`${name}@1.0.0`]: YOUNG }, OLD_DEPS] });
+  f.commit(f.bot, { "pin.json": pin(NIGHTLY(3917), f.shas[1]) }, "Pin nightly");
+  return Object.assign(f, { routes: npmRoutes({ [name]: { "1.0.0": { publishedAt: new Date(now - 3_600_000).toISOString(), integrity: YOUNG } } }) });
 }
 
 /** pin.json naming `ref` at `sha`; each tool in `locked` gets a frozen dependency lock (lib/device-tools.mjs). */

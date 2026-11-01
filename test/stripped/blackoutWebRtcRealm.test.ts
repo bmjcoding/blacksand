@@ -1,5 +1,5 @@
 // Copied to packages/client-runtime/src/device/ in a stripped upstream checkout and run there
-// (rules desktop/webrtc-window-realm*, APP4-01): in the desktop app the device stream makes its
+// (rules desktop/webrtc-window-realm*): in the desktop app the device stream makes its
 // peer connections in the app's WebRTC window, once the app has marked it, and nowhere else;
 // in a browser or a subframe it's the page's own RTCPeerConnection.
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";

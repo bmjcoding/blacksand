@@ -34,6 +34,7 @@ function fakeIo({ tools = { [sha("0")]: "0.21.31", [sha("a")]: "0.21.31" }, rele
     show: (at, file) => (file === "pnpm-lock.yaml" ? UPSTREAM : tools[at] ? JSON.stringify({ "agent-device": tools[at] }) : null),
     unreleasedPin: (previous, next) => (released ? null : `pins nightly to ${next.channels.nightly.ref} at ${next.channels.nightly.sha.slice(0, 10)}, but upstream's ${next.channels.nightly.ref} is missing`),
     knownDeviceTools: () => new Set(["agent-device@0.21.25"]),
+    toolOverrides: [],
     reviewAddedDeviceTools: async (previous, next, known) => {
       const reviewed = new Set([...known, ...previous]);
       const added = [...new Set(next)].filter((tool) => !reviewed.has(tool));
@@ -65,7 +66,7 @@ test("a real, newer release that passes everything is signed; an identical pin i
   assert.equal(await verify(structuredClone(CURRENT)).result, "unchanged");
 });
 
-test("an approval for a device tool the release doesn't pin is refused (PIPE-01, SUPPLY-03)", async () => {
+test("an approval for a device tool the release doesn't pin is refused", async () => {
   await assert.rejects(verify(moved({}, ["agent-device@0.21.31", "unreviewed-attacker-tool@1.0.0"])).result, /approves device tools .* doesn't pin: unreviewed-attacker-tool@1\.0\.0/);
 });
 
@@ -103,7 +104,7 @@ test("dependencies under the minimum age are refused, with the fast lane the eva
   assert.equal(typeof waive, "function", "the fast lane from the pinned release's exposure");
   waive = "unset";
   await verify(moved(), { gate: watch, resolved: { [sha("a")]: UPSTREAM } }).result;
-  assert.equal(typeof waive, "function", "the fast lane comes from upstream's own lockfile, not the evaluate job's resolution (SUPPLY2-01)");
+  assert.equal(typeof waive, "function", "the fast lane comes from upstream's own lockfile, not the evaluate job's resolution");
 });
 
 test("the resolved lockfile must be there and fit upstream's", async () => {

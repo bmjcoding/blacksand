@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import { applyRules, findHosts, hostsIn, insideRoot, scanForbidden } from "../lib/strip-engine.mjs";
 import { isReservedHost } from "../lib/build.mjs";
 import loopback from "../lib/files/loopback.cjs";
+import { makeRules } from "../lib/rules.mjs";
 
 const scratch = () => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "t3b-build-strip-")));
 const quiet = (fn) => {
@@ -39,6 +40,12 @@ test("rules replace, write, transform and rebrand inside the checkout", () => {
   assert.equal(fs.readFileSync(path.join(root, "src", "new", "b.ts"), "utf8"), "export {};\n");
 });
 
+test("every string anchor has a string replacement", () => {
+  for (const rule of makeRules({ updater: { node: "n", launcher: "l", path: "p" } })) {
+    for (const edit of rule.edits ?? []) if (typeof edit.find === "string") assert.equal(typeof edit.replace, "string", rule.id);
+  }
+});
+
 test("a missing anchor is drift, and a regex anchor carries its pattern", () => {
   const root = scratch();
   fs.writeFileSync(path.join(root, "a.ts"), "x\n");
@@ -48,7 +55,7 @@ test("a missing anchor is drift, and a regex anchor carries its pattern", () => 
   assert.ok(failures[0].pattern instanceof RegExp);
 });
 
-test("BUILD-11: a symlink in the checkout never redirects a rule's write", () => {
+test("a symlink in the checkout never redirects a rule's write", () => {
   const root = scratch();
   const outside = scratch();
   const victim = path.join(outside, "victim.png");
@@ -75,7 +82,7 @@ test("BUILD-11: a symlink in the checkout never redirects a rule's write", () =>
   assert.equal(fs.readFileSync(path.join(root, "web", "real.ts"), "utf8"), "T3 Blackout");
 });
 
-test("BUILD-06: hosts are read the way a URL parser reads them", () => {
+test("hosts are read the way a URL parser reads them", () => {
   const cases = {
     "https://example.com@unreviewed.tld/upload": ["unreviewed.tld"],
     "https://u:p@x.example.dev:8443/": ["x.example.dev"],
@@ -111,11 +118,11 @@ test("findHosts names where each host first appears, skipping tests and links ou
   assert.deepEqual([...hosts], [["telemetry.example.org", "apps/web/a.ts:2"]]);
 });
 
-test("BUILD-07: example.com/net/org need a known-hosts entry; reserved TLDs and loopback don't", () => {
+test("reserved TLDs and loopback need no known-hosts entry; example.com/net/org, which resolve, and look-alikes do", () => {
   for (const host of ["x.invalid", "t3-boot.test", "foo.localhost", "FOO.LOCALHOST.", "a.example", "127.0.0.1", "127.9.9.9", "0.0.0.0", "::1", "::"]) {
     assert.equal(isReservedHost(host), true, host);
   }
-  for (const host of ["example.com", "example.net", "api.example.org", "127.collector.attacker.tld", "10.0.0.1", "169.254.169.254", "fe80::1"]) {
+  for (const host of ["example.com", "example.net", "api.example.org", "example.attacker.com", "examples.com", "box.example.ts.net", "invalid.com", "github.com", "127.collector.attacker.tld", "10.0.0.1", "169.254.169.254", "fe80::1"]) {
     assert.equal(isReservedHost(host), false, host);
   }
   assert.equal(loopback.isLoopbackAddress("::ffff:127.0.0.1"), true);
@@ -124,7 +131,7 @@ test("BUILD-07: example.com/net/org need a known-hosts entry; reserved TLDs and 
   assert.equal(loopback.isLoopbackAddress("127.collector.tld"), false);
 });
 
-test("BUILD-10: the forbidden scan reads unpacked node_modules, binaries, any case, UTF-16", () => {
+test("the forbidden scan reads unpacked node_modules, binaries, any case, UTF-16", () => {
   const root = scratch();
   const unpacked = path.join(root, "Resources", "app.asar.unpacked", "node_modules", "x");
   fs.mkdirSync(unpacked, { recursive: true });
