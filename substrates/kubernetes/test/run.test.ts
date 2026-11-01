@@ -7,6 +7,7 @@ import { test } from "node:test";
 import { DEADLINE, LABEL, NS, proxyObjects, runNames, sandboxObjects } from "../src/manifests.ts";
 import { FLOOR } from "../src/node.ts";
 import { parseAllow, parseRoute } from "../src/policy.ts";
+import { provisionReceipts, receiptDir } from "../src/receipt.ts";
 import { recordProblems } from "../src/record.ts";
 import { hostBundle, reconcile, runOnce, type RunDeps, type RunSpec } from "../src/run.ts";
 import { AGENT_IMAGE, PROXY_IMAGE, fakeCluster, fakeRepo, labelled, sealedAudit, type Call } from "./fake-cluster.ts";
@@ -42,7 +43,7 @@ function setup(overrides: Parameters<typeof fakeCluster>[2] = {}, extra: Partial
     proxyImage: PROXY_IMAGE,
     timeoutSeconds: 60,
     key: "case-7/repeat-2",
-    out: path.join(fs.mkdtempSync(path.join(os.tmpdir(), "substrate-k8s-run-")), "out"),
+    out: receiptDir(provisionReceipts(fs.mkdtempSync(path.join(os.tmpdir(), "substrate-k8s-run-"))), "case-7/repeat-2"),
     fake: { allowed: "example.com:443", denied: "example.org:443", direct: ["1.1.1.1:443"] },
   };
   return { cluster, deps, spec };

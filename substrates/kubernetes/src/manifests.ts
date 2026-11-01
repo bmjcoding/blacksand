@@ -6,7 +6,8 @@
 //   egress namespace: ConfigMap and Pod `p<hex>` (the proxy, holding the route
 //     credential), and a NetworkPolicy letting only this run's sandbox in.
 //   runs namespace: NetworkPolicy `s<hex>` letting the sandbox reach only its
-//     proxy, ConfigMap `s<hex>` (the run's inputs, read-only), Sandbox `s<hex>`.
+//     proxy, ConfigMap `s<hex>` (the run's inputs, read-only, and a command's
+//     input files), Sandbox `s<hex>`.
 // Every one carries the run label and its deadline, so `setup` and `run` can
 // delete whatever a lost runner left behind.
 
@@ -91,7 +92,8 @@ export interface ProxyInput {
   image: string;
   /** The proxy's source and its config, as files. */
   files: { "proxy.ts": string; "config.json": string };
-  route: RouteSpec;
+  /** Null: no model route, so no credential is mounted. */
+  route: RouteSpec | null;
   /** The Pod's own lifetime, enforced by the kubelet whatever happens to the runner. */
   deadlineSeconds: number;
   /** Seconds since the epoch, for reconciliation. */
@@ -100,7 +102,7 @@ export interface ProxyInput {
 
 export function proxyObjects({ names, image, files, route, deadlineSeconds, deadline }: ProxyInput): Obj[] {
   const meta = (name: string) => ({ name, namespace: NS.egress, labels: labels(names.id, "proxy"), annotations: { [DEADLINE]: String(deadline) } });
-  const secret = `secret-${route.kind}`;
+  const secret = route ? { name: `secret-${route.kind}`, mount: secretMount(route.kind), secretName: route.secret } : null;
   return [
     { apiVersion: "v1", kind: "ConfigMap", metadata: meta(names.proxy), data: files },
     {
@@ -120,15 +122,12 @@ export function proxyObjects({ names, image, files, route, deadlineSeconds, dead
             securityContext: containerSecurity,
             resources: { requests: { cpu: "100m", memory: "64Mi", "ephemeral-storage": "16Mi" }, limits: { cpu: "1", memory: "256Mi", "ephemeral-storage": "64Mi" } },
             readinessProbe: { tcpSocket: { port: PORTS.model }, periodSeconds: 1 },
-            volumeMounts: [
-              { name: "proxy", mountPath: "/proxy", readOnly: true },
-              { name: secret, mountPath: secretMount(route.kind), readOnly: true },
-            ],
+            volumeMounts: [{ name: "proxy", mountPath: "/proxy", readOnly: true }, ...(secret ? [{ name: secret.name, mountPath: secret.mount, readOnly: true }] : [])],
           },
         ],
         volumes: [
           { name: "proxy", configMap: { name: names.proxy, defaultMode: 0o444 } },
-          { name: secret, secret: { secretName: route.secret, defaultMode: 0o400, items: [{ key: "key", path: "key" }] } },
+          ...(secret ? [{ name: secret.name, secret: { secretName: secret.secretName, defaultMode: 0o400, items: [{ key: "key", path: "key" }] } }] : []),
         ],
       },
     },
@@ -168,6 +167,8 @@ export const TRIPWIRE_SCRIPT = [
 ].join("\n");
 
 export const TOOLS_MOUNT = "/opt/agent-tools";
+/** Where a command's input files are mounted, read-only, inside its workspace (/workspace, the command's working directory). */
+export const COMMAND_INPUTS = "/workspace/inputs";
 /** The agent's HOME: its own empty volume, like /tmp and the workspace. */
 export const HOME_MOUNT = "/home/agent";
 
@@ -180,6 +181,8 @@ export interface SandboxInput {
   tripwire: { image: string; canary: { host: string; port: number } };
   /** Files under /run/blacksand/inputs, read-only to the agent. */
   inputs: Record<string, string>;
+  /** A command's input files by relative path, mounted read-only at COMMAND_INPUTS (an empty read-only volume when there are none); undefined for an agent. */
+  files?: Record<string, Buffer>;
   env: Record<string, string>;
   /** The Pod's own deadline, enforced by the kubelet even if the runner is gone. */
   deadlineSeconds: number;
@@ -189,8 +192,13 @@ export interface SandboxInput {
   deadline: number;
 }
 
-export function sandboxObjects({ names, image, toolsImage, tripwire, inputs, env, deadlineSeconds, shutdownTime, deadline }: SandboxInput): Obj[] {
+export function sandboxObjects({ names, image, toolsImage, tripwire, inputs, files, env, deadlineSeconds, shutdownTime, deadline }: SandboxInput): Obj[] {
   const meta = { name: names.sandbox, namespace: NS.runs, labels: labels(names.id, "sandbox"), annotations: { [DEADLINE]: String(deadline) } };
+  // Input files ride in the same ConfigMap as binaryData (exact bytes), under keys of their own, each projected to its path.
+  const paths = Object.keys(files ?? {}).sort();
+  const binaryData = Object.fromEntries(paths.map((p, i) => [`file.${i}`, (files?.[p] as Buffer).toString("base64")]));
+  // A command always has its inputs mount, so inputs/ is never its own writable output (which collection leaves out).
+  const filesVolume = !files ? null : paths.length ? { configMap: { name: names.sandbox, defaultMode: 0o444, items: paths.map((path, i) => ({ key: `file.${i}`, path })) } } : { emptyDir: { sizeLimit: "1Mi" } };
   return [
     {
       apiVersion: "networking.k8s.io/v1",
@@ -207,7 +215,7 @@ export function sandboxObjects({ names, image, toolsImage, tripwire, inputs, env
         ],
       },
     },
-    { apiVersion: "v1", kind: "ConfigMap", metadata: meta, data: inputs },
+    { apiVersion: "v1", kind: "ConfigMap", metadata: meta, data: inputs, ...(paths.length ? { binaryData } : {}) },
     {
       apiVersion: SANDBOX_API,
       kind: "Sandbox",
@@ -247,6 +255,7 @@ export function sandboxObjects({ names, image, toolsImage, tripwire, inputs, env
                   { name: "scratch", mountPath: "/tmp" },
                   { name: "home", mountPath: HOME_MOUNT },
                   { name: "inputs", mountPath: "/run/blacksand/inputs", readOnly: true },
+                  ...(filesVolume ? [{ name: "files", mountPath: COMMAND_INPUTS, readOnly: true }] : []),
                   ...(toolsImage ? [{ name: "tools", mountPath: TOOLS_MOUNT, readOnly: true }] : []),
                 ],
               },
@@ -255,7 +264,8 @@ export function sandboxObjects({ names, image, toolsImage, tripwire, inputs, env
               { name: "workspace", emptyDir: { sizeLimit: "4Gi" } },
               { name: "scratch", emptyDir: { sizeLimit: "2Gi" } },
               { name: "home", emptyDir: { sizeLimit: "1Gi" } },
-              { name: "inputs", configMap: { name: names.sandbox, defaultMode: 0o444 } },
+              { name: "inputs", configMap: { name: names.sandbox, defaultMode: 0o444, items: Object.keys(inputs).sort().map((key) => ({ key, path: key })) } },
+              ...(filesVolume ? [{ name: "files", ...filesVolume }] : []),
               ...(toolsImage ? [{ name: "tools", image: { reference: assertPinned(toolsImage), pullPolicy: "IfNotPresent" } }] : []),
             ],
           },

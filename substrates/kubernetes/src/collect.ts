@@ -11,8 +11,14 @@
 // output, dependencies). A file the base tracks is always compared, ignore
 // rules or not, and the .gitignore files are themselves in the diff, so no
 // rule the agent writes can hide a change to the repository.
+//
+// A command's files (collectFiles) come from the same kind of export: read
+// here, each regular file copied out by this process into a directory only it
+// writes, with its digest. Nothing in the archive is extracted by tar, and no
+// link in it is ever followed or made.
 
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -223,4 +229,99 @@ export function collectPatch(bundle: Buffer, base: string, exportTar: string): C
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
+}
+
+export interface OutputFile {
+  /** Relative to the command's workspace. */
+  path: string;
+  sha256: string;
+  bytes: number;
+}
+
+export interface CollectedFiles {
+  files: OutputFile[];
+  /** Entries that aren't regular files or have paths it won't write (symlinks, devices, `..`, `.git`). */
+  skipped: number;
+}
+
+/** The most files a command may leave: enough for any build output a record should list. */
+export const MAX_OUTPUT_FILES = 10_000;
+
+/**
+ * Copies every regular file in the export into `dir` (which must not exist
+ * yet), except the subtree `exclude` (the read-only inputs), and returns each
+ * with its digest. Paths that would land on the same file on a case- or
+ * normalization-insensitive disk fail it, so the directory holds exactly what
+ * the list says on any runner.
+ */
+export function collectFiles(exportTar: string, dir: string, exclude: string): CollectedFiles {
+  let skipped = 0;
+  const kept = new Map<string, TarEntry>();
+  for (const e of readTar(exportTar)) {
+    if (e.kind === "dir") continue;
+    if (e.kind === "hardlink") throw new CollectError("the export has a hard-link entry: it didn't come from the run's exporter");
+    const p = cleanPath(e.path);
+    if (p === exclude || p?.startsWith(`${exclude}/`)) continue;
+    if (!p || e.kind !== "file") {
+      skipped++;
+      continue;
+    }
+    kept.set(p, e); // a later entry for the same path wins, as extraction would
+  }
+  if (kept.size > MAX_OUTPUT_FILES) throw new CollectError(`the command left ${kept.size} files, over ${MAX_OUTPUT_FILES}`);
+  const folded = new Map<string, string>();
+  for (const p of kept.keys()) {
+    const fold = p.normalize("NFC").toLowerCase();
+    const other = folded.get(fold);
+    if (other !== undefined) throw new CollectError(`the command left ${JSON.stringify(other)} and ${JSON.stringify(p)}, one file on a case-insensitive disk`);
+    folded.set(fold, p);
+  }
+
+  fs.mkdirSync(dir, { mode: 0o700 });
+  const dirs = new Set([dir]);
+  const files: OutputFile[] = [];
+  const fd = fs.openSync(exportTar, "r");
+  try {
+    for (const [p, e] of [...kept].sort(([a], [b]) => (a < b ? -1 : 1))) {
+      // Each directory made here, one level at a time: nothing in `dir` was made by anyone else, so no link can redirect a write.
+      let at = dir;
+      for (const part of p.split("/").slice(0, -1)) {
+        at = path.join(at, part);
+        dirs.add(at);
+        try {
+          fs.mkdirSync(at, { mode: 0o700 });
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "EEXIST" || !fs.lstatSync(at).isDirectory()) throw new CollectError(`the command left ${JSON.stringify(p)} under a path that is a file`);
+        }
+      }
+      const hash = createHash("sha256");
+      const out = fs.openSync(path.join(dir, p), "wx", 0o600);
+      try {
+        const chunk = Buffer.alloc(Math.min(e.size, 1024 * 1024));
+        for (let done = 0; done < e.size; ) {
+          const n = fs.readSync(fd, chunk, 0, Math.min(chunk.length, e.size - done), e.offset + done);
+          if (n <= 0) throw new CollectError("the export ended inside a file");
+          hash.update(chunk.subarray(0, n));
+          fs.writeFileSync(out, chunk.subarray(0, n)); // all n bytes, however many writes that takes
+          done += n;
+        }
+        fs.fsyncSync(out);
+      } finally {
+        fs.closeSync(out);
+      }
+      files.push({ path: p, sha256: hash.digest("hex"), bytes: e.size });
+    }
+  } finally {
+    fs.closeSync(fd);
+  }
+  // Every name on disk before the record that lists it: each directory synced, deepest first.
+  for (const d of [...dirs].sort((a, b) => b.length - a.length)) {
+    const dfd = fs.openSync(d, "r");
+    try {
+      fs.fsyncSync(dfd);
+    } finally {
+      fs.closeSync(dfd);
+    }
+  }
+  return { files, skipped };
 }

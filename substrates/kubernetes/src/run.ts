@@ -1,8 +1,13 @@
 // Per-run mode: one task in a fresh Sandbox, start to finish.
 //
-//   preflight (reconcile, floor, policies) -> bundle (outside) -> proxy Pod
+//   [claim] -> preflight (reconcile, floor, policies) -> bundle (outside) -> proxy Pod
 //   -> Sandbox (tripwire) -> clone -> agent -> freeze -> export
 //   -> seal the proxy -> its audit -> teardown (always) -> patch (outside) -> record
+//
+// The command adapter runs the same way without a repository: no bundle or
+// clone, its argv run in /workspace with its input files read-only there, and
+// the files it wrote collected outside instead of a patch. Under a caller's key,
+// the output directory is the key's durable receipt (receipt.ts).
 //
 // Every object a run creates carries its run label and deadline, so teardown
 // is one delete per namespace, its check one list per namespace, and a run
@@ -21,23 +26,32 @@ import { blacksandInfo } from "../../../src/core/envelope.ts";
 import { agentEnv, agentNamed, type AgentName } from "./agents.ts";
 import { readAudit } from "./audit.ts";
 import { census, deleteObjects, reconcile } from "./lifecycle.ts";
-import { collectPatch } from "./collect.ts";
+import { collectFiles, collectPatch } from "./collect.ts";
 import { getJson, must, type Kubectl, type KubectlOptions, type KubectlResult } from "./kubectl.ts";
-import { LABEL, NS, assertPinned, list, proxyObjects, runNames, sandboxObjects } from "./manifests.ts";
+import { COMMAND_INPUTS, LABEL, NS, assertPinned, list, proxyObjects, runNames, sandboxObjects } from "./manifests.ts";
 import { FLOOR, FLOOR_ID } from "./node.ts";
 import { assertModel, canonical, DEFAULT_LIMITS, proxyConfig, sha256, type Allow, type Limits, type RouteSpec } from "./policy.ts";
+import { answerFromReceipt, CLAIM_SCHEMA, publishDurable, takeClaim, writeDurable } from "./receipt.ts";
 import { recordProblems, RUN_SCHEMA, type Artifact, type RunRecord } from "./record.ts";
 
 const SANDBOX_DIR = new URL("../sandbox/", import.meta.url);
 /** A file from sandbox/: on disk beside this module, or, in a single binary, the copy scripts/build-sea.ts embedded as `sandbox/NAME`. */
 export const sandboxFile = (name: string) => (isSea() ? getAsset(`sandbox/${name}`, "utf8") : fs.readFileSync(new URL(name, SANDBOX_DIR), "utf8"));
 
+/** What the command adapter runs: an argument list (never a shell line) and its input files by relative path. */
+export interface CommandSpec {
+  argv: string[];
+  inputs: Record<string, Buffer>;
+}
+
 export interface RunSpec {
-  /** A local git repository (its committed HEAD) or an https URL, cloned here, outside the sandbox. */
-  repo: string;
+  /** A local git repository (its committed HEAD) or an https URL, cloned here, outside the sandbox; null for a command. */
+  repo: string | null;
+  /** The agent's prompt; "" for a command. */
   prompt: string;
   agent: AgentName;
-  model: string;
+  /** Null only for a command with no model route. */
+  model: string | null;
   /** The models the run may name; the agent's model is always among them. */
   models: string[];
   routes: RouteSpec[];
@@ -51,10 +65,12 @@ export interface RunSpec {
   maxModelRequests?: number;
   /** Time the run may take beyond the agent's own (start, clone, collect) before everything of it expires. */
   slackSeconds?: number;
-  /** The caller's own id for the run, recorded as given. */
+  /** The caller's own id for the run, recorded as given. With a key, `out` is its receipt (receiptDir): claimed with one mkdir, and a claim already there is answered from, never run again. */
   key: string | null;
-  /** Directory for the record and artifacts; must not exist yet. */
+  /** Directory for the record and artifacts: with a key, receiptDir(root, key); without one, a directory that doesn't exist yet. */
   out: string;
+  /** For the command adapter. */
+  command?: CommandSpec;
   /** For the fake agent: where its allowed, denied and direct calls go. */
   fake?: { allowed: string; denied: string; direct: string[] };
 }
@@ -122,12 +138,19 @@ function hashFile(file: string): string {
   try {
     const chunk = Buffer.alloc(1024 * 1024);
     for (let n; (n = fs.readSync(fd, chunk)) > 0; ) hash.update(chunk.subarray(0, n));
+    fs.fsyncSync(fd); // on disk before the record that names it
   } finally {
     fs.closeSync(fd);
   }
   return hash.digest("hex");
 }
 const STEPS = "/run/blacksand/inputs/steps.sh";
+/** A command's limits: what fits in its inputs ConfigMap (1 MiB in all) with room for the rest. */
+const MAX_ARGV_BYTES = 64 * 1024;
+const MAX_INPUT_BYTES = 768 * 1024;
+const MAX_INPUT_FILES = 1000;
+/** An input path: relative, plain segments, none starting with a dot. */
+const INPUT_SEGMENT = /^[A-Za-z0-9_][A-Za-z0-9._+-]*$/;
 const READY_TIMEOUT_S = 300;
 const EXPORT_MAX = 1024 * 1024 * 1024;
 
@@ -144,24 +167,71 @@ const sameDigest = (resolved: string | null, pinned: string) => digestOf(resolve
 /** The highest request budget a run may ask for. */
 export const MAX_MODEL_REQUESTS = 100_000;
 
+/** The run's model route: the agent's own kind, or for the command adapter, the one the caller gave, if any. */
+function routeOf(spec: RunSpec): RouteSpec | null {
+  const agent = agentNamed(spec.agent);
+  return (agent.route ? spec.routes.find((r) => r.kind === agent.route) : spec.routes[0]) ?? null;
+}
+
+function checkCommand(spec: RunSpec): void {
+  const command = spec.command;
+  if (!command || spec.repo !== null || spec.prompt !== "") throw new Error("the command adapter takes an argv and input files, not a repository or a prompt");
+  if (spec.routes.length > 1) throw new Error("a command takes at most one model route");
+  if (!command.argv.length || command.argv.some((a) => typeof a !== "string" || a.includes("\0"))) throw new Error("a command needs an argv: one or more arguments, none with a NUL");
+  if (Buffer.byteLength(command.argv.join("")) > MAX_ARGV_BYTES) throw new Error(`a command's argv is over ${MAX_ARGV_BYTES} bytes`);
+  const names = Object.keys(command.inputs);
+  if (names.length > MAX_INPUT_FILES) throw new Error(`a command takes at most ${MAX_INPUT_FILES} input files`);
+  if (Object.values(command.inputs).reduce((n, data) => n + data.length, 0) > MAX_INPUT_BYTES) throw new Error(`a command's input files are over ${MAX_INPUT_BYTES} bytes in all`);
+  for (const name of names) {
+    if (name.length > 255 || !name.split("/").every((part) => INPUT_SEGMENT.test(part))) throw new Error(`input ${JSON.stringify(name)}: a relative path of plain segments, none starting with a dot`);
+    if (names.some((other) => other.startsWith(`${name}/`))) throw new Error(`input ${JSON.stringify(name)} is both a file and a directory`);
+  }
+}
+
 /** Checks a spec before anything is created; throws saying what's wrong. */
 export function checkSpec(spec: RunSpec): void {
   const agent = agentNamed(spec.agent);
-  assertModel(spec.model);
+  if (agent.name === "command") checkCommand(spec);
+  else if (spec.command || spec.repo === null) throw new Error(`agent ${agent.name} takes a repository and a prompt, not a command`);
+  const route = routeOf(spec);
   spec.models.forEach(assertModel);
-  if (!spec.models.includes(spec.model)) throw new Error(`the agent's model ${spec.model} must be among the granted models`);
+  if (route || agent.route) {
+    if (spec.model === null) throw new Error(`a run with a model route needs a model`);
+    assertModel(spec.model);
+    if (!spec.models.includes(spec.model)) throw new Error(`the agent's model ${spec.model} must be among the granted models`);
+  } else if (spec.model !== null || spec.models.length) throw new Error("a command with no model route can't be granted models");
   assertPinned(spec.image);
   assertPinned(spec.proxyImage);
   if (spec.toolsImage) assertPinned(spec.toolsImage);
-  if (!spec.routes.some((r) => r.kind === agent.route)) throw new Error(`agent ${agent.name} needs a ${agent.route} route (--route ${agent.route}=URL@SECRET)`);
+  if (agent.route && !route) throw new Error(`agent ${agent.name} needs a ${agent.route} route (--route ${agent.route}=URL@SECRET)`);
   if (!Number.isInteger(spec.timeoutSeconds) || spec.timeoutSeconds < 10 || spec.timeoutSeconds > 24 * 3600) throw new Error("timeout must be 10 s to 24 h");
   const budget = spec.maxModelRequests ?? DEFAULT_LIMITS.requests_total;
   if (!Number.isInteger(budget) || budget < 1 || budget > MAX_MODEL_REQUESTS) throw new Error(`the model request budget must be 1 to ${MAX_MODEL_REQUESTS}`);
-  if (fs.existsSync(spec.out)) throw new Error(`${spec.out} already exists: give each run a new --out`);
+  if (spec.key !== null && path.basename(spec.out) !== sha256(spec.key)) throw new Error("with a key, the output directory is the key's receipt: receiptDir(root, key)");
+  if (spec.key === null && fs.existsSync(spec.out)) throw new Error(`${spec.out} already exists: give each run a new --out`);
+  if (spec.repo === null) return;
   if (isUrl(spec.repo)) {
     const url = new URL(spec.repo);
     if (url.username || url.password) throw new Error("the repository URL can't carry credentials");
   } else if (!fs.existsSync(spec.repo)) throw new Error(`no repository at ${spec.repo}`);
+}
+
+/**
+ * The digest of everything that decides what a run does: the whole spec but
+ * its output directory and key, with the prompt and input files by digest.
+ * (A local repository counts by its path: the record's source.base says
+ * which commit it was.)
+ */
+export function requestDigest(spec: RunSpec): string {
+  const { out: _out, key: _key, prompt, command, ...rest } = spec;
+  const request = {
+    ...rest,
+    maxModelRequests: spec.maxModelRequests ?? DEFAULT_LIMITS.requests_total,
+    slackSeconds: spec.slackSeconds ?? 300,
+    prompt_sha256: sha256(prompt),
+    command: command ? { argv: command.argv, inputs: Object.fromEntries(Object.entries(command.inputs).map(([name, data]) => [name, sha256(data)])) } : null,
+  };
+  return sha256(canonical(JSON.parse(JSON.stringify(request))));
 }
 
 type Listed = { items: { metadata: { name: string; labels?: Record<string, string> } }[] };
@@ -171,7 +241,9 @@ export { reconcile };
 export async function runOnce(spec: RunSpec, deps: RunDeps): Promise<RunRecord> {
   checkSpec(spec);
   const agent = agentNamed(spec.agent);
-  const route = spec.routes.find((r) => r.kind === agent.route) as RouteSpec;
+  const route = routeOf(spec);
+  const request = requestDigest(spec);
+  const command = spec.command ?? null;
   const names = runNames(deps.randomHex(6));
   const token = deps.randomHex(32);
   const startedMs = deps.now();
@@ -189,13 +261,15 @@ export async function runOnce(spec: RunSpec, deps: RunDeps): Promise<RunRecord> 
 
   const files = new Map<string, Buffer>();
   const proxySource = sandboxFile("proxy.ts");
-  const inputs: Record<string, string> = { "steps.sh": sandboxFile("steps.sh"), "agent.sh": agent.script, prompt: spec.prompt };
+  const inputs: Record<string, string> = { "steps.sh": sandboxFile("steps.sh"), "agent.sh": agent.script };
+  if (command) Object.assign(inputs, { argc: String(command.argv.length) }, Object.fromEntries(command.argv.map((arg, i) => [`argv.${i}`, arg])));
+  else inputs.prompt = spec.prompt;
   const models = [...new Set(spec.models)].sort();
   const limits: Limits = { ...DEFAULT_LIMITS, requests_total: spec.maxModelRequests ?? DEFAULT_LIMITS.requests_total };
   const r: RunRecord = {
     schema: RUN_SCHEMA,
     blacksand: blacksandInfo(),
-    run: { id: names.id, key: spec.key, status: "failed", complete: false, error: null },
+    run: { id: names.id, key: spec.key, request_sha256: request, status: "failed", complete: false, error: null },
     substrate: { kind: "kubernetes", adapter: "substrate-k8s", mode: "per-run" },
     times: { started: iso(startedMs), sandbox_ready: null, agent_started: null, agent_ended: null, ended: "", deadline: iso(deadlineMs) },
     cluster: { server_version: null, node: { name: null, os_image: null, kernel: null, container_runtime: null, architecture: null } },
@@ -213,16 +287,25 @@ export async function runOnce(spec: RunSpec, deps: RunDeps): Promise<RunRecord> 
     },
     image: { requested: spec.image, resolved: null, matches: false, tools: spec.toolsImage },
     proxy: { pod: names.proxy, pod_uid: null, image: spec.proxyImage, resolved: null, matches: false, source_sha256: sha256(proxySource) },
-    policy: { allow: spec.allow, route: { kind: route.kind, origin: route.origin, base_path: route.basePath, secret: route.secret }, models, limits, effective_sha256: null, inputs_sha256: "" },
-    source: { repo: spec.repo, kind: isUrl(spec.repo) ? "url" : "local", base: null },
-    agent: { name: agent.name, model: spec.model, route: agent.route, settings: { ...agent.settings }, exit_status: null, env_names: [] },
+    policy: { allow: spec.allow, route: route ? { kind: route.kind, origin: route.origin, base_path: route.basePath, secret: route.secret } : null, models, limits, effective_sha256: null, inputs_sha256: "" },
+    source: { repo: spec.repo, kind: spec.repo === null ? "none" : isUrl(spec.repo) ? "url" : "local", base: null },
+    agent: { name: agent.name, model: spec.model, route: route?.kind ?? null, settings: { ...agent.settings }, exit_status: null, env_names: [] },
+    command: command ? { argv_sha256: sha256(JSON.stringify(command.argv)), argc: command.argv.length, inputs: Object.fromEntries(Object.keys(command.inputs).sort().map((name) => [name, sha256(command.inputs[name] as Buffer)])) } : null,
     egress: { allowed: 0, denied: 0, denied_hosts: {}, model_calls: [], audit: null },
-    result: { patch: null, patch_files: null, ignored_files: null, skipped_entries: null },
+    result: { patch: null, patch_files: null, ignored_files: null, skipped_entries: null, files: null },
     artifacts: [],
     cleanup: { status: "not-run", remaining: [], foreign: [] },
   };
 
-  fs.mkdirSync(spec.out, { recursive: true, mode: 0o700 });
+  if (spec.key !== null) {
+    // The receipt: one mkdir decides which runner process owns the key; the claim is on disk before the cluster is touched.
+    const claim = { schema: CLAIM_SCHEMA, key: spec.key, request_sha256: request, run_id: names.id, claimed_at: iso(startedMs), deadline: iso(deadlineMs) } as const;
+    if (!takeClaim(spec.out, claim)) {
+      const prior = answerFromReceipt(spec.out, spec.key, request);
+      deps.progress(`key ${spec.key}: already completed as run ${prior.run.id}; not launched again`);
+      return prior;
+    }
+  } else fs.mkdirSync(spec.out, { recursive: true, mode: 0o700 });
   const exportFile = path.join(spec.out, "workspace.tar");
   let bundle: { data: Buffer; head: string } | null = null;
   let exported = false;
@@ -253,7 +336,7 @@ export async function runOnce(spec: RunSpec, deps: RunDeps): Promise<RunRecord> 
     const dns = await kJson<{ spec: { clusterIP?: string } }>(["get", "service", "kube-dns", "-n", "kube-system"]);
     if (!dns.spec.clusterIP || dns.spec.clusterIP.includes(":")) throw new Error("no IPv4 cluster DNS Service (kube-system/kube-dns) for the tripwire's canary");
     const canary = { host: dns.spec.clusterIP, port: 53 };
-    bundle = await deps.bundle(spec.repo);
+    if (spec.repo !== null) bundle = await deps.bundle(spec.repo);
 
     // The proxy first: the sandbox is given its address, and nothing else.
     deps.progress(`run ${names.id}: starting the proxy`);
@@ -275,10 +358,10 @@ export async function runOnce(spec: RunSpec, deps: RunDeps): Promise<RunRecord> 
     Object.assign(inputs, agent.files(ctx));
     if (agent.name === "fake") inputs["fake-agent.ts"] = sandboxFile("fake-agent.ts");
     const fakeEnv: Record<string, string> = spec.fake ? { BLACKSAND_FAKE_ALLOWED: spec.fake.allowed, BLACKSAND_FAKE_DENIED: spec.fake.denied, BLACKSAND_FAKE_DIRECT: spec.fake.direct.join(",") } : {};
-    const env = agentEnv(agent, ctx, spec.model, token, fakeEnv);
+    const env = agentEnv(route?.kind ?? null, ctx, spec.model, token, fakeEnv);
     r.agent.env_names = Object.keys(env).sort();
     await kMust(["create", "-f", "-"], {
-      stdin: JSON.stringify(list(sandboxObjects({ names, image: spec.image, toolsImage: spec.toolsImage, tripwire: { image: spec.proxyImage, canary }, inputs, env, deadlineSeconds: lifetime, shutdownTime: iso(deadlineMs), deadline }))),
+      stdin: JSON.stringify(list(sandboxObjects({ names, image: spec.image, toolsImage: spec.toolsImage, tripwire: { image: spec.proxyImage, canary }, inputs, ...(command ? { files: command.inputs } : {}), env, deadlineSeconds: lifetime, shutdownTime: iso(deadlineMs), deadline }))),
     });
     sandboxUp = true;
     await kMust(["wait", "--for=condition=Ready", `sandbox/${names.sandbox}`, "-n", NS.runs, `--timeout=${READY_TIMEOUT_S}s`], { timeoutMs: (READY_TIMEOUT_S + 10) * 1000 });
@@ -317,18 +400,22 @@ export async function runOnce(spec: RunSpec, deps: RunDeps): Promise<RunRecord> 
     files.set("policies.json", policies);
     r.policy.effective_sha256 = sha256(policies);
 
-    deps.progress(`run ${names.id}: cloning`);
-    await step("receive", { stdin: bundle.data, timeoutMs: 300_000 });
-    const prepared = (await step("prepare", { timeoutMs: 600_000 })).toString();
+    if (bundle) {
+      deps.progress(`run ${names.id}: cloning`);
+      await step("receive", { stdin: bundle.data, timeoutMs: 300_000 });
+    }
+    const prepared = (await step(bundle ? "prepare" : "observe", { timeoutMs: 600_000 })).toString();
     files.set("prepare.txt", Buffer.from(prepared));
     const seen = Object.fromEntries(prepared.split("\n").filter((l) => l.includes("=")).map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]));
     r.sandbox.observed = { uid: seen.uid ?? null, kernel: seen.kernel ?? null, dmesg: seen.dmesg || null };
-    if (seen.base !== bundle.head) throw new Error(`the sandbox cloned ${seen.base ?? "nothing"}, not the repository's HEAD ${bundle.head}`);
-    r.source.base = bundle.head;
+    if (bundle) {
+      if (seen.base !== bundle.head) throw new Error(`the sandbox cloned ${seen.base ?? "nothing"}, not the repository's HEAD ${bundle.head}`);
+      r.source.base = bundle.head;
+    }
 
     deps.progress(`run ${names.id}: running ${agent.name}`);
     r.times.agent_started = iso(deps.now());
-    const ran = await exec(["sh", STEPS, "agent"], { timeoutMs: spec.timeoutSeconds * 1000 });
+    const ran = await exec(["sh", STEPS, bundle ? "agent" : "run"], { timeoutMs: spec.timeoutSeconds * 1000 });
     r.times.agent_ended = iso(deps.now());
     r.agent.exit_status = ran.status;
     files.set("agent.stdout", ran.stdout);
@@ -340,7 +427,7 @@ export async function runOnce(spec: RunSpec, deps: RunDeps): Promise<RunRecord> 
     const frozen = (await step("freeze", { timeoutMs: 60_000 })).toString();
     r.sandbox.left_running = (frozen.match(/^running=/gm) ?? []).length;
     if (r.sandbox.left_running) throw new Error(`${r.sandbox.left_running} process(es) still running after the freeze`);
-    const tar = await exec(["sh", STEPS, "export"], { stdoutFile: exportFile, maxOutput: EXPORT_MAX, timeoutMs: 600_000 });
+    const tar = await exec(["sh", STEPS, bundle ? "export" : "export-workspace"], { stdoutFile: exportFile, maxOutput: EXPORT_MAX, timeoutMs: 600_000 });
     if (tar.status !== 0) throw new Error(tar.killed === "output-limit" ? "the workspace is over 1 GiB" : `step export failed (${tar.status ?? tar.killed ?? "killed"}): ${tar.stderr.trim().slice(0, 300)}`);
     exported = true;
     if (ran.killed === "timeout") {
@@ -400,10 +487,21 @@ export async function runOnce(spec: RunSpec, deps: RunDeps): Promise<RunRecord> 
       r.run.error ??= `the patch couldn't be made: ${(error as Error).message}`;
     }
   }
+  if (exported && command) {
+    // The command's files, read from the export here, outside; its read-only inputs aren't its output.
+    try {
+      const collected = collectFiles(exportFile, path.join(spec.out, "files"), path.posix.relative("/workspace", COMMAND_INPUTS));
+      r.result.files = collected.files;
+      r.result.skipped_entries = collected.skipped;
+    } catch (error) {
+      if (r.run.status === "completed") r.run.status = "failed";
+      r.run.error ??= `the command's files couldn't be collected: ${(error as Error).message}`;
+    }
+  }
   r.policy.inputs_sha256 = sha256(canonical(inputs));
   r.times.ended = iso(deps.now());
   for (const [file, data] of [...files].sort(([a], [b]) => a.localeCompare(b))) {
-    fs.writeFileSync(path.join(spec.out, file), data, { mode: 0o600 });
+    writeDurable(path.join(spec.out, file), data);
     const artifact: Artifact = { file, sha256: sha256(data), bytes: data.length };
     r.artifacts.push(artifact);
     if (file === "patch.diff") r.result.patch = artifact;
@@ -414,6 +512,7 @@ export async function runOnce(spec: RunSpec, deps: RunDeps): Promise<RunRecord> 
   if (r.run.status === "completed" && missing.length) r.run.error = `incomplete evidence: ${missing.join("; ")}`;
   const problems = recordProblems(r);
   if (problems.length) throw new Error(`run ${names.id} produced a malformed record: ${problems.join("; ")}`);
-  fs.writeFileSync(path.join(spec.out, "record.json"), `${JSON.stringify(r, null, 2)}\n`, { mode: 0o600 });
+  // Last, whole or not at all: a receipt with this file is completed, and one without it is unknown.
+  publishDurable(path.join(spec.out, "record.json"), `${JSON.stringify(r, null, 2)}\n`);
   return r;
 }

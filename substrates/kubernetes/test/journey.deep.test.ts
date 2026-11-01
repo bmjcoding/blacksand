@@ -9,6 +9,7 @@
 //   BLACKSAND_K8S_TOOLS_IMAGE=blacksand.local/agent-tools@sha256:…   optional: also run the real Claude Code and
 //     Codex (from images/agent-tools.sh) at their default models against the fake model, each editing the repository
 //     through its tools; Codex with apply_patch, then a probe it runs itself
+// The command adapter runs here too (a fixed argv, read-only inputs, its files collected, under a receipt).
 // Evidence (records and artifacts) goes to BLACKSAND_K8S_EVIDENCE, else a temp dir.
 
 import assert from "node:assert/strict";
@@ -24,7 +25,8 @@ import { IMAGES } from "../src/command.ts";
 import { getJson, must, type Kubectl, type KubectlOptions, type KubectlResult } from "../src/kubectl.ts";
 import { LABEL, NS, list, setupObjects } from "../src/manifests.ts";
 import { FLOOR, FLOOR_ID, nodeSetupScript } from "../src/node.ts";
-import { parseAllow, parseRoute } from "../src/policy.ts";
+import { parseAllow, parseRoute, sha256 } from "../src/policy.ts";
+import { provisionReceipts, readReceipt, receiptDir } from "../src/receipt.ts";
 import { recordProblems, type RunRecord } from "../src/record.ts";
 import { processRunDeps, reconcile, runOnce, type RunSpec } from "../src/run.ts";
 import { FAKE_MODEL, deployFakeModel, floorTargets, labKubectl, probePod, removeFakeModel, type ProbeResult } from "./fixtures/lab.ts";
@@ -78,7 +80,7 @@ function spec(out: string, change: Partial<RunSpec> = {}): RunSpec {
     toolsImage: null,
     proxyImage: IMAGES.proxy,
     timeoutSeconds: 120,
-    key: `journey/${path.basename(out)}`,
+    key: null,
     out: path.join(evidence, out),
     // The fake model's own addresses: reachable from its proxy, so a refusal here is the sandbox's boundary.
     fake: { allowed, denied, direct: [model.upstream.replace("http://", ""), "1.1.1.1:443", `${model.ipv6}:8080`] },
@@ -256,6 +258,90 @@ for (const [agent, model_, route] of [
     assert.equal(new Set(reached).size, 1, "both on the run's own proxy");
   });
 }
+
+/** The command run's program, an input file: what it was given and what it could touch, written to out/result.json. */
+const ATTEMPT = `
+import * as fs from "node:fs";
+import * as http from "node:http";
+const tryWrite = (file) => { try { fs.writeFileSync(file, "x"); return "written"; } catch (e) { return e.code; } };
+const model = await new Promise((resolve) => {
+  const req = http.request({ host: process.env.BLACKSAND_PROXY, port: 8080, method: "POST", path: "/anthropic/v1/messages", headers: { "x-api-key": process.env.BLACKSAND_RUN_TOKEN, "content-type": "application/json" }, timeout: 5000 }, (res) => (res.resume(), resolve(res.statusCode)));
+  req.on("error", (e) => resolve(e.code));
+  req.end(JSON.stringify({ model: "claude-opus-5-5", max_tokens: 1, messages: [{ role: "user", content: "hi" }] }));
+});
+fs.mkdirSync("out");
+fs.copyFileSync("inputs/data/case.bin", "out/case-copy.bin");
+fs.writeFileSync("out/a.txt", "one file, two names\\n");
+fs.linkSync("out/a.txt", "out/b.txt");
+fs.symlinkSync("/etc/passwd", "out/link");
+fs.writeFileSync(process.env.HOME + "/not-collected", "home");
+fs.writeFileSync("out/result.json", JSON.stringify({ argv: process.argv.slice(2), cwd: process.cwd(), uid: process.getuid(), inputs: tryWrite("inputs/new"), input: tryWrite("inputs/attempt.mjs"), model, model_env: process.env.BLACKSAND_MODEL_URL ?? null }));
+`;
+
+test("the command adapter: a fixed argv as data, frozen inputs read-only, its files collected outside, under a receipt", { skip }, async () => {
+  const CASE = Buffer.from([0, 1, 2, 255, 10]);
+  const argv = ["node", "inputs/attempt.mjs", "a b", "$(id)", "", "two\nlines\n"];
+  const key = "journey/command";
+  const receipts = path.join(evidence, "receipts");
+  const commandSpec: RunSpec = {
+    repo: null,
+    prompt: "",
+    agent: "command",
+    model: null,
+    models: [],
+    routes: [],
+    allow: [],
+    image: IMAGES.agent,
+    toolsImage: null,
+    proxyImage: IMAGES.proxy,
+    timeoutSeconds: 120,
+    key,
+    out: receiptDir(provisionReceipts(receipts), key),
+    command: { argv, inputs: { "attempt.mjs": Buffer.from(ATTEMPT), "data/case.bin": CASE } },
+  };
+  const record = await timed("command_ms", () => runOnce(commandSpec, processRunDeps(kubectl, () => {})));
+  records.push(record);
+  const out = commandSpec.out;
+  assert.deepEqual(recordProblems(record), []);
+  assert.equal(record.run.complete, true, record.run.error ?? fs.readFileSync(path.join(out, "agent.stderr"), "utf8"));
+  assert.equal(record.agent.exit_status, 0, fs.readFileSync(path.join(out, "agent.stderr"), "utf8"));
+  assert.match(record.sandbox.observed.dmesg ?? "", /gVisor/);
+  assert.equal(record.sandbox.floor.canary_reached, false);
+  assert.deepEqual([record.policy.route, record.policy.models, record.agent.route], [null, [], null]);
+  assert.deepEqual(record.command, { argv_sha256: sha256(JSON.stringify(argv)), argc: argv.length, inputs: { "attempt.mjs": sha256(ATTEMPT), "data/case.bin": sha256(CASE) } });
+  const result = JSON.parse(fs.readFileSync(path.join(out, "files", "out", "result.json"), "utf8")) as Record<string, unknown>;
+  save("command-result.json", result);
+  assert.deepEqual(result.argv, argv.slice(2), "every argument arrived as given");
+  assert.equal(result.cwd, "/workspace");
+  assert.equal(result.uid, 1000);
+  assert.match(String(result.inputs), /EROFS|EACCES/, "the inputs are read-only");
+  assert.match(String(result.input), /EROFS|EACCES/);
+  assert.equal(result.model, 404, "no route: the model listener grants nothing");
+  assert.equal(result.model_env, null);
+  const files = Object.fromEntries((record.result.files ?? []).map((f) => [f.path, f.sha256]));
+  assert.deepEqual(Object.keys(files).sort(), ["out/a.txt", "out/b.txt", "out/case-copy.bin", "out/result.json"], "regular files only: no inputs, no link, nothing from HOME");
+  assert.equal(files["out/case-copy.bin"], sha256(CASE));
+  assert.equal(files["out/b.txt"], files["out/a.txt"], "a hard link's second name arrives with its own bytes");
+  assert.equal(record.cleanup.status, "verified-absent");
+  // The receipt: completed, and the same request again is answered from it without launching.
+  assert.equal(readReceipt(out).state, "completed");
+  let launched = false;
+  const again = await runOnce(commandSpec, { ...processRunDeps(kubectl, () => {}), kubectl: (args, options) => ((launched = true), kubectl(args, options)) });
+  assert.equal(again.run.id, record.run.id);
+  assert.equal(launched, false);
+  // No input files: inputs/ is still a read-only mount, so nothing the command writes can hide under it.
+  const bare = { ...commandSpec, key: "journey/command-no-inputs", out: receiptDir(receipts, "journey/command-no-inputs"), command: { argv: ["node", "-e", 'const fs=require("fs");const t=(f)=>{try{f();return "written"}catch(e){return e.code}};fs.writeFileSync("result.json",JSON.stringify({file:t(()=>fs.writeFileSync("inputs/x","x")),dir:t(()=>fs.mkdirSync("inputs/d")),deep:t(()=>fs.mkdirSync("inputs/a/b",{recursive:true}))}))'], inputs: {} } };
+  const noInputs = await timed("command_no_inputs_ms", () => runOnce(bare, processRunDeps(kubectl, () => {})));
+  records.push(noInputs);
+  assert.equal(noInputs.run.complete, true, noInputs.run.error ?? "");
+  const tried = JSON.parse(fs.readFileSync(path.join(bare.out, "files", "result.json"), "utf8")) as Record<string, string>;
+  save("command-no-inputs-result.json", tried);
+  for (const [what, code] of Object.entries(tried)) assert.notEqual(code, "written", `inputs/ is read-only even with no inputs: ${what} ${code}`);
+  assert.deepEqual(noInputs.result.files?.map((f) => f.path), ["result.json"]);
+  // And the export itself, read outside, holds nothing under inputs/ but the empty mount point.
+  const listed = execFileSync("tar", ["-tf", path.join(bare.out, "workspace.tar")]).toString().split("\n").filter((e) => e.startsWith("./inputs/") && e !== "./inputs/");
+  assert.deepEqual(listed, []);
+});
 
 test("a runner killed mid-run: its proxy stops serving at its own deadline, and the next setup deletes everything it left", { skip }, async () => {
   const out = "lost";

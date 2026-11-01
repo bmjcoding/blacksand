@@ -9,10 +9,22 @@
 #   export    the repository's files as a POSIX tar on stdout (hard links dereferenced), every .git left out
 # The patch is made outside, from the export and the original base, by git the
 # agent never touched: nothing here decides what the agent changed.
+# A command run has no repository; instead of receive, prepare, agent and export:
+#   observe            print what the sandbox observes
+#   run                run the command (agent.sh) in /workspace, stdin empty
+#   export-workspace   /workspace as a POSIX tar on stdout (hard links dereferenced); the
+#                      runner drops the read-only inputs/ and copies out the rest itself
 set -eu
 inputs=/run/blacksand/inputs
 repo=/workspace/repo
 bundle=/tmp/blacksand/repo.bundle
+
+observe() {
+  echo "uid=$(id -u)"
+  echo "kernel=$(uname -r)"
+  # gVisor's kernel greets with its own dmesg line, so this shows the runtime in effect.
+  echo "dmesg=$(dmesg 2>/dev/null | head -n 1 || true)"
+}
 
 case "${1:-}" in
 receive)
@@ -23,14 +35,18 @@ prepare)
   git -c core.hooksPath=/dev/null clone --quiet --no-hardlinks "$bundle" "$repo"
   rm -f "$bundle"
   echo "base=$(git -C "$repo" rev-parse HEAD)"
-  echo "uid=$(id -u)"
-  echo "kernel=$(uname -r)"
-  # gVisor's kernel greets with its own dmesg line, so this shows the runtime in effect.
-  echo "dmesg=$(dmesg 2>/dev/null | head -n 1 || true)"
+  observe
+  ;;
+observe)
+  observe
   ;;
 agent)
   cd "$repo"
   exec sh "$inputs/agent.sh" < "$inputs/prompt"
+  ;;
+run)
+  cd /workspace
+  exec sh "$inputs/agent.sh" < /dev/null
   ;;
 freeze)
   # kill -1 signals every process this user may signal except PID 1 (sleep) and
@@ -56,8 +72,11 @@ export)
   # --hard-dereference: each name of a hard-linked file carries its own bytes, so no name depends on another being kept.
   tar -C "$repo" --format=posix --hard-dereference --exclude=.git -cf - .
   ;;
+export-workspace)
+  tar -C /workspace --format=posix --hard-dereference -cf - .
+  ;;
 *)
-  echo "usage: steps.sh receive|prepare|agent|freeze|export" >&2
+  echo "usage: steps.sh receive|prepare|agent|freeze|export|observe|run|export-workspace" >&2
   exit 2
   ;;
 esac

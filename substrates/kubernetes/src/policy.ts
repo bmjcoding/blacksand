@@ -85,9 +85,9 @@ export const secretMount = (kind: RouteKind) => `/secrets/${kind}`;
 export interface ProxyInputs {
   run: string;
   allow: readonly Allow[];
-  /** The one route the run's agent uses; the proxy has no other. */
-  route: RouteSpec;
-  /** The model ids the run may name. */
+  /** The one route the run's agent uses; the proxy has no other. Null: no route, so the model listener grants nothing. */
+  route: RouteSpec | null;
+  /** The model ids the run may name (none without a route). */
   models: readonly string[];
   tokenSha256: string;
   expiresAt: number;
@@ -95,7 +95,8 @@ export interface ProxyInputs {
 }
 
 export function proxyConfig(p: ProxyInputs): ProxyConfig {
-  if (!p.models.length) throw new PolicyError("a run needs at least one granted model");
+  if (p.route && !p.models.length) throw new PolicyError("a run with a model route needs at least one granted model");
+  if (!p.route && p.models.length) throw new PolicyError("a run without a model route can't grant models");
   return {
     run: p.run,
     expires_at: p.expiresAt,
@@ -104,16 +105,18 @@ export function proxyConfig(p: ProxyInputs): ProxyConfig {
     connect: { port: PORTS.connect, allow: [...p.allow].sort((a, b) => `${a.host}:${a.port}`.localeCompare(`${b.host}:${b.port}`)) },
     model: {
       port: PORTS.model,
-      routes: [
-        {
-          name: p.route.kind,
-          origin: p.route.origin,
-          base_path: p.route.basePath,
-          header: p.route.kind === "anthropic" ? "x-api-key" : "authorization",
-          secret_file: `${secretMount(p.route.kind)}/key`,
-          models: [...new Set(p.models.map(assertModel))].sort(),
-        },
-      ],
+      routes: p.route
+        ? [
+            {
+              name: p.route.kind,
+              origin: p.route.origin,
+              base_path: p.route.basePath,
+              header: p.route.kind === "anthropic" ? "x-api-key" : "authorization",
+              secret_file: `${secretMount(p.route.kind)}/key`,
+              models: [...new Set(p.models.map(assertModel))].sort(),
+            },
+          ]
+        : [],
     },
   };
 }

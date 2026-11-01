@@ -3,6 +3,8 @@
 // so nothing the caller types is ever spliced into a command line. Each agent
 // talks to its model through the run's proxy with the run token as its API
 // key: the proxy swaps in the real credential, which never enters the sandbox.
+// The command adapter runs a fixed argv instead of an agent: each argument is
+// a read-only input file, so none of it is ever parsed by a shell either.
 //
 // The rule: agents run with full access inside the sandbox; the sandbox is
 // the boundary. No inner sandbox, no approval prompts, no harness permission
@@ -15,7 +17,7 @@ import { assertModel, PORTS, type RouteKind } from "./policy.ts";
 
 const TOOLS_PATH = `export PATH="${TOOLS_MOUNT}/bin:$PATH"`;
 
-export type AgentName = "fake" | "claude" | "codex";
+export type AgentName = "fake" | "claude" | "codex" | "command";
 
 export interface AgentContext {
   proxyIp: string;
@@ -23,9 +25,9 @@ export interface AgentContext {
 
 export interface Agent {
   name: AgentName;
-  /** The model route it needs. */
-  route: RouteKind;
-  /** agent.sh, run in the repository with the prompt on stdin. */
+  /** The model route it needs; null: whichever route the caller gives, if any (the command adapter). */
+  route: RouteKind | null;
+  /** agent.sh, run in the repository with the prompt on stdin (the command adapter: in /workspace, stdin empty). */
   script: string;
   /** Extra input files, by name. */
   files(ctx: AgentContext): Record<string, string>;
@@ -124,7 +126,34 @@ const codex: Agent = {
   }),
 };
 
-export const AGENTS: Record<AgentName, Agent> = { fake, claude, codex };
+// A fixed command, no agent and no prompt: for a caller that stages its own
+// program as frozen inputs (mounted read-only at /workspace/inputs) and wants
+// back the files it writes under /workspace. The runner writes argc and one
+// file per argument (argv.0, argv.1, …); this script reads each back whole and
+// execs the list, so an argument is only ever data: no eval, no splitting, no
+// globbing. The trailing x keeps trailing newlines, which $(…) would strip.
+const command: Agent = {
+  name: "command",
+  route: null,
+  binary: "sh",
+  settings: {}, // no harness: nothing to switch off
+  script: [
+    "set -eu",
+    "n=$(cat /run/blacksand/inputs/argc)",
+    "set --",
+    "i=0",
+    'while [ "$i" -lt "$n" ]; do',
+    '  arg=$(cat "/run/blacksand/inputs/argv.$i"; printf x)',
+    '  set -- "$@" "${arg%x}"',
+    "  i=$((i + 1))",
+    "done",
+    'exec "$@"',
+    "",
+  ].join("\n"),
+  files: () => ({}), // argc and argv.N are added by the runner, from the run's argv
+};
+
+export const AGENTS: Record<AgentName, Agent> = { fake, claude, codex, command };
 
 export function agentNamed(name: string): Agent {
   const agent = AGENTS[name as AgentName];
@@ -132,8 +161,8 @@ export function agentNamed(name: string): Agent {
   return agent;
 }
 
-/** The environment every agent gets: the proxy for HTTPS (the run token as its password), the model route, a HOME of its own, a git identity. */
-export function agentEnv(agent: Agent, ctx: AgentContext, model: string, token: string, extra: Record<string, string> = {}): Record<string, string> {
+/** The environment every agent gets: the proxy for HTTPS (the run token as its password), the model route if the run has one, a HOME of its own, a git identity. */
+export function agentEnv(route: RouteKind | null, ctx: AgentContext, model: string | null, token: string, extra: Record<string, string> = {}): Record<string, string> {
   const proxy = `http://run:${token}@${ctx.proxyIp}:${PORTS.connect}`;
   return {
     HOME: HOME_MOUNT,
@@ -144,8 +173,7 @@ export function agentEnv(agent: Agent, ctx: AgentContext, model: string, token: 
     NO_PROXY: ctx.proxyIp,
     no_proxy: ctx.proxyIp,
     BLACKSAND_PROXY: ctx.proxyIp,
-    BLACKSAND_MODEL_URL: modelUrl(ctx, agent.route),
-    BLACKSAND_MODEL: assertModel(model),
+    ...(route && model !== null ? { BLACKSAND_MODEL_URL: modelUrl(ctx, route), BLACKSAND_MODEL: assertModel(model) } : {}),
     BLACKSAND_RUN_TOKEN: token,
     GIT_AUTHOR_NAME: "blacksand agent",
     GIT_AUTHOR_EMAIL: "agent@blacksand.invalid",

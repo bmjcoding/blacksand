@@ -4,13 +4,17 @@
 // effect, the proxy's sealed audit), not only what was asked for, and reports
 // cleanup separately from the run's own status. `complete` is true only when
 // every step ran and its evidence was captured; an incomplete record can't
-// stand in for a finished run.
+// stand in for a finished run. A command run (the command adapter) has no
+// repository, prompt or patch: it records the command's digest, its input
+// files' digests and the files it wrote instead, and a model route only if it
+// was given one.
 
 import type { BlacksandInfo } from "../../../src/core/envelope.ts";
 import type { ModelCall } from "./audit.ts";
+import type { OutputFile } from "./collect.ts";
 import type { Allow, Limits } from "./policy.ts";
 
-export type { ModelCall };
+export type { ModelCall, OutputFile };
 
 export const RUN_SCHEMA = "blacksand.run/1";
 
@@ -25,7 +29,8 @@ export interface Artifact {
 export interface RunRecord {
   schema: typeof RUN_SCHEMA;
   blacksand: BlacksandInfo;
-  run: { id: string; key: string | null; status: RunStatus; complete: boolean; error: string | null };
+  /** `request_sha256`: the digest of the whole request (requestDigest), which a receipt for `key` compares. */
+  run: { id: string; key: string | null; request_sha256: string; status: RunStatus; complete: boolean; error: string | null };
   substrate: { kind: "kubernetes"; adapter: "substrate-k8s"; mode: "per-run" };
   times: { started: string; sandbox_ready: string | null; agent_started: string | null; agent_ended: string | null; ended: string; deadline: string };
   cluster: { server_version: string | null; node: { name: string | null; os_image: string | null; kernel: string | null; container_runtime: string | null; architecture: string | null } };
@@ -49,7 +54,8 @@ export interface RunRecord {
   proxy: { pod: string; pod_uid: string | null; image: string; resolved: string | null; matches: boolean; source_sha256: string };
   policy: {
     allow: Allow[];
-    route: { kind: string; origin: string; base_path: string; secret: string };
+    /** Null: no model route (a command given none), so the proxy's model listener granted nothing. */
+    route: { kind: string; origin: string; base_path: string; secret: string } | null;
     /** The models the run's token may name. */
     models: string[];
     limits: Limits;
@@ -58,9 +64,16 @@ export interface RunRecord {
     /** SHA-256 of the run's inputs (steps, agent script, prompt, repository source) as canonical JSON. */
     inputs_sha256: string;
   };
-  source: { repo: string; kind: "local" | "url"; base: string | null };
+  /** `kind: "none"`: a command run, with no repository. */
+  source: { repo: string | null; kind: "local" | "url" | "none"; base: string | null };
   /** `settings`: how its harness was set to run, e.g. Codex's sandbox_mode, approval_policy and model_reasoning_effort (agents run with full access; the sandbox is the boundary). */
-  agent: { name: string; model: string; route: string; settings: Record<string, string>; exit_status: number | null; env_names: string[] };
+  agent: { name: string; model: string | null; route: string | null; settings: Record<string, string>; exit_status: number | null; env_names: string[] };
+  /**
+   * What a command run ran: `argv_sha256` is SHA-256 of JSON.stringify(argv), the argument
+   * list as a JSON array; `inputs` maps each input file's path (under /workspace/inputs) to
+   * the SHA-256 of its bytes. Null for an agent run.
+   */
+  command: { argv_sha256: string; argc: number; inputs: Record<string, string> } | null;
   egress: {
     allowed: number;
     denied: number;
@@ -69,7 +82,8 @@ export interface RunRecord {
     /** The audit's own state: lines, whether it closed with its marker, and why it can't be relied on, if it can't. */
     audit: { entries: number; sealed: boolean; problems: string[] } | null;
   };
-  result: { patch: Artifact | null; patch_files: number | null; ignored_files: number | null; skipped_entries: number | null };
+  /** `files`: a command's output, each regular file it left under /workspace (its inputs aside), copied to `files/<path>` in the output directory. */
+  result: { patch: Artifact | null; patch_files: number | null; ignored_files: number | null; skipped_entries: number | null; files: OutputFile[] | null };
   artifacts: Artifact[];
   /** `remaining`: this run's own objects still there. `foreign`: objects wearing its label that it didn't create, left alone. */
   cleanup: { status: "verified-absent" | "incomplete" | "not-run"; remaining: string[]; foreign: string[] };
@@ -89,7 +103,13 @@ export function recordProblems(r: RunRecord): string[] {
   need(Date.parse(r.times.ended) >= Date.parse(r.times.started), "the run ended before it started");
   need(/@sha256:[0-9a-f]{64}$/.test(r.image.requested) && /@sha256:[0-9a-f]{64}$/.test(r.proxy.image), "an image isn't pinned by digest");
   need(r.image.tools === null || /@sha256:[0-9a-f]{64}$/.test(r.image.tools), "image.tools isn't pinned by digest");
-  need(HEX64.test(r.proxy.source_sha256) && HEX64.test(r.policy.inputs_sha256), "a source digest is malformed");
+  need(HEX64.test(r.proxy.source_sha256) && HEX64.test(r.policy.inputs_sha256) && HEX64.test(r.run.request_sha256), "a source digest is malformed");
+  need((r.policy.route === null) === (r.agent.route === null) && (r.policy.route === null) === (r.policy.models.length === 0), "the route, the agent's route and the granted models disagree");
+  if (r.command) {
+    need(HEX64.test(r.command.argv_sha256) && Number.isInteger(r.command.argc) && r.command.argc > 0 && Object.values(r.command.inputs).every((d) => HEX64.test(d)), "the command's digests are malformed");
+    need(r.source.kind === "none" && r.result.patch === null, "a command run has no repository or patch");
+  }
+  for (const f of r.result.files ?? []) need(HEX64.test(f.sha256) && Number.isInteger(f.bytes) && !f.path.startsWith("/") && !f.path.split("/").includes(".."), `output file ${f.path} is malformed`);
   need(r.run.status === "completed" || r.run.error !== null, "a run that didn't complete says why");
   for (const a of [...r.artifacts, ...(r.result.patch ? [r.result.patch] : [])]) need(HEX64.test(a.sha256) && Number.isInteger(a.bytes), `artifact ${a.file} has a malformed digest`);
   need(r.agent.settings !== undefined && Object.values(r.agent.settings).every((v) => typeof v === "string"), "agent.settings is missing or malformed");
@@ -103,9 +123,12 @@ export function recordProblems(r: RunRecord): string[] {
     need(r.sandbox.floor.node_label !== null && r.sandbox.floor.canary_reached === false, "complete without the node's egress floor in effect");
     need(r.sandbox.left_running === 0, "complete without the agent frozen before its export");
     need(r.policy.effective_sha256 !== null && HEX64.test(r.policy.effective_sha256), "complete without the effective policy");
-    need(r.source.base !== null && /^[0-9a-f]{40}$/.test(r.source.base), "complete without the base commit");
+    if (r.command) need(r.result.files !== null, "complete without the command's files");
+    else {
+      need(r.source.base !== null && /^[0-9a-f]{40}$/.test(r.source.base), "complete without the base commit");
+      need(r.result.patch !== null, "complete without the patch");
+    }
     need(r.agent.exit_status !== null, "complete without the agent's exit status");
-    need(r.result.patch !== null, "complete without the patch");
     need(r.egress.audit !== null && r.egress.audit.sealed && r.egress.audit.problems.length === 0, "complete without the proxy's whole, sealed audit");
     need(r.times.sandbox_ready !== null && r.times.agent_started !== null && r.times.agent_ended !== null, "complete without step times");
   }

@@ -34,6 +34,16 @@ test("the proxy config has one route, the agent's, with its grant, expiry and li
   assert.equal(budget.limits.requests_total, 20);
 });
 
+test("a run without a model route gets a proxy whose model listener grants nothing, and no model in its environment", () => {
+  const config = proxyConfig({ run: "abcdef012345", allow: [], route: null, models: [], tokenSha256: "0".repeat(64), expiresAt: 5 });
+  assert.deepEqual(config.model.routes, []);
+  assert.throws(() => proxyConfig({ run: "abcdef012345", allow: [], route: null, models: ["gpt-6.1-sol"], tokenSha256: "0".repeat(64), expiresAt: 5 }), /can't grant models/);
+  const env = agentEnv(null, { proxyIp: "10.247.1.9" }, null, "t0k3n");
+  assert.equal(env.BLACKSAND_MODEL_URL, undefined);
+  assert.equal(env.BLACKSAND_MODEL, undefined);
+  assert.equal(env.HTTPS_PROXY, "http://run:t0k3n@10.247.1.9:3128", "the allowlist still goes through its proxy");
+});
+
 test("canonical JSON doesn't depend on key order", () => {
   assert.equal(canonical({ b: 1, a: [{ d: 2, c: 3 }] }), canonical({ a: [{ c: 3, d: 2 }], b: 1 }));
 });
@@ -57,7 +67,7 @@ test("agent scripts are fixed text: the prompt and model reach them only through
 });
 
 test("each agent's traffic goes to its own proxy with the run token: as the API key, and as the CONNECT password", () => {
-  const env = agentEnv(AGENTS.claude, { proxyIp: "10.247.1.9" }, "claude-opus-5-5", "t0k3n");
+  const env = agentEnv(AGENTS.claude.route, { proxyIp: "10.247.1.9" }, "claude-opus-5-5", "t0k3n");
   assert.equal(env.BLACKSAND_MODEL_URL, "http://10.247.1.9:8080/anthropic");
   assert.equal(env.HTTPS_PROXY, "http://run:t0k3n@10.247.1.9:3128");
   assert.equal(env.NO_PROXY, "10.247.1.9");
@@ -70,5 +80,5 @@ test("each agent's traffic goes to its own proxy with the run token: as the API 
 
 test("unknown agents and models are refused, including names that exist on every object", () => {
   for (const name of ["aider", "constructor", "__proto__", "toString"]) assert.throws(() => agentNamed(name), /unknown agent/, name);
-  for (const model of ["", "m odel", "m;x", "$(id)", "a".repeat(200)]) assert.throws(() => agentEnv(AGENTS.fake, { proxyIp: "10.0.0.1" }, model, "t"), /model id/, model);
+  for (const model of ["", "m odel", "m;x", "$(id)", "a".repeat(200)]) assert.throws(() => agentEnv(AGENTS.fake.route, { proxyIp: "10.0.0.1" }, model, "t"), /model id/, model);
 });

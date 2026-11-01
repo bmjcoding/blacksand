@@ -12,7 +12,7 @@ import * as path from "node:path";
 import { test } from "node:test";
 
 import { AGENTS, type Agent, type AgentName } from "../src/agents.ts";
-import { NS, SANDBOX_API, setupObjects } from "../src/manifests.ts";
+import { COMMAND_INPUTS, NS, SANDBOX_API, setupObjects } from "../src/manifests.ts";
 import { FLOOR, FLOOR_ID } from "../src/node.ts";
 import { parseRoute } from "../src/policy.ts";
 import { hostBundle, runOnce, type RunSpec } from "../src/run.ts";
@@ -44,6 +44,14 @@ const FULL_ACCESS: Record<AgentName, (r: ReturnType<typeof rendered>, agent: Age
     assert.doesNotMatch(config, /\[sandbox_workspace_write\]|workspace-write|read-only|on-request|untrusted/, "no inner sandbox settings left");
     assert.doesNotMatch(r.script, /--sandbox|\s-s\s|--ask-for-approval|\s-a\s|--full-auto|--dangerously|-c\s/, "set in config.toml, never by flags");
   },
+  // No harness: the runner's fixed script, which rebuilds the caller's argv from read-only files and execs it, as data.
+  command: (r, agent) => {
+    assert.deepEqual(r.files, {});
+    assert.deepEqual(agent.settings, {});
+    assert.equal(agent.route, null, "a model route only if the caller gives one");
+    assert.doesNotMatch(r.script, /\beval\b|\$\(\s*\$|\bsh -c\b/, "nothing the caller gives is run as shell code");
+    assert.deepEqual(r.script.match(/^exec .*$/gm), ['exec "$@"']);
+  },
 };
 
 test("every registered adapter runs with full access and no approvals", () => {
@@ -59,14 +67,14 @@ async function runPod(name: AgentName) {
   const repo = fakeRepo();
   const cluster = fakeCluster(repo.head, repo.exportTar);
   const agent = AGENTS[name];
-  const model = agent.route === "openai" ? "gpt-6.1-sol" : "claude-opus-5-5";
+  const model = agent.route === "openai" ? "gpt-6.1-sol" : agent.route ? "claude-opus-5-5" : null;
   const spec: RunSpec = {
-    repo: repo.repo,
-    prompt: "p",
+    repo: agent.route ? repo.repo : null,
+    prompt: agent.route ? "p" : "",
     agent: name,
     model,
-    models: [model],
-    routes: [parseRoute(`${agent.route}=https://model.test@model-key`)],
+    models: model ? [model] : [],
+    routes: agent.route ? [parseRoute(`${agent.route}=https://model.test@model-key`)] : [],
     allow: [],
     image: AGENT_IMAGE,
     toolsImage: name === "fake" ? null : `blacksand.local/agent-tools@sha256:${"b".repeat(64)}`,
@@ -75,13 +83,14 @@ async function runPod(name: AgentName) {
     key: null,
     out: path.join(fs.mkdtempSync(path.join(os.tmpdir(), "substrate-k8s-access-")), "out"),
     ...(name === "fake" ? { fake: { allowed: "", denied: "example.org:443", direct: [] } } : {}),
+    ...(name === "command" ? { command: { argv: ["python3", "-I", "inputs/attempt.py"], inputs: { "attempt.py": Buffer.from("print(1)\n") } } } : {}),
   };
   let hex = 0;
   const record = await runOnce(spec, { kubectl: cluster.kubectl, now: () => Date.parse("2026-11-01T00:00:00Z") + hex * 1000, randomHex: (bytes) => (hex++ ? "f".repeat(bytes * 2) : "abcdef012345"), bundle: hostBundle, progress: () => {}, sleep: async () => {} });
   const created = cluster.calls.filter((c) => c.args[0] === "create").flatMap((c) => (JSON.parse(c.stdin) as { items: Any[] }).items);
   const sandboxes = created.filter((o) => o.kind === "Sandbox");
   assert.equal(sandboxes.length, 1);
-  return { record, sandbox: sandboxes[0] as Any, inRuns: created.filter((o) => o.metadata.namespace === NS.runs) };
+  return { record, sandbox: sandboxes[0] as Any, inRuns: created.filter((o) => o.metadata.namespace === NS.runs), proxyPod: created.find((o) => o.kind === "Pod" && o.metadata.namespace === NS.egress) as Any };
 }
 
 test("the condition: every adapter's sandbox Pod is locked down, so full access inside it stays inside it", async () => {
@@ -89,7 +98,7 @@ test("the condition: every adapter's sandbox Pod is locked down, so full access 
   const sandboxClass = classes.find((c) => c.metadata.name === FLOOR.runtimes.sandbox);
   assert.deepEqual(sandboxClass?.scheduling.nodeSelector, { [FLOOR.label]: FLOOR_ID }, "the sandbox RuntimeClass schedules only onto nodes with this floor");
   for (const name of Object.keys(AGENTS) as AgentName[]) {
-    const { record, sandbox, inRuns } = await runPod(name);
+    const { record, sandbox, inRuns, proxyPod } = await runPod(name);
     const pod = sandbox.spec.podTemplate.spec as Any;
     const at = `adapter ${name}`;
     assert.equal(sandbox.apiVersion, SANDBOX_API);
@@ -118,7 +127,16 @@ test("the condition: every adapter's sandbox Pod is locked down, so full access 
       for (const e of (c.env ?? []) as Any[]) assert.equal(e.valueFrom, undefined, `${at}: ${c.name} ${e.name}`);
     }
     assert.doesNotMatch(JSON.stringify(inRuns), /model-key|secretKeyRef|"secret"|projected|hostPath/, at);
+    // Every mount but the workspace, scratch and HOME is read-only: the inputs, a command's input files, the tools image.
+    for (const m of pod.containers[0].volumeMounts as Any[]) assert.ok(["/workspace", "/tmp", "/home/agent"].includes(m.mountPath) || m.readOnly === true, `${at}: ${m.mountPath} is read-only`);
+    // A run with no model route gets no credential, even in its proxy, and no grant.
+    if (!record.agent.route) {
+      assert.deepEqual(proxyPod.spec.volumes.map((v: Any) => v.name), ["proxy"], at);
+      assert.deepEqual(record.policy.models, [], at);
+      assert.ok(pod.containers[0].volumeMounts.some((m: Any) => m.mountPath === COMMAND_INPUTS && m.readOnly), at);
+    }
     // And the record says how the harness ran.
     assert.deepEqual(record.agent.settings, AGENTS[name].settings, at);
+    assert.equal(record.run.complete, true, `${at}: ${record.run.error}`);
   }
 });

@@ -11,6 +11,7 @@ import * as path from "node:path";
 import type { Kubectl, KubectlOptions, KubectlResult } from "../src/kubectl.ts";
 import { DEADLINE, LABEL, NS } from "../src/manifests.ts";
 import { FLOOR, FLOOR_ID } from "../src/node.ts";
+import type { RunSpec } from "../src/run.ts";
 
 export const AGENT_IMAGE = "docker.io/library/node@sha256:e7add2a490bb17d97b485b8641bd88455fff7839ade0f5eba493c3508124d413";
 export const PROXY_IMAGE = "docker.io/library/node@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85";
@@ -124,8 +125,14 @@ export function fakeCluster(head: string, exportTar: string, overrides: Record<s
     "exec receive": {},
     "exec prepare": { stdout: Buffer.from(`base=${head}\nuid=1000\nkernel=4.19.0-gvisor\ndmesg=[   0.000000] Starting gVisor...\n`) },
     "exec agent": { stdout: Buffer.from('{"done":true}\n'), stderr: "working\n" },
+    "exec observe": { stdout: Buffer.from("uid=1000\nkernel=4.19.0-gvisor\ndmesg=[   0.000000] Starting gVisor...\n") },
+    "exec run": { stdout: Buffer.from("ran\n") },
     "exec freeze": {},
     "exec export": (_call, options) => {
+      if (options.stdoutFile) fs.copyFileSync(exportTar, options.stdoutFile);
+      return {};
+    },
+    "exec export-workspace": (_call, options) => {
       if (options.stdoutFile) fs.copyFileSync(exportTar, options.stdoutFile);
       return {};
     },
@@ -178,3 +185,42 @@ export const labelled = (kind: string, namespace: string, name: string, labels: 
   metadata: { name, namespace, labels, annotations: deadline === null ? {} : { [DEADLINE]: String(deadline) } },
   ...(kind === "Sandbox" ? { spec: { podTemplate: { metadata: { labels, annotations: deadline === null ? {} : { [DEADLINE]: String(deadline) } } } } } : {}),
 });
+
+/** A workspace export as the sandbox's export-workspace step sends it: `files` by path, plus anything `extra` adds to the tree first. */
+export function workspaceTar(files: Record<string, string>, extra: (dir: string) => void = () => {}): string {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "substrate-k8s-ws-"));
+  const ws = path.join(root, "workspace");
+  for (const [name, data] of Object.entries(files)) {
+    fs.mkdirSync(path.dirname(path.join(ws, name)), { recursive: true });
+    fs.writeFileSync(path.join(ws, name), data);
+  }
+  fs.mkdirSync(ws, { recursive: true });
+  extra(ws);
+  const tar = path.join(root, "export.tar");
+  execFileSync("tar", ["-C", ws, "--format", "pax", "-cf", tar, "."], { env: gitEnv });
+  return tar;
+}
+
+export const ATTEMPT = Buffer.from("print('attempt')\n");
+export const CASE = Buffer.from([0, 1, 2, 255]);
+
+/** A command run as Eevie would ask for one: a staged program and a binary input, no route. */
+export function commandSpec(out: string, change: Partial<RunSpec> = {}): RunSpec {
+  return {
+    repo: null,
+    prompt: "",
+    agent: "command",
+    model: null,
+    models: [],
+    routes: [],
+    allow: [],
+    image: AGENT_IMAGE,
+    toolsImage: null,
+    proxyImage: PROXY_IMAGE,
+    timeoutSeconds: 60,
+    key: null,
+    out,
+    command: { argv: ["python3", "-I", "inputs/refunds/attempt.py"], inputs: { "refunds/attempt.py": ATTEMPT, "case.bin": CASE } },
+    ...change,
+  };
+}
