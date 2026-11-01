@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Lets your phone reach one agent account's Blacksand T3 server over Tailscale,
+# Lets your phone reach one agent account's blacksand-t3 server over Tailscale,
 # with no relay (tooling/t3code/docs/remote-access/phone.md). Run on the always-on host, with sudo,
 # from the admin account, after scripts/add-agent-account.sh made the account:
 #
@@ -87,7 +87,7 @@ print_policy() {
   deny+=("\"$DESKTOP_TAG:22\"" "\"$DESKTOP_TAG:$port\"")
   cat <<EOF
 {
-  // Blacksand T3 phone access (scripts/add-phone-service.sh): tag the phone
+  // blacksand-t3 phone access (scripts/add-phone-service.sh): tag the phone
   // $PHONE_TAG in the admin console (Machines → … → Edit ACL tags).
   "tagOwners": {
     "$PHONE_TAG": ["autogroup:admin"]

@@ -1,5 +1,5 @@
 [Unit]
-Description=Scheduled Blacksand T3 update
+Description=Scheduled blacksand-t3 update
 
 [Timer]
 OnCalendar=__CALENDAR__

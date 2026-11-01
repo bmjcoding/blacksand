@@ -43,7 +43,7 @@ in `~/.ssh/config` before the first login, with your host's name, and your agent
 socket if it isn't 1Password's:
 
 ```
-# The key agent accounts accept, and only it, for the machines Blacksand T3 logs in to.
+# The key agent accounts accept, and only it, for the machines blacksand-t3 logs in to.
 Host t3b-host localhost 127.0.0.1 ::1
   IdentityFile ~/.ssh/blacksand.pub
   IdentitiesOnly yes

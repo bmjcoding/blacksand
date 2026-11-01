@@ -31,7 +31,7 @@ export const WORK = path.join(DATA, "work");
 export const OUT = path.join(DATA, "out");
 export const STATE = IS_BUILDER ? path.join(BUILDER_HOME, "state") : path.join(ROOT, "state");
 /**
- * Where a Blacksand T3 server on this machine drops a marker to ask for an update
+ * Where a blacksand-t3 server on this machine drops a marker to ask for an update
  * (rule server/self-update-requests-host-build): "Update everything" from a
  * desktop reaching this host over SSH. The scheduled updater's launchd job
  * watches it (macOS).

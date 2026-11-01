@@ -1,5 +1,5 @@
 // Copied to apps/web/src/components/sidebar/ in a stripped upstream checkout and run there
-// (rules web/self-update-blacksand-host-requested-*): a host whose Blacksand T3 updater only took
+// (rules web/self-update-blacksand-host-requested-*): a host whose blacksand-t3 updater only took
 // the request is reported as requested, never as updated.
 import { EnvironmentId } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
@@ -49,7 +49,7 @@ describe("blacksand requested host updates", () => {
     expect(only?.type).toBe("success");
     expect(only?.title).toBe("Update requested on 1 server");
     expect(only?.title).not.toMatch(/^Updated/);
-    expect(only?.description).toContain("Blacksand T3 updater builds the signed pin");
+    expect(only?.description).toContain("blacksand-t3 updater builds the signed pin");
 
     const mixed = getUpdateEverythingToastView(
       { localVersion: null, updatedServers: 0, requestedServers: 2, updatedProviders: 1, failures: [], restarting: [] },

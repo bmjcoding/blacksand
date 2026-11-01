@@ -68,7 +68,7 @@ describe("blacksand CLI routes", () => {
     expect(root).toMatch(/^\s*pair\b/m);
   });
 
-  it("never offers upstream's background service: its install is refused, saying what Blacksand T3 does", async () => {
+  it("never offers upstream's background service: its install is refused, saying what blacksand-t3 does", async () => {
     const baseDir = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3b-service-"));
     try {
       for (const args of [["service", "--help"], ["service", "install", "--help"], ["service", "status", "--base-dir", baseDir]]) {
@@ -78,15 +78,15 @@ describe("blacksand CLI routes", () => {
         const recommends = out.split("\n").filter((line) => /\bt3 service (?:install|update)\b/.test(line) && !/^t3 service (?:install|update)(?:\s|$)/.test(line.trim()));
         expect(recommends, args.join(" ")).toEqual([]);
       }
-      expect(await cli(["service", "status", "--base-dir", baseDir])).toMatch(/Blacksand T3 sets up no background service/);
+      expect(await cli(["service", "status", "--base-dir", baseDir])).toMatch(/blacksand-t3 sets up no background service/);
       // The install fails before it sets up or downloads anything.
       const install = await cli(["service", "install", "--base-dir", baseDir]);
-      expect(install).toMatch(/Blacksand T3 sets up no background service\. Other Macs reach Blacksand T3 over SSH/);
+      expect(install).toMatch(/blacksand-t3 sets up no background service\. Other Macs reach T3 Code \(blacksand\) over SSH/);
       expect(NodeFS.readdirSync(baseDir).filter((name) => /runtime|service/.test(name))).toEqual([]);
     } finally {
       NodeFS.rmSync(baseDir, { recursive: true, force: true });
     }
-    expect(new BootServiceInstallError({ cause: "blacksand" }).message).toMatch(/^Blacksand T3 sets up no background service\./);
+    expect(new BootServiceInstallError({ cause: "blacksand" }).message).toMatch(/^blacksand-t3 sets up no background service\./);
     expect(new BootServiceInstallError({ cause: new Error("disk full") }).message).toBe("Could not set up the T3 Code (blacksand) background service.");
   });
 
@@ -100,9 +100,9 @@ describe("blacksand CLI routes", () => {
       NodeFS.writeFileSync(NodePath.join(versionDir, "t3"), `#!/bin/sh\necho ran > '${ran}'\necho 1.2.3\n`, { mode: 0o755 });
       NodeFS.writeFileSync(NodePath.join(versionDir, ".install-complete"), "1.2.3\n");
       const help = await cli(["update", "--help"]);
-      expect(help).toMatch(/Not in Blacksand T3\. Blacksand T3 runs only the build its own updater makes/);
+      expect(help).toMatch(/Not in T3 Code \(blacksand\)\. blacksand-t3 runs only the build its own updater makes/);
       const update = await cli(["update", "1.2.3", "--yes", "--base-dir", baseDir]);
-      expect(update).toMatch(/Blacksand T3 runs only the build its own updater makes: update it with `~\/\.blacksand\/t3\/bin\/t3 update`/);
+      expect(update).toMatch(/blacksand-t3 runs only the build its own updater makes: update it with `~\/\.blacksand\/t3\/bin\/t3 update`/);
       expect(update).not.toMatch(/Installed T3/);
       // The installer itself, as a managed server's self-update calls it: refused before its cache.
       let validated = false;
@@ -121,7 +121,7 @@ describe("blacksand CLI routes", () => {
         }).pipe(Effect.provide(NodeServices.layer)),
       );
       expect(Exit.isFailure(exit)).toBe(true);
-      if (Exit.isFailure(exit)) expect(String((Cause.squash(exit.cause) as Error).message)).toMatch(/^Blacksand T3 runs only the build its own updater makes/);
+      if (Exit.isFailure(exit)) expect(String((Cause.squash(exit.cause) as Error).message)).toMatch(/^blacksand-t3 runs only the build its own updater makes/);
       expect(validated).toBe(false);
       expect(NodeFS.existsSync(ran)).toBe(false);
     } finally {
@@ -160,16 +160,16 @@ describe("blacksand CLI routes", () => {
       process.env.T3CODE_HOME = baseDir;
       // The hidden command a stock service's unit runs.
       const out = await cli(["__service-launcher"]);
-      expect(out).toMatch(/\[service-launcher\] Blacksand T3 runs only the build its own updater makes: update it with `~\/\.blacksand\/t3\/bin\/t3 update`/);
+      expect(out).toMatch(/\[service-launcher\] blacksand-t3 runs only the build its own updater makes: update it with `~\/\.blacksand\/t3\/bin\/t3 update`/);
       expect(process.exitCode).toBe(1);
       untouched();
       // Its entry and the class, as anything else would use them, both with the update to recover.
-      await expect(runServiceLauncher()).rejects.toThrow(/^Blacksand T3 runs only the build its own updater makes/);
+      await expect(runServiceLauncher()).rejects.toThrow(/^blacksand-t3 runs only the build its own updater makes/);
       // The entry refuses before it reads anything: with no T3 home given, before upstream's own check.
       delete process.env.T3CODE_HOME;
-      await expect(runServiceLauncher()).rejects.toThrow(/^Blacksand T3 runs only the build its own updater makes/);
-      expect(() => new Launcher(baseDir, state)).toThrow(/^Blacksand T3 runs only the build its own updater makes/);
-      expect(() => new Launcher(baseDir, { protocol: 3, activeVersion: "1.2.3" })).toThrow(/^Blacksand T3 runs only/);
+      await expect(runServiceLauncher()).rejects.toThrow(/^blacksand-t3 runs only the build its own updater makes/);
+      expect(() => new Launcher(baseDir, state)).toThrow(/^blacksand-t3 runs only the build its own updater makes/);
+      expect(() => new Launcher(baseDir, { protocol: 3, activeVersion: "1.2.3" })).toThrow(/^blacksand-t3 runs only/);
       untouched();
     } finally {
       if (home === undefined) delete process.env.T3CODE_HOME;
@@ -181,7 +181,7 @@ describe("blacksand CLI routes", () => {
 
   it("has `--tailscale-serve` say the host's admin sets up Serve", async () => {
     const help = await cli(["serve", "--help"]);
-    expect(help).toMatch(/--tailscale-serve[\s\S]*Not in Blacksand T3, which leaves Tailscale Serve to the host's admin/);
+    expect(help).toMatch(/--tailscale-serve[\s\S]*Not in T3 Code \(blacksand\), which leaves Tailscale Serve to the host's admin/);
   });
 
   it("has `t3 pair --tailscale` leave Tailscale Serve to the host's admin", () => {

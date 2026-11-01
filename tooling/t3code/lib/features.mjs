@@ -106,7 +106,7 @@ export const features = [
   {
     name: "host-update-requests",
     label: "Update everything for SSH hosts",
-    description: "Update everything includes SSH hosts and asks each one's Blacksand T3 updater to build the signed pin; without it, they need a manual update",
+    description: "Update everything includes SSH hosts and asks each one's blacksand-t3 updater to build the signed pin; without it, they need a manual update",
     rules: [
       "server/blacksand-host-update-file",
       "server/self-update-requests-host-build",
@@ -125,7 +125,7 @@ export const features = [
   {
     name: "update-track-note",
     label: "Update track explained",
-    description: "Picking another update track says how Blacksand T3's pinned tracks are switched; without it, it says npm has no release",
+    description: "Picking another update track says how blacksand-t3's pinned tracks are switched; without it, it says npm has no release",
     rules: ["web/update-track-pinned"],
   },
   {
@@ -139,7 +139,7 @@ export const features = [
     // reworded upstream sentence costs accuracy, not privacy, and doesn't hold an update.
     name: "privacy-text",
     label: "Accurate privacy text",
-    description: "The welcome screen and Settings → About say Blacksand T3 collects no usage data and link its README; without it, they repeat upstream's claim and link T3's privacy policy",
+    description: "The welcome screen and Settings → About say T3 Code (blacksand) collects no usage data and link its README; without it, they repeat upstream's claim and link T3's privacy policy",
     rules: ["web/privacy-text-*"],
   },
 ];

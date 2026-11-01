@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# Shared by Blacksand T3's setup scripts (install.sh, scripts/add-agent-account.sh,
+# Shared by blacksand-t3's setup scripts (install.sh, scripts/add-agent-account.sh,
 # scripts/add-phone-service.sh, scripts/enable-screen-sharing.sh and the Screen
 # Sharing check installed from it): sourced, not run; all but install.sh as root
 # (sudo; tailscaled's LocalAPI takes writes from root only). Output, the legacy

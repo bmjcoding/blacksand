@@ -36,7 +36,7 @@ const collect = collectServerUpdateTargets as unknown as (
 ) => ReturnType<typeof collectServerUpdateTargets> & { readonly waitForNpm?: ReadonlyArray<unknown> };
 
 describe("blacksand host updates", () => {
-  it("updates a host whose Blacksand T3 updater takes requests, without waiting for npm", () => {
+  it("updates a host whose blacksand-t3 updater takes requests, without waiting for npm", () => {
     const { targets, skipped, waitForNpm } = collect(
       [machine("build-host", { blacksandHostUpdate: true }), machine("manual", {})],
       "0.1.6-nightly.20261031.4000",

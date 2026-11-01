@@ -51,7 +51,7 @@ test("the app's updater passes what it chose to the CLI", () => {
 
 test("a build staged with other strip rules isn't installed", () => {
   assert.equal(staleRulesProblem({ sha: "a", blacksand: RULES }, RULES), null);
-  assert.match(staleRulesProblem({ sha: "a", blacksand: OLD_RULES }, RULES), /made with Blacksand T3 111111111111, not this checkout's 222222222222/);
+  assert.match(staleRulesProblem({ sha: "a", blacksand: OLD_RULES }, RULES), /made with blacksand-t3 111111111111, not this checkout's 222222222222/);
   assert.match(staleRulesProblem({ sha: "a" }, RULES), /\(unknown\)/);
   // No checkout identity (not a git clone): nothing to compare against.
   assert.equal(staleRulesProblem({ sha: "a", blacksand: OLD_RULES }, null), null);

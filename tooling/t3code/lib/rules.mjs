@@ -163,20 +163,20 @@ export const STOCK_GUIDANCE = [
   { label: "t3 service install", pattern: /\bt3 service (?:install|update)\b/ },
 ];
 
-// Blacksand T3's own ways to install, update and roll back, which replace them.
+// blacksand-t3's own ways to install, update and roll back, which replace them.
 const T3_README = "https://github.com/bmjcoding/blacksand/tree/main/tooling/t3code#readme";
 const BLACKSAND_UPDATE = "~/.blacksand/t3/bin/t3 update";
 const BLACKSAND_ROLLBACK = "~/.blacksand/t3/bin/t3 rollback";
 
-// How other devices reach a Blacksand T3 server: the desktop app over SSH, a phone through
+// How other devices reach a blacksand-t3 server: the desktop app over SSH, a phone through
 // the host's phone service, whose Tailscale Serve mapping the host's admin sets up
 // (scripts/add-phone-service.sh). Agent accounts get no Tailscale rights.
 const BLACKSAND_PHONE_SERVICE = "sudo scripts/add-phone-service.sh <agent account>";
-const BLACKSAND_OTHER_DEVICES = `Other Macs reach Blacksand T3 over SSH (an SSH environment in the desktop app); for a phone, the host's admin runs \`${BLACKSAND_PHONE_SERVICE} --pair\` in the Blacksand T3 clone.`;
+const BLACKSAND_OTHER_DEVICES = `Other Macs reach T3 Code (blacksand) over SSH (an SSH environment in the desktop app); for a phone, the host's admin runs \`${BLACKSAND_PHONE_SERVICE} --pair\` in the blacksand-t3 clone.`;
 
-/** Why nothing in a Blacksand T3 build looks up T3's releases on npm (rules web/no-npm-release-poll, server/no-npm-release-lookup). */
+/** Why nothing in a blacksand-t3 build looks up T3's releases on npm (rules web/no-npm-release-poll, server/no-npm-release-lookup). */
 const BLACKSAND_NO_NPM_RELEASES =
-  "Blacksand T3 doesn't look up releases on npm: each track builds the release its repository's pin.json pins. Switch tracks with `blacksand t3 update --channel nightly` (or `--channel stable`) on each Mac.";
+  "blacksand-t3 doesn't look up releases on npm: each track builds the release its repository's pin.json pins. Switch tracks with `blacksand t3 update --channel nightly` (or `--channel stable`) on each Mac.";
 
 const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -209,12 +209,12 @@ const addedAfter = (before, edit) => ({ ...edit, absentIn: [...new Set(Object.va
  */
 const shippedOnlyIn = (shippedIn, edit) => ({ ...edit, onlyIn: [...new Set(Object.values(shippedIn))], shippedIn });
 
-// What Blacksand T3 says instead of upstream's background service, which it never
+// What blacksand-t3 says instead of upstream's background service, which it never
 // sets up (its install and repair download stock T3's runtime, refused here).
-const BLACKSAND_NO_SERVICE = `Blacksand T3 sets up no background service. ${BLACKSAND_OTHER_DEVICES}`;
-const BLACKSAND_REMOVE_SERVICE = "Blacksand T3 sets up no background service, so remove this one with `t3 service uninstall`.";
+const BLACKSAND_NO_SERVICE = `blacksand-t3 sets up no background service. ${BLACKSAND_OTHER_DEVICES}`;
+const BLACKSAND_REMOVE_SERVICE = "blacksand-t3 sets up no background service, so remove this one with `t3 service uninstall`.";
 // Instead of switching to another T3 runtime (`t3 update`, a managed server's self-update).
-const BLACKSAND_NO_RUNTIME = `Blacksand T3 runs only the build its own updater makes: update it with \`${BLACKSAND_UPDATE}\` on each Mac. ${BLACKSAND_REMOVE_SERVICE}`;
+const BLACKSAND_NO_RUNTIME = `blacksand-t3 runs only the build its own updater makes: update it with \`${BLACKSAND_UPDATE}\` on each Mac. ${BLACKSAND_REMOVE_SERVICE}`;
 
 // Upstream's files as the audited releases from before each addition ship them
 // (sha-256; test/strip-rules.test.mjs checks their form, CI's `check --ref`
@@ -709,7 +709,7 @@ export const makeRules = ({ updater, build }) => [
           "): ProviderMaintenanceCapabilities {\n" +
           "  return {\n" +
           "    ...manual,\n" +
-          "    manualReason: `Blacksand T3 doesn't update a provider installed with ${installer}, which can't hold its dependencies to the ${MIN_RELEASE_AGE_DAYS}-day minimum release age. Update this provider with npm or pnpm, or its own updater.`,\n" +
+          "    manualReason: `T3 Code (blacksand) doesn't update a provider installed with ${installer}, which can't hold its dependencies to the ${MIN_RELEASE_AGE_DAYS}-day minimum release age. Update this provider with npm or pnpm, or its own updater.`,\n" +
           "  };\n" +
           "}\n\n" +
           "function manualUpdateMessage(latestVersion: string, installPath: string | undefined): string {\n",
@@ -781,7 +781,7 @@ export const makeRules = ({ updater, build }) => [
         find: "  readonly installPath?: string;\n}\n",
         replace:
           "  readonly installPath?: string;\n" +
-          "  /** blacksand: why Blacksand T3 leaves this install to the user, in place of the generic advice. */\n" +
+          "  /** blacksand: why blacksand-t3 leaves this install to the user, in place of the generic advice. */\n" +
           "  readonly manualReason?: string;\n}\n",
       },
     ],
@@ -921,7 +921,7 @@ export const makeRules = ({ updater, build }) => [
       {
         find: "        detail: `ACP Registry agent ${agent.id} has no ${preference === \"auto\" ? \"compatible\" : preference} distribution for ${platform}-${architecture}.`,\n",
         replace:
-          "        detail: `ACP Registry agent ${agent.id} has no npx or uvx package for ${platform}-${architecture}, so it isn't supported in Blacksand T3 (it doesn't install prebuilt binaries).`,\n",
+          "        detail: `ACP Registry agent ${agent.id} has no npx or uvx package for ${platform}-${architecture}, so it isn't supported in T3 Code (blacksand) (it doesn't install prebuilt binaries).`,\n",
       },
       {
         // A switch typed boolean, so TypeScript still checks the code it turns off.
@@ -939,7 +939,7 @@ export const makeRules = ({ updater, build }) => [
           "    if (!BLACKSAND_PREBUILT_BINARIES) {\n" +
           "      return yield* new AcpRegistryError({\n" +
           '        reason: "unsupported_distribution",\n' +
-          "        detail: `ACP Registry agent ${agent.id} ships a prebuilt binary, which Blacksand T3 doesn't install.`,\n" +
+          "        detail: `ACP Registry agent ${agent.id} ships a prebuilt binary, which T3 Code (blacksand) doesn't install.`,\n" +
           "      });\n" +
           "    }\n" +
           "    if (platformTarget === undefined) {\n",
@@ -953,26 +953,26 @@ export const makeRules = ({ updater, build }) => [
   },
   {
     id: "acp-registry/no-prebuilt-binaries-message",
-    why: "An agent that ships only a prebuilt binary says it isn't supported in Blacksand T3",
+    why: "An agent that ships only a prebuilt binary says it isn't supported in T3 Code (blacksand)",
     file: "packages/provider-acp-registry/src/server/driver.ts",
     edits: [
       {
         find: "        message: `ACP Registry agent '${inspection.agentId}' has no compatible distribution for this environment.`,\n",
         replace:
-          "        message: `ACP Registry agent '${inspection.agentId}' has no npx or uvx package for this environment, so it isn't supported in Blacksand T3 (it doesn't install prebuilt binaries).`,\n",
+          "        message: `ACP Registry agent '${inspection.agentId}' has no npx or uvx package for this environment, so it isn't supported in T3 Code (blacksand) (it doesn't install prebuilt binaries).`,\n",
       },
     ],
   },
   {
     id: "server/blacksand-host-update-file",
-    why: "How a server without upstream's service asks this host's Blacksand T3 updater for the signed pin: an unguessable marker, created exclusively",
+    why: "How a server without upstream's service asks this host's blacksand-t3 updater for the signed pin: an unguessable marker, created exclusively",
     kind: "write",
     file: "apps/server/src/cloud/blacksandHostUpdate.ts",
     content: readFile("blacksandHostUpdate.ts"),
   },
   {
     id: "server/self-update-requests-host-build",
-    why: "\"Update everything\" on a server without upstream's service asks this host's Blacksand T3 updater to build the signed pin, never a download; the request is the update's success",
+    why: "\"Update everything\" on a server without upstream's service asks this host's blacksand-t3 updater to build the signed pin, never a download; the request is the update's success",
     file: "apps/server/src/cloud/selfUpdate.ts",
     edits: [
       {
@@ -986,7 +986,7 @@ export const makeRules = ({ updater, build }) => [
           "      // this server runs the new build from the next connection on.\n" +
           "      if (!(yield* Effect.sync(() => requestBlacksandHostUpdate()))) {\n" +
           "        return yield* failWith(\n" +
-          '          "This host has no Blacksand T3 update agent (install.sh --role host sets one up), so it cannot be updated from here.",\n' +
+          '          "This host has no blacksand-t3 update agent (install.sh --role host sets one up), so it cannot be updated from here.",\n' +
           "        );\n" +
           "      }\n" +
           '      return { targetVersion: input.targetVersion, method: "blacksand-host" as const };',
@@ -995,7 +995,7 @@ export const makeRules = ({ updater, build }) => [
   },
   {
     // A server with upstream's background service (boot-service, respawn) updates by switching
-    // to another runtime, from the cache or a download: refused, saying what Blacksand T3 does.
+    // to another runtime, from the cache or a download: refused, saying what blacksand-t3 does.
     // Desktop-managed servers (the app's own updater) and the host build request stay. Strict,
     // so it fits a build that left out host-update-requests too (upstream's capability-null text).
     id: "server/no-stock-runtime-self-update",
@@ -1049,7 +1049,7 @@ export const makeRules = ({ updater, build }) => [
       {
         find: 'export const ServerSelfUpdateMethod = Schema.Literals(["boot-service", "respawn", "desktop-app"]);',
         replace:
-          '// blacksand: "blacksand-host" is a request queued with the host\'s Blacksand T3 updater.\n' +
+          '// blacksand: "blacksand-host" is a request queued with the host\'s blacksand-t3 updater.\n' +
           'export const ServerSelfUpdateMethod = Schema.Literals(["boot-service", "respawn", "desktop-app", "blacksand-host"]);',
       },
       {
@@ -1061,7 +1061,7 @@ export const makeRules = ({ updater, build }) => [
         find: "  serverSelfUpdate: Schema.optionalKey(ServerSelfUpdateCapability),\n",
         replace:
           "  serverSelfUpdate: Schema.optionalKey(ServerSelfUpdateCapability),\n" +
-          "  /** blacksand: the host's Blacksand T3 updater takes update requests (cloud/blacksandHostUpdate.ts). */\n" +
+          "  /** blacksand: the host's blacksand-t3 updater takes update requests (cloud/blacksandHostUpdate.ts). */\n" +
           "  blacksandHostUpdate: Schema.optionalKey(Schema.Boolean),\n",
       },
     ],
@@ -1086,7 +1086,7 @@ export const makeRules = ({ updater, build }) => [
   },
   {
     id: "web/self-update-blacksand-host",
-    why: "Hosts whose Blacksand T3 updater takes requests can be updated from here, without waiting for npm",
+    why: "Hosts whose blacksand-t3 updater takes requests can be updated from here, without waiting for npm",
     file: "apps/web/src/versionSkew.ts",
     edits: [
       {
@@ -1118,13 +1118,13 @@ export const makeRules = ({ updater, build }) => [
   },
   {
     id: "web/self-update-blacksand-host-wording",
-    why: "Say a host update was requested, not done (and report it as requested, so Update everything never counts it as updated), and how to update a host by hand with Blacksand T3",
+    why: "Say a host update was requested, not done (and report it as requested, so Update everything never counts it as updated), and how to update a host by hand with blacksand-t3",
     file: "apps/web/src/components/ServerUpdateAction.tsx",
     edits: [
       {
         find: '  | { readonly status: "updated" | "skipped" }\n',
         replace:
-          '  // blacksand: "requested": the host\'s Blacksand T3 updater queued the build; nothing is updated yet.\n' +
+          '  // blacksand: "requested": the host\'s blacksand-t3 updater queued the build; nothing is updated yet.\n' +
           '  | { readonly status: "updated" | "requested" | "skipped" }\n',
       },
       {
@@ -1147,7 +1147,7 @@ export const makeRules = ({ updater, build }) => [
           '        type: "success",\n' +
           "        title: requested ? `${serverLabel} update requested` : `${serverLabel} updated`,\n" +
           "        description: requested\n" +
-          "          ? `Its Blacksand T3 updater is building the pinned release. Reconnect when it finishes (usually 15 to 20 minutes).`\n" +
+          "          ? `Its blacksand-t3 updater is building the pinned release. Reconnect when it finishes (usually 15 to 20 minutes).`\n" +
           '          : selfUpdate === "desktop-managed"\n' +
           "            ? `Desktop app relaunched on ${result.value.targetVersion}.`\n" +
           "            : `Reconnected on t3@${result.value.targetVersion}.`,\n" +
@@ -1173,7 +1173,7 @@ export const makeRules = ({ updater, build }) => [
           "      toastManager.add({\n" +
           '        type: "success",\n' +
           '        title: "Update command copied",\n' +
-          "        description: `Run \\`${command}\\` on ${serverLabel} as the account that installed Blacksand T3 there (install.sh --role host also sets up its updater), then reconnect.`,\n",
+          "        description: `Run \\`${command}\\` on ${serverLabel} as the account that installed blacksand-t3 there (install.sh --role host also sets up its updater), then reconnect.`,\n",
       },
       {
         find:
@@ -1188,7 +1188,7 @@ export const makeRules = ({ updater, build }) => [
   },
   {
     id: "web/self-update-blacksand-host-requested-results",
-    why: "Update everything reports a host whose Blacksand T3 updater took the request as requested, never as updated, in its run and its result",
+    why: "Update everything reports a host whose blacksand-t3 updater took the request as requested, never as updated, in its run and its result",
     file: "apps/web/src/components/sidebar/updateEverything.logic.ts",
     edits: [
       { find: '  | "done"\n  | "failed";\n', replace: '  | "done"\n  | "requested"\n  | "failed";\n' },
@@ -1207,7 +1207,7 @@ export const makeRules = ({ updater, build }) => [
         find: "  readonly updatedServers: number;\n",
         replace:
           "  readonly updatedServers: number;\n" +
-          "  /** blacksand: hosts whose Blacksand T3 updater took an update request; not updated yet. */\n" +
+          "  /** blacksand: hosts whose blacksand-t3 updater took an update request; not updated yet. */\n" +
           "  readonly requestedServers?: number;\n",
       },
       {
@@ -1224,7 +1224,7 @@ export const makeRules = ({ updater, build }) => [
           "    requested === 0\n" +
           "      ? []\n" +
           "      : [\n" +
-          '          `Requested an update of ${countLabel(requested, "server")}: ${requested === 1 ? "its" : "their"} Blacksand T3 updater builds the signed pin, and the next connection runs it.`,\n' +
+          '          `Requested an update of ${countLabel(requested, "server")}: ${requested === 1 ? "its" : "their"} blacksand-t3 updater builds the signed pin, and the next connection runs it.`,\n' +
           "        ];\n" +
           "  const restarting =\n    result.restarting.length === 0\n",
       },
@@ -1269,7 +1269,7 @@ export const makeRules = ({ updater, build }) => [
           "    providerFailure,\n" +
           "  }: {\n" +
           "    readonly serverUpdated?: boolean;\n" +
-          "    /** blacksand: the host's Blacksand T3 updater took the request and builds on its own. */\n" +
+          "    /** blacksand: the host's blacksand-t3 updater took the request and builds on its own. */\n" +
           "    readonly serverRequested?: boolean;\n" +
           "    readonly providerFailure?: string | null;\n" +
           "  } = {},\n",
@@ -1493,7 +1493,7 @@ export const makeRules = ({ updater, build }) => [
   {
     // Since 0.1.6-nightly.20261031.3956 the server answers server.getNpmRelease by running
     // `npm view t3@<spec>`, or fetching registry.npmjs.org/t3 without npm. Its one layer
-    // gives every caller Blacksand T3's answer instead; releases before it have neither.
+    // gives every caller blacksand-t3's answer instead; releases before it have neither.
     id: "server/no-npm-release-lookup",
     why: "The server looks up T3's npm releases for the update-track switch (npm view, or registry.npmjs.org)",
     file: "apps/server/src/ws.ts",
@@ -1707,7 +1707,7 @@ export const makeRules = ({ updater, build }) => [
         ].map((find) => ({
           find,
           replace:
-            "            {`Blacksand T3 builds the release its repository's pin.json pins for each track, not the latest on npm, so the track isn't switched from here. ` +\n" +
+            "            {`blacksand-t3 builds the release its repository's pin.json pins for each track, not the latest on npm, so the track isn't switched from here. ` +\n" +
             '              `To move to ${label}, run \\`blacksand t3 update --channel ${channel === "nightly" ? "nightly" : "stable"}\\` on each Mac; it refuses a track pin.json doesn\'t pin yet.`}\n',
         })),
       ),
@@ -2243,7 +2243,7 @@ export const makeRules = ({ updater, build }) => [
           '              ? "Download and reinstall the latest nightly build"\n' +
           '              : "Download and reinstall T3 Code",\n' +
           "          ),\n",
-        replace: `          link(DOWNLOAD_URL, "Rebuild and reinstall Blacksand T3 (${BLACKSAND_UPDATE} --force); see its README"),\n`,
+        replace: `          link(DOWNLOAD_URL, "Rebuild and reinstall T3 Code (blacksand) (${BLACKSAND_UPDATE} --force); see its README"),\n`,
       },
     ],
   },
@@ -2259,7 +2259,7 @@ export const makeRules = ({ updater, build }) => [
     ],
   },
   {
-    // The updater's "Read more" and release-history links. A Blacksand T3 update is a
+    // The updater's "Read more" and release-history links. A blacksand-t3 update is a
     // build of upstream's source, so they show upstream's commits up to the release,
     // never a release page with stock downloads.
     id: "web/no-stock-release-links",
@@ -2292,8 +2292,8 @@ export const makeRules = ({ updater, build }) => [
       {
         find: '        text: "Get a different version from the releases page.",\n        action: actionLink("releases", "Open releases", true),\n',
         replace:
-          `        text: "To rebuild and reinstall it, run ${BLACKSAND_UPDATE} --force in Terminal. The Blacksand T3 README has the rest.",\n` +
-          '        action: actionLink("releases", "Open the Blacksand T3 README", true),\n',
+          `        text: "To rebuild and reinstall it, run ${BLACKSAND_UPDATE} --force in Terminal. The blacksand-t3 README has the rest.",\n` +
+          '        action: actionLink("releases", "Open the blacksand-t3 README", true),\n',
       },
       {
         find: "          yield* electronShell.openExternal(`${RELEASES_URL}/tag/v${current.version}`);\n",
@@ -2303,7 +2303,7 @@ export const makeRules = ({ updater, build }) => [
   },
   {
     id: "web/no-stock-commands-onboarding",
-    why: "Onboarding tells you to run `npx t3 connect|pair|serve`, which fetch stock T3; name the t3 command Blacksand T3 installs",
+    why: "Onboarding tells you to run `npx t3 connect|pair|serve`, which fetch stock T3; name the t3 command blacksand-t3 installs",
     file: "apps/web/src/components/onboarding/WelcomeWizard.tsx",
     edits: [
       { find: '<CommandBlock command="npx t3 connect" className="mt-3" />', replace: '<CommandBlock command="t3 connect" className="mt-3" />' },
@@ -2327,14 +2327,14 @@ export const makeRules = ({ updater, build }) => [
           find: '<code className="font-mono">--tailscale</code> to use your tailnet.',
           replace:
             '<code className="font-mono">--tailscale</code> to pair over your tailnet once the host\'s admin has run{" "}\n' +
-            '              <code className="font-mono">sudo scripts/add-phone-service.sh</code> for this account (Blacksand T3\'s phone service).',
+            '              <code className="font-mono">sudo scripts/add-phone-service.sh</code> for this account (blacksand-t3\'s phone service).',
         },
         {
           // Since 0.1.6-nightly.20261031.3956.
           find: 'On a tailnet, run <code className="font-mono">npx t3 pair --tailscale</code> instead.',
           replace:
             'On a tailnet, run <code className="font-mono">t3 pair --tailscale</code> instead, once the host\'s admin has run{" "}\n' +
-            '              <code className="font-mono">sudo scripts/add-phone-service.sh</code> for this account (Blacksand T3\'s phone service).',
+            '              <code className="font-mono">sudo scripts/add-phone-service.sh</code> for this account (blacksand-t3\'s phone service).',
         },
       ),
     ],
@@ -2378,19 +2378,19 @@ export const makeRules = ({ updater, build }) => [
     edits: [
       {
         find: '      "Start one with `npx t3 serve`, or connect this machine with T3 Connect: `npx t3 connect`.",\n',
-        replace: '      "Start one with `t3 serve` (Settings → About in Blacksand T3 installs the t3 command), or add this machine to Blacksand T3 as an SSH environment.",\n',
+        replace: '      "Start one with `t3 serve` (Settings → About in T3 Code (blacksand) installs the t3 command), or add this machine to T3 Code (blacksand) as an SSH environment.",\n',
       },
       {
         find: "      `Pair with the matching CLI instead: \\`npx t3@${this.serverVersion} pair\\`.`,\n",
         replace:
-          "      `Pair with the t3 command of the Blacksand T3 build running this server (${this.serverVersion}), or update both with \\`" +
+          "      `Pair with the t3 command of the blacksand-t3 build running this server (${this.serverVersion}), or update both with \\`" +
           BLACKSAND_UPDATE +
           "\\`.`,\n",
       },
     ],
   },
   {
-    // `t3 pair` says how else to reach the server: in Blacksand T3, SSH from the desktop app
+    // `t3 pair` says how else to reach the server: in blacksand-t3, SSH from the desktop app
     // or the host's phone service. `--tailscale` pairs through a Serve mapping the host's
     // admin made; it never writes one itself (an agent account has no Tailscale rights, and
     // its attempt was refused with a 403 and a misleading "run tailscale serve by hand").
@@ -2432,8 +2432,8 @@ export const makeRules = ({ updater, build }) => [
       {
         find: "    return `tailscale serve failed for HTTPS port ${String(this.servePort)}. Run \\`tailscale serve --https=${String(this.servePort)} --bg <local-url>\\` by hand to see why.`;\n",
         replace:
-          "    return `Tailscale Serve has no HTTPS mapping on port ${String(this.servePort)} for this server, and Blacksand T3 leaves Serve to the host's admin. " +
-          "From the admin account, in the Blacksand T3 clone, run \\`" +
+          "    return `Tailscale Serve has no HTTPS mapping on port ${String(this.servePort)} for this server, and blacksand-t3 leaves Serve to the host's admin. " +
+          "From the admin account, in the blacksand-t3 clone, run \\`" +
           BLACKSAND_PHONE_SERVICE +
           " --https-port ${String(this.servePort)}\\`, then pair with its --pair, or run this again.`;\n",
       },
@@ -2441,7 +2441,7 @@ export const makeRules = ({ updater, build }) => [
   },
   {
     // Since 0.1.6-nightly.20261031.3973 `t3 up` sets up upstream's background service, T3
-    // Connect and LAN access, and `t3 status` shows them; Blacksand T3 has none of the three
+    // Connect and LAN access, and `t3 status` shows them; blacksand-t3 has none of the three
     // (its download of the service's runtime is disabled), so both leave the CLI.
     id: "server/no-t3-up",
     why: "`t3` and `t3 serve` say to run `t3 up`, which installs upstream's background service",
@@ -2486,7 +2486,7 @@ export const makeRules = ({ updater, build }) => [
         ...[
           '  Command.withDescription("Install T3 Code as a background service for this user."),\n',
           '  Command.withDescription(\n    "Install T3 Code as a background service for this user. `t3 up` also chooses how your other devices reach it.",\n  ),\n',
-        ].map((find) => ({ find, replace: `  Command.withDescription(${JSON.stringify(`Not in Blacksand T3. ${BLACKSAND_NO_SERVICE}`)}),\n` })),
+        ].map((find) => ({ find, replace: `  Command.withDescription(${JSON.stringify(`Not in T3 Code (blacksand). ${BLACKSAND_NO_SERVICE}`)}),\n` })),
       ),
       // `t3 service install` and `update` stop here, before anything is written (since
       // 0.1.6-nightly.20261031.3973 a service.env); bootService.ts refuses every other caller.
@@ -2526,7 +2526,7 @@ export const makeRules = ({ updater, build }) => [
   },
   {
     id: "server/no-stock-runner-command",
-    why: "Commands the server suggests (browser setup, triage) become `npx t3@<channel> ...` when it was started by a package runner; a Blacksand T3 server suggests its own t3",
+    why: "Commands the server suggests (browser setup, triage) become `npx t3@<channel> ...` when it was started by a package runner; a blacksand-t3 server suggests its own t3",
     file: "apps/server/src/cli/invocation.ts",
     edits: [
       {
@@ -2544,7 +2544,7 @@ export const makeRules = ({ updater, build }) => [
         find:
           "On that machine, try \\`t3 update\\` and let it restart (or run \\`t3 service restart\\` if the update is already installed). If the older launcher cannot update, run \\`t3 service uninstall\\`, then reinstall with \\`t3 service install\\` from a current CLI. You can also leave the service uninstalled. Pass \\`--base-dir ${this.baseDir}\\` to each command, and use \\`npx t3@latest\\` if \\`t3\\` is not installed or is outdated.",
         replace:
-          "On that machine, remove it with \\`t3 service uninstall --base-dir ${this.baseDir}\\` (Blacksand T3 doesn't install upstream's background service), and update Blacksand T3 with \\`" +
+          "On that machine, remove it with \\`t3 service uninstall --base-dir ${this.baseDir}\\` (blacksand-t3 doesn't install upstream's background service), and update T3 Code (blacksand) with \\`" +
           BLACKSAND_UPDATE +
           "\\`.",
       },
@@ -2612,7 +2612,7 @@ export const makeRules = ({ updater, build }) => [
     edits: [
       {
         find: '    "Download a newer t3 and switch this machine to it, including the background service when one is installed.",\n',
-        replace: `    ${JSON.stringify(`Not in Blacksand T3. ${BLACKSAND_NO_RUNTIME}`)},\n`,
+        replace: `    ${JSON.stringify(`Not in T3 Code (blacksand). ${BLACKSAND_NO_RUNTIME}`)},\n`,
       },
       {
         find: "    Effect.gen(function* () {\n      const logLevel = yield* GlobalFlag.LogLevel;\n      const config = yield* resolveCliAuthConfig(flags, logLevel);\n      return yield* runUpdate({\n",
@@ -2627,7 +2627,7 @@ export const makeRules = ({ updater, build }) => [
   {
     // Setting up upstream's background service (`t3 service install` and `update`, `t3 up`)
     // starts by installing a T3 runtime (refused anyway: server/no-stock-runtime); it fails
-    // here first, saying what Blacksand T3 does.
+    // here first, saying what blacksand-t3 does.
     id: "server/no-stock-service-install",
     why: "Setting up upstream's background service downloads stock T3's runtime; its problems say to run `t3 service install`",
     file: "apps/server/src/cloud/bootService.ts",
@@ -2672,7 +2672,7 @@ export const makeRules = ({ updater, build }) => [
           'import { disableTailscaleServe, ensureTailscaleServe as upstreamEnsureTailscaleServe } from "@t3tools/tailscale";\n' +
           "/** blacksand: Tailscale Serve is the host admin's (scripts/add-phone-service.sh); this server never writes it. */\n" +
           "const ensureTailscaleServe = (_input: Parameters<typeof upstreamEnsureTailscaleServe>[0]) =>\n" +
-          `  Effect.fail(new Error(${JSON.stringify(`Blacksand T3 leaves Tailscale Serve to the host's admin: from the admin account, in the Blacksand T3 clone, run \`${BLACKSAND_PHONE_SERVICE}\`, and start this server without --tailscale-serve.`)}));\n`,
+          `  Effect.fail(new Error(${JSON.stringify(`blacksand-t3 leaves Tailscale Serve to the host's admin: from the admin account, in the blacksand-t3 clone, run \`${BLACKSAND_PHONE_SERVICE}\`, and start this server without --tailscale-serve.`)}));\n`,
       },
     ],
   },
@@ -2683,7 +2683,7 @@ export const makeRules = ({ updater, build }) => [
     edits: [
       {
         find: '    "Configure Tailscale Serve to expose this backend over HTTPS on the Tailnet.",\n',
-        replace: `    ${JSON.stringify(`Not in Blacksand T3, which leaves Tailscale Serve to the host's admin (\`${BLACKSAND_PHONE_SERVICE}\`).`)},\n`,
+        replace: `    ${JSON.stringify(`Not in T3 Code (blacksand), which leaves Tailscale Serve to the host's admin (\`${BLACKSAND_PHONE_SERVICE}\`).`)},\n`,
       },
     ],
   },
@@ -2697,7 +2697,7 @@ export const makeRules = ({ updater, build }) => [
           "        `On the server machine, install this exact CLI: \\`curl -fsSL https://t3.codes/install.sh | T3CODE_VERSION=${version} sh\\`.`,\n" +
           "        `Check that \\`t3 --version\\` prints ${version} and that \\`which -a t3\\` lists no older t3 (such as an npm or nvm install) first, then run \\`~/.local/bin/t3 service install\\` (the installer's default path).`,\n",
         replace:
-          "        `Blacksand T3 doesn't install upstream's CLI or background service: on the server machine, remove this one with \\`t3 service uninstall\\` and update Blacksand T3 with \\`" +
+          "        `blacksand-t3 doesn't install upstream's CLI or background service: on the server machine, remove this one with \\`t3 service uninstall\\` and update T3 Code (blacksand) with \\`" +
           BLACKSAND_UPDATE +
           "\\`.`,\n",
       },
@@ -2724,7 +2724,7 @@ export const makeRules = ({ updater, build }) => [
           "instead of this one. The user may be on an old release with an old copy.\n",
         replace:
           "## 3. Follow this playbook\n\n" +
-          "This is Blacksand T3's own playbook: follow it, not another copy. Blacksand T3\n" +
+          "This is blacksand-t3's own playbook: follow it, not another copy. blacksand-t3\n" +
           "builds upstream's source (pingdotgg/t3code) with its phone-home code removed, so\n" +
           "upstream's playbook and install or update instructions don't apply to it.\n",
       },
@@ -2744,7 +2744,7 @@ export const makeRules = ({ updater, build }) => [
           "exact update command for how they run the CLI (the context file records how it was\n" +
           "launched).\n",
         replace:
-          "If the user is behind and the fix likely shipped, say so plainly: Blacksand T3\n" +
+          "If the user is behind and the fix likely shipped, say so plainly: T3 Code (blacksand)\n" +
           `updates with \\\`${BLACKSAND_UPDATE}\\\` (its README, ${T3_README},\n` +
           "has the rest), never from upstream's releases or npm.\n",
       },
@@ -2758,7 +2758,7 @@ export const makeRules = ({ updater, build }) => [
       {
         find:
           "Stop that server or try `t3 update`. If the older launcher cannot update, run `t3 service uninstall` and optionally reinstall with `t3 service install` from a current CLI. Use `npx t3@latest` if `t3` is missing or outdated, and pass `--base-dir` with the service's T3 home to each command.",
-        replace: `Stop that server, or remove an older background service with \`t3 service uninstall --base-dir <its T3 home>\`. \`${BLACKSAND_UPDATE}\` updates Blacksand T3.`,
+        replace: `Stop that server, or remove an older background service with \`t3 service uninstall --base-dir <its T3 home>\`. \`${BLACKSAND_UPDATE}\` updates T3 Code (blacksand).`,
       },
     ],
   },

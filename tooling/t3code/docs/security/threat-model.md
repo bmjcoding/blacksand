@@ -35,7 +35,7 @@ design.
 ```mermaid
 flowchart LR
   subgraph desktop["Desktop: your account"]
-    app["Blacksand T3 app<br/>CSP: loopback only"]
+    app["T3 Code (blacksand) app<br/>CSP: loopback only"]
     dupd["updater and self-update"]
     dbuild["build account _blacksand-build"]
   end

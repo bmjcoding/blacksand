@@ -94,7 +94,7 @@ test("a release that asks for the pinned pnpm builds; one that asks for any othe
     assert.equal(pnpmPinProblem(ok), null, ok);
   }
   for (const [text, says] of [
-    [manifest({ packageManager: "pnpm@12.16.1" }), /asks for pnpm@12\.16\.1 \(packageManager in package\.json\), not pnpm 12\.14\.0, the one Blacksand T3 pins/],
+    [manifest({ packageManager: "pnpm@12.16.1" }), /asks for pnpm@12\.16\.1 \(packageManager in package\.json\), not pnpm 12\.14\.0, the one blacksand-t3 pins/],
     // Older is another pnpm too: pnpm switches down as readily as up.
     [manifest({ packageManager: "pnpm@12.12.0" }), /pnpm@12\.12\.0/],
     [manifest({ packageManager: "pnpm@12.16.1+sha512.0000" }), /pnpm@12\.16\.1\+sha512\.0000/],
@@ -324,7 +324,7 @@ test("tools the running account can't get to are refused with what to do, not a 
   }
 });
 
-test("the Vite+ home is exactly what Blacksand T3 gave it: entries, kinds, launchers, binary and, for the build account, owner", () => {
+test("the Vite+ home is exactly what blacksand-t3 gave it: entries, kinds, launchers, binary and, for the build account, owner", () => {
   const dir = scratch();
   try {
     const fake = fakePnpm(dir, path.join(dir, "calls.log"));
@@ -338,7 +338,7 @@ test("the Vite+ home is exactly what Blacksand T3 gave it: entries, kinds, launc
     checkVitePlusHome(home, opts);
     // A launcher replaced, the binary left alone.
     fs.writeFileSync(path.join(bin, "pnpm"), "#!/bin/sh\necho replaced\n");
-    assert.throws(() => checkVitePlusHome(home, opts), /pnpm isn't Vite\+'s launcher as Blacksand T3 writes it/);
+    assert.throws(() => checkVitePlusHome(home, opts), /pnpm isn't Vite\+'s launcher as blacksand-t3 writes it/);
     // A launcher made a symlink (to the binary, even), a lock gone, a directory swapped for a file.
     fresh();
     fs.rmSync(path.join(bin, "pnpx"));
@@ -405,7 +405,7 @@ test("upstream's Vite+ runs the pinned pnpm from a home the build seeds, and may
     for (const extra of [["package_manager", "pnpm", "12.16.1"], ["package_manager", "npm"], ["node"]]) {
       seedVitePlusHome(home, fake.file);
       fs.mkdirSync(path.join(home, ...extra), { recursive: true });
-      assert.throws(() => checkVitePlusHome(home, opts), /upstream's Vite\+ home isn't what Blacksand T3 gave it \(fetched or added: /, extra.join("/"));
+      assert.throws(() => checkVitePlusHome(home, opts), /upstream's Vite\+ home isn't what blacksand-t3 gave it \(fetched or added: /, extra.join("/"));
     }
     // Its binary swapped: the build stops too.
     seedVitePlusHome(home, fake.file);

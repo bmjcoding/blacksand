@@ -1,5 +1,5 @@
 // @effect-diagnostics globalTimers:off - Part of stream.ts's transport, which runs without an Effect runtime.
-// blacksand (lib/rules.mjs, desktop/webrtc-window): in Blacksand T3's desktop app no frame
+// blacksand (lib/rules.mjs, desktop/webrtc-window): in blacksand-t3's desktop app no frame
 // in the app's window may send WebRTC over UDP (apps/desktop/src/boot.ts), so the device
 // stream makes its peer connections in a hidden window of the app's own, which may
 // (apps/desktop/src/window/blacksandWebRtcWindow.ts). Anywhere else, a browser or the

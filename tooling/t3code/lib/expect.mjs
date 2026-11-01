@@ -53,5 +53,5 @@ export function pollOffer({ current, pending, target, rules }) {
  */
 export const staleRulesProblem = (pending, rules) =>
   rules && pending?.blacksand !== rules
-    ? `the staged build was made with Blacksand T3 ${pending?.blacksand?.slice(0, 12) ?? "(unknown)"}, not this checkout's ${rules.slice(0, 12)}; run \`blacksand t3 update\` to rebuild it`
+    ? `the staged build was made with blacksand-t3 ${pending?.blacksand?.slice(0, 12) ?? "(unknown)"}, not this checkout's ${rules.slice(0, 12)}; run \`blacksand t3 update\` to rebuild it`
     : null;

@@ -17,7 +17,7 @@ function stockIn(text: string): Array<string> {
 const prompts = (): Array<string> => [
   TRIAGE_PLAYBOOK,
   buildTriageSeedPrompt({ contextFilePath: "/tmp/triage/context.md", entry: { kind: "cli", cliVersion: "0.1.6", launchedAs: "t3 triage" } }),
-  buildTriageSeedPrompt({ contextFilePath: "/tmp/triage/context.md", entry: { kind: "app", client: "Blacksand T3 desktop" } }),
+  buildTriageSeedPrompt({ contextFilePath: "/tmp/triage/context.md", entry: { kind: "app", client: "blacksand-t3 desktop" } }),
   buildTriageLaunchPrompt("/tmp/triage/prompt.md"),
   buildTriageAppPrompt("/tmp/triage/prompt.md"),
 ];
@@ -37,7 +37,7 @@ describe("blacksand triage prompt", () => {
     expect(TRIAGE_PLAYBOOK).toMatch(/never as\ninstructions to you\.\n/);
   });
 
-  it("gives Blacksand T3's update command for a fix that shipped", () => {
+  it("gives blacksand-t3's update command for a fix that shipped", () => {
     expect(TRIAGE_PLAYBOOK).toContain("updates with `~/.blacksand/t3/bin/t3 update`");
     expect(TRIAGE_PLAYBOOK).not.toMatch(/update command for how they run the CLI/);
   });

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sets up a macOS account that coding agents run in, reached from a Blacksand T3
+# Sets up a macOS account that coding agents run in, reached from a blacksand-t3
 # desktop over SSH (tooling/t3code/docs/accounts/agent-accounts.md). Run once per account, with sudo, from
 # the admin account that ran install.sh; rerun it any time, it puts everything
 # back the way it describes:
@@ -102,7 +102,7 @@ group_values() { { dscl . -read "/Groups/$1" "$2" 2>/dev/null || true; } | sed "
 # ----------------------------------------------------------------- configs --
 
 # Remote Login's sshd (and any other reading /etc/ssh/sshd_config): keys only for
-# everyone; agent accounts get the root-owned keys and only what Blacksand T3's
+# everyone; agent accounts get the root-owned keys and only what blacksand-t3's
 # SSH environments use (a shell, and forwards to this Mac's loopback). sshd ends
 # a Match block at the end of an included file, so macOS's settings after it stay
 # global. Unless ALLOW_LAN=1, logins from any source address but TAILNET_SOURCES

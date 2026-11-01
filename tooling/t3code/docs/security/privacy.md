@@ -1,6 +1,6 @@
 # Privacy
 
-> **Applies to:** the Blacksand T3 app and its servers, macOS and Linux.
+> **Applies to:** the T3 Code (blacksand) app and its servers, macOS and Linux.
 
 This page lists what blacksand-t3 removes, what still leaves the machine and why, how
 each part is enforced, and how you can check it yourself.

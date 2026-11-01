@@ -59,7 +59,7 @@ button offers the release again.
   ([advisory sources](updates/fast-lane.md#advisory-sources)).
 - **A network error fetching a native package's headers or binary, such as
   `ETIMEDOUT` for node-pty's.** Rerun. Nothing was installed.
-- **"Update not applied: the staged build was made with Blacksand T3 …", or "staged
+- **"Update not applied: the staged build was made with blacksand-t3 …", or "staged
   build not installed" in the log after `launch`.** The waiting build came from a
   different blacksand-t3 commit than this clone's. The installed build keeps running.
   `blacksand t3 update`, or the next hourly run, rebuilds it.
@@ -81,10 +81,10 @@ button offers the release again.
   update or rollback first finishes it, or puts the previous build back. It may stop
   with "`state/activation.json` is damaged (…)" or "says its build went in, but
   nothing is installed". Then the journal is one this install can't trust. Compare
-  the app folders with `state/current.json` by hand, and make sure `T3 Code (blacksand).app`
-  is the build that file names. The app folders are `T3 Code (blacksand).app` and the hidden
-  `.T3 Code (blacksand).previous`, `.outgoing`, `.new` and `.pending` copies beside it. Then
-  remove `state/activation.json`.
+  the app folders with `state/current.json` by hand, and make sure
+  `T3 Code (blacksand).app` is the build that file names. Beside it are hidden copies:
+  `.T3 Code (blacksand).previous.app`, `.outgoing.app`, `.new.app` and `.pending.app`.
+  Then remove `state/activation.json`.
 - **Every command stops with an error about `state/install.json`.** The file is
   unreadable or invalid. `blacksand t3 configure --role ui` (or `host`, `both`)
   writes a new one.
@@ -133,14 +133,14 @@ These messages appear in the log. Only "refused" also sends a notification.
 - **`signing init` fails over SSH with "The authorization was denied since no user
   interaction was possible".** Run `install.sh`, or `signing init`, in Terminal at
   the Mac.
-- **You see "Blacksand T3 is not installed on this host".** Run
+- **You see "blacksand-t3 is not installed on this host".** Run
   `tooling/t3code/install.sh --role host` on that host. The app must be in
   `/Applications`.
 - **The host doesn't update.** Check `blacksand t3 status` (the schedule line),
   `sudo launchctl print system/dev.blacksand.update`, and the two logs. The daemon
   can't reach a clone inside `~/Documents`, `~/Desktop` or `~/Downloads`. Move the
   clone and rerun `tooling/t3code/install.sh --role host`.
-- **You see "This host has no Blacksand T3 update agent".** The host's request folder
+- **You see "This host has no blacksand-t3 update agent".** The host's request folder
   is missing. Run `blacksand t3 schedule` on the host, as the admin who installed it.
 
 ## SSH
@@ -184,7 +184,7 @@ These messages appear in the log. Only "refused" also sends a notification.
 
 ## Agent accounts and providers
 
-- **You see "Blacksand T3 sets up no background service, so remove this one with
+- **You see "blacksand-t3 sets up no background service, so remove this one with
   `t3 service uninstall`".** An upstream `t3` background service is still installed
   in that account. Do what the message says, as that account.
 - **You see "…server.env must belong to you and be readable only by you".** Run
@@ -201,13 +201,13 @@ These messages appear in the log. Only "refused" also sends a notification.
 - **Settings won't update a provider, saying "…installed with bun/yarn/Volta/Vite+,
   which can't hold its dependencies to the 3-day minimum release age".** Reinstall
   that CLI with npm.
-- **An ACP Registry agent "isn't supported in Blacksand T3".** It ships only a
+- **An ACP Registry agent "isn't supported in T3 Code (blacksand)".** It ships only a
   prebuilt binary. blacksand-t3 installs agents only from npm or PyPI packages,
   through `npx` or `uvx`. `brew install uv` provides `uvx`.
 - **The desktop says the account's server is still starting.** The phone service's
   server is starting, or restarting after an update. Wait a minute and reconnect. Its
   log is in that account's `~/.blacksand/t3/phone/`.
-- **You see "Blacksand T3 server … still runs a build this host has replaced and did
+- **You see "blacksand-t3 server … still runs a build this host has replaced and did
   not stop; stop it (kill -9 …) and connect again".** A server from the old build
   didn't stop when the connection tried to stop it, with SIGTERM and then SIGKILL
   after 5 seconds. Do what the message says, as that agent account, then connect

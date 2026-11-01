@@ -203,7 +203,7 @@ EOF
 print_policy() {
   cat <<EOF
 {
-  // Blacksand T3 Screen Sharing (scripts/enable-screen-sharing.sh): TCP only.
+  // blacksand-t3 Screen Sharing (scripts/enable-screen-sharing.sh): TCP only.
   "tagOwners": {
     "$PHONE_TAG": ["autogroup:admin"]
   },

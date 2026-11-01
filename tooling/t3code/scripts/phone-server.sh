@@ -1,5 +1,5 @@
 #!/bin/sh
-# Blacksand T3: one agent account's long-running server, for the phone
+# blacksand-t3: one agent account's long-running server, for the phone
 # (tooling/t3code/docs/remote-access/phone.md). scripts/add-phone-service.sh installs a root-owned
 # copy as /usr/local/libexec/blacksand/phone-server and a launchd job that runs
 # it as the account, at boot, logged in or not:

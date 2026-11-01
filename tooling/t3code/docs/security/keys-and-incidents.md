@@ -14,7 +14,7 @@
 | Codex login | use your OpenAI account from that agent account | `~/.codex/auth.json` in the agent account | `codex logout`, `codex login` |
 | GitHub CLI login (yours) | push; with `workflow` scope, change workflows (and so read the evaluator key) | your account only, never an agent account | revoke at GitHub → Settings → Applications when you rebuild a machine |
 | `state/github-token` (optional) | nothing. It is a fine-grained token with no permissions, used only for the advisory API's rate limit | the clone's `state/`, mode 600 | replace the file |
-| Apple Development certificate (macOS) | sign apps that your Keychain treats as blacksand-t3 | 1Password item "Blacksand T3 code signing"; `state/signing.keychain-db` on each Mac | yearly ([signing](../install/signing-macos.md#renewal)) |
+| Apple Development certificate (macOS) | sign apps that your Keychain treats as T3 Code (blacksand) | 1Password item "Blacksand T3 code signing"; `state/signing.keychain-db` on each Mac | yearly ([signing](../install/signing-macos.md#renewal)) |
 | Tailscale node keys | be a device in your tailnet | each machine; the host's has key expiry disabled | remove the device in the admin console and re-join |
 | Tailnet Lock keys and disablement secrets | sign devices in; turn the lock off | each signing node; secrets in your password manager | `tailscale lock revoke-keys` ([Tailscale](../networking/tailscale.md#tailnet-lock-optional)) |
 | Phone sessions | act as that agent account's server | the paired phone | revoke in the desktop app: the environment → **Settings → Sharing & access → Authorized clients** |

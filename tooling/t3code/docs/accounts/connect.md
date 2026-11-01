@@ -25,7 +25,7 @@ The standby lane's script records its key for you.
 
 ## Add the environment
 
-In Blacksand T3, open **Settings → Connections → Environments → Add environment →
+In T3 Code (blacksand), open **Settings → Connections → Environments → Add environment →
 SSH**.
 
 | Environment | SSH host or alias | Username | Port |
@@ -43,7 +43,7 @@ desktop does three things:
 3. It runs a second SSH command that creates a one-time pairing credential, and
    exchanges that credential for the one it keeps.
 
-Your SSH agent may ask you to approve Blacksand T3's use of the key the first time.
+Your SSH agent may ask you to approve T3 Code (blacksand)'s use of the key the first time.
 
 - **Only the installed build runs.** Rule `ssh/runner-installed-blacksand-only`
   enforces this. The remote never downloads a server. It looks for

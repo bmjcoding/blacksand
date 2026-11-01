@@ -44,9 +44,9 @@ describe("blacksand ACP Registry distributions", () => {
     expect(source).toContain('["tool", "install", "--force", "--exclude-newer", releaseAgeCutoff(), packageSpec]');
     expect(source).not.toMatch(/\["install", "--global", packageSpec\]|\["tool", "install", "--force", packageSpec\]/);
   });
-  it("says a binary-only agent isn't supported in Blacksand T3", () => {
+  it("says a binary-only agent isn't supported in T3 Code (blacksand)", () => {
     const driver = NodeFs.readFileSync(NodePath.join(import.meta.dirname, "driver.ts"), "utf8");
-    expect(driver).toContain("has no npx or uvx package for this environment, so it isn't supported in Blacksand T3");
+    expect(driver).toContain("has no npx or uvx package for this environment, so it isn't supported in T3 Code (blacksand)");
   });
 });
 
@@ -84,7 +84,7 @@ it.layer(NodeServices.layer)("blacksand ACP Registry binaries", (it) => {
 
       const prepared = yield* Effect.flip(catalog.prepare({ agentId: "example-agent" }));
       expect(prepared.reason).toBe("unsupported_distribution");
-      expect(prepared.detail).toContain("isn't supported in Blacksand T3");
+      expect(prepared.detail).toContain("isn't supported in T3 Code (blacksand)");
       for (const distribution of ["auto", "binary"] as const) {
         const resolved = yield* Effect.flip(catalog.resolve(settings({ distribution }), "/workspace"));
         expect(resolved.reason).toBe("unsupported_distribution");

@@ -225,7 +225,7 @@ export function pnpmPinProblem(text, pinned = PNPM_VERSION) {
   }
   if (!manifest || typeof manifest !== "object") return "upstream's package.json isn't an object";
   const other = requests(manifest).find(([, , version]) => version !== pinned);
-  return other ? `upstream asks for ${other[1]} (${other[0]} in package.json), not pnpm ${pinned}, the one Blacksand T3 pins` : null;
+  return other ? `upstream asks for ${other[1]} (${other[0]} in package.json), not pnpm ${pinned}, the one blacksand-t3 pins` : null;
 }
 
 /** pnpmPinProblem for the checkout in `dir`. */
@@ -289,7 +289,7 @@ export function seedVitePlusHome(dir, pnpm = verifiedPnpm()) {
  */
 export function checkVitePlusHome(dir, { target = pnpmTarget(), digests = PNPM_BINARY_SHA256, rootOwned = runsAsBuilder(), lstat = fs.lstatSync, acl, writable } = {}) {
   const fail = (why) => {
-    throw new Error(`upstream's Vite+ home isn't what Blacksand T3 gave it (${why} in ${dir}); nothing was installed`);
+    throw new Error(`upstream's Vite+ home isn't what blacksand-t3 gave it (${why} in ${dir}); nothing was installed`);
   };
   const { dirs, files, native } = vitePlusEntries();
   // This account must get into every directory (top down, before anything is read
@@ -320,7 +320,7 @@ export function checkVitePlusHome(dir, { target = pnpmTarget(), digests = PNPM_B
   for (const entry of dirs) if (!lstat(path.join(dir, entry)).isDirectory()) fail(`${entry} isn't a directory`);
   for (const [entry, text] of Object.entries(files)) {
     if (!lstat(path.join(dir, entry)).isFile()) fail(`${entry} isn't a regular file`);
-    if (fs.readFileSync(path.join(dir, entry), "utf8") !== text) fail(`${entry} isn't Vite+'s launcher as Blacksand T3 writes it`);
+    if (fs.readFileSync(path.join(dir, entry), "utf8") !== text) fail(`${entry} isn't Vite+'s launcher as blacksand-t3 writes it`);
   }
   for (const [entry, text] of Object.entries(files)) usable(entry, text ? fs.constants.R_OK | fs.constants.X_OK : fs.constants.R_OK);
   verifiedPnpm({ file: path.join(dir, native), target, digests, rootOwned: false });

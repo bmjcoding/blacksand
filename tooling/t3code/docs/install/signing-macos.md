@@ -3,7 +3,7 @@
 > **Applies to:** macOS, every role. Linux needs no signing, because its keyrings
 > don't tie access to an app's signature.
 
-Blacksand T3 keeps its encryption key in your Keychain, as the item "blacksand Safe
+T3 Code (blacksand) keeps its encryption key in your Keychain, as the item "blacksand Safe
 Storage". macOS lets the app read it without asking only when both of these match
 what you approved:
 

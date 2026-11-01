@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Blacksand T3 installer for macOS and Linux. Safe to rerun: every step checks
+# blacksand-t3 installer for macOS and Linux. Safe to rerun: every step checks
 # before acting.
 #
 #   ./install.sh [--role ui|host|both] [--unisolated-build]   # hourly update check (macOS: vault "Personal")
@@ -114,7 +114,7 @@ git_problem() {
   [[ "$out" =~ $re ]] || { echo "can't read git's version (${out:-nothing})"; return 1; }
   version="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[4]:-0}"
   if (($(version_key "$version") < $(version_key "$GIT_MIN"))); then
-    echo "git $version is too old: Blacksand T3 needs $GIT_MIN or later, for security fixes (CVE-2024-52005)"
+    echo "git $version is too old: blacksand-t3 needs $GIT_MIN or later, for security fixes (CVE-2024-52005)"
     return 1
   fi
 }
@@ -624,7 +624,7 @@ builder_sudo() {
     warn "$why, so this install builds as you (--unisolated-build): upstream's dependency and build scripts run with your files and credentials"
     return 1
   fi
-  die "$why. Blacksand T3 runs upstream's dependency and build scripts only as its build account $BUILDER, which needs sudo once to set up; rerun ./install.sh from an account that can use sudo. To build as you instead, with those scripts able to read your files and credentials: ./install.sh --unisolated-build"
+  die "$why. blacksand-t3 runs upstream's dependency and build scripts only as its build account $BUILDER, which needs sudo once to set up; rerun ./install.sh from an account that can use sudo. To build as you instead, with those scripts able to read your files and credentials: ./install.sh --unisolated-build"
 }
 
 # Called as a plain command, never in a condition, so `set -e` stops the
@@ -713,7 +713,7 @@ main() {
     warn "Building as you (--unisolated-build): no build account keeps upstream's scripts away from your files"
   fi
 
-  say "Building and installing Blacksand T3 (a few minutes on first run)"
+  say "Building and installing T3 Code (blacksand) (a few minutes on first run)"
   bin/t3 update
 
   if [[ "$DAY" == hourly ]]; then say "Scheduling the update check: hourly, and on update requests"; else say "Scheduling the update: ${DAY}, ${HOUR}:00"; fi

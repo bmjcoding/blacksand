@@ -15,7 +15,7 @@ npm folder. Put Homebrew's tools and its own npm folder on its `PATH` in
 
 ```sh
 cat >> ~/.zprofile <<'EOF'
-# Blacksand T3 agent account: Homebrew's tools (read-only) and this account's own npm installs.
+# blacksand-t3 agent account: Homebrew's tools (read-only) and this account's own npm installs.
 export PATH="$HOME/.npm-global/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 EOF
 exec zsh -l

@@ -1,7 +1,7 @@
 // @effect-diagnostics nodeBuiltinImport:off - One stat and one exclusive create, outside any fiber.
 // Injected by blacksand. "Update everything" for a host whose server runs
 // without upstream's service, as every SSH host's does: a marker in the host's
-// request folder asks its Blacksand T3 updater (the LaunchDaemon install.sh
+// request folder asks its blacksand-t3 updater (the LaunchDaemon install.sh
 // --role host sets up, watching the folder) to build and install the signed
 // pin.json. The server advertises this as the blacksandHostUpdate capability.
 

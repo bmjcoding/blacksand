@@ -1,5 +1,5 @@
 // node --test test/*.test.mjs: nothing in a build sends people to stock T3 (npx t3, t3.codes
-// downloads, upstream's release pages): stock T3 would run outside Blacksand T3's privacy build.
+// downloads, upstream's release pages): stock T3 would run outside blacksand-t3's privacy build.
 // Each stock replacement is strict, and a final assertion fails the build on any match left.
 import { test } from "node:test";
 import assert from "node:assert/strict";

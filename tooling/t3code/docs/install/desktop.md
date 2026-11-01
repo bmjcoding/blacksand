@@ -82,7 +82,7 @@ The restored threads belong to the Local environment.
 
 ## Open the app
 
-Run `blacksand t3 launch`, or open Blacksand T3 from Applications or your launcher.
+Run `blacksand t3 launch`, or open T3 Code (blacksand) from Applications or your launcher.
 On macOS, after the first build signed with the shared certificate, macOS asks twice
 for the app's Keychain item. Click **Always Allow** both times.
 

@@ -586,7 +586,7 @@ function keepPending(dir, build) {
     fs.renameSync(dir, platform.pendingPath);
   }
   writeJsonAtomic(PENDING, { ...build, stagedAt: new Date().toISOString() });
-  log(`${build.ref} is ready; it installs when Blacksand T3 restarts`);
+  log(`${build.ref} is ready; it installs when T3 Code (blacksand) restarts`);
   announceStaged(build);
 }
 
@@ -609,7 +609,7 @@ async function cmdUpdate(opts) {
     // A newer blacksand (a rule fix pushed from another machine) builds this update.
     const self = isRerun ? "skipped" : await selfUpdate();
     if (self === "refused") {
-      platform.notify("Blacksand T3 self-update refused", "origin/main has commits self-update won't take (unsigned, or an evaluator pin it can't verify). See state/blacksand-t3.log.");
+      platform.notify("blacksand-t3 self-update refused", "origin/main has commits self-update won't take (unsigned, or an evaluator pin it can't verify). See state/blacksand-t3.log.");
     }
     if (self === "updated") {
       await rerunHoldingLock(release);
@@ -629,7 +629,7 @@ async function update(opts) {
   const { ref, sha, held } = await chooseTarget(opts, current, { mayCheck: true });
   if (held.length && sha === current.sha) {
     log(heldLine(held, current.ref));
-    if (!opts.json) platform.notify("Blacksand T3 update held", heldLine(held, current.ref));
+    if (!opts.json) platform.notify("T3 Code (blacksand) update held", heldLine(held, current.ref));
   }
   const build = { ref, sha, version: versionOf(ref, sha), blacksand: blacksandCommit() };
   // The app builds the commit its check offered; if the approved release has moved since, nothing.
@@ -654,7 +654,7 @@ async function update(opts) {
       const next = !platform.isScheduled?.() ? `; rerun ./install.sh --role ${installConfig?.role ?? "ui"} to try again` : verdict.result === "refused" ? "" : "; the scheduled update tries again";
       const message = `not building ${ref}: pin.json here can't be verified yet (${verdict.message})${next}`;
       log(message);
-      if (!opts.json) platform.notify(verdict.result === "refused" ? "Blacksand T3 update refused" : "Blacksand T3 update held", message);
+      if (!opts.json) platform.notify(verdict.result === "refused" ? "T3 Code (blacksand) update refused" : "T3 Code (blacksand) update held", message);
       emit({ type: "error", message });
       process.exitCode = 1;
       return;
@@ -663,7 +663,7 @@ async function update(opts) {
   }
   if (isBuild(pending) && !opts.force) {
     if (stageOnly()) {
-      log(`${ref} is already built and waiting for Blacksand T3 to restart`);
+      log(`${ref} is already built and waiting for T3 Code (blacksand) to restart`);
       announceStaged(pending);
     } else install(platform.pendingPath, pending);
     progress(100);
@@ -692,7 +692,7 @@ async function update(opts) {
     if (stageOnly()) {
       keepPending(staged, build);
       if (!opts.json) {
-        platform.notify("Blacksand T3 update ready", `${build.version} is built. Preview it from the version stamp, then restart Blacksand T3 from the update button in its sidebar.${leftOut}`);
+        platform.notify("T3 Code (blacksand) update ready", `${build.version} is built. Preview it from the version stamp, then restart T3 Code (blacksand) from the update button in its sidebar.${leftOut}`);
       }
     } else {
       try {
@@ -709,13 +709,13 @@ async function update(opts) {
         staged = null;
         throw new Error(`${build.version} is built but couldn't be installed (${error.message}); it stays staged and installs on the next update or restart`);
       }
-      if (!opts.json) platform.notify("Blacksand T3 updated", `${build.version} installed.${leftOut}`);
+      if (!opts.json) platform.notify("T3 Code (blacksand) updated", `${build.version} installed.${leftOut}`);
     }
     staged = null;
     progress(100);
   } catch (error) {
     log(`update FAILED, keeping the installed build: ${error.message}`);
-    platform.notify("Blacksand T3 update failed", String(error.message).split("\n")[0]);
+    platform.notify("T3 Code (blacksand) update failed", String(error.message).split("\n")[0]);
     emit({ type: "error", message: String(error.message).split("\n")[0] });
     process.exitCode = 1;
   } finally {
@@ -736,8 +736,8 @@ async function tryLock() {
 function notesFor(current, sha, version, { verdict, held }) {
   const notes = releaseNotes(current.sha, sha, version);
   const lines = [];
-  if (verdict?.skipped?.length) lines.push(`- Blacksand T3 leaves out: ${labelsOf(verdict.skipped).join(", ")} (upstream moved their code; the version stamp shows what changed)`);
-  for (const { ref, message } of held) lines.push(`- Blacksand T3 skipped ${ref.replace(/^v/, "")}: ${message.split("\n")[0]}`);
+  if (verdict?.skipped?.length) lines.push(`- blacksand-t3 leaves out: ${labelsOf(verdict.skipped).join(", ")} (upstream moved their code; the version stamp shows what changed)`);
+  for (const { ref, message } of held) lines.push(`- blacksand-t3 skipped ${ref.replace(/^v/, "")}: ${message.split("\n")[0]}`);
   if (!lines.length) return notes;
   if (!notes.length) return [{ version, note: lines.join("\n") }];
   return [{ ...notes[0], note: `${lines.join("\n")}\n${notes[0].note}` }, ...notes.slice(1)];
@@ -820,12 +820,12 @@ async function applyPending(expected = null) {
 async function cmdApply(opts) {
   try {
     const pid = Number(opts["wait-pid"]);
-    if (pid && !(await waitFor(() => !isAlive(pid), 60_000))) throw new Error(`Blacksand T3 (pid ${pid}) didn't quit`);
-    if (!(await waitFor(() => !platform.isRunning(), 15_000))) throw new Error("Blacksand T3 is still running");
+    if (pid && !(await waitFor(() => !isAlive(pid), 60_000))) throw new Error(`T3 Code (blacksand) (pid ${pid}) didn't quit`);
+    if (!(await waitFor(() => !platform.isRunning(), 15_000))) throw new Error("T3 Code (blacksand) is still running");
     await applyPending(expectedBuild(opts));
   } catch (error) {
     log(`update not applied: ${error.message}; the new build stays staged`);
-    platform.notify("Blacksand T3 update not applied", error.message);
+    platform.notify("T3 Code (blacksand) update not applied", error.message);
     process.exitCode = 1;
   }
   // Relaunch either way: the user asked for a restart.

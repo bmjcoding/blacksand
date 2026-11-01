@@ -14,7 +14,7 @@ the pinned release. A machine never installs another machine's build.
 
 ## Desktop
 
-This is the Blacksand T3 app. Its Local environment runs agents in your own account.
+This is the T3 Code (blacksand) app. Its Local environment runs agents in your own account.
 It can also reach agent accounts on other machines as SSH environments, using
 upstream's remote-environment feature.
 

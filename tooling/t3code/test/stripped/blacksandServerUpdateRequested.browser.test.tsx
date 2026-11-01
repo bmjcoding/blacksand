@@ -1,6 +1,6 @@
 // Copied to apps/web/src/components/ in a stripped upstream checkout and run there
 // (rules web/self-update-blacksand-host-wording, web/self-update-blacksand-host-requested-*): a host
-// update its Blacksand T3 updater only queued comes back as "requested", quiet or not, and settles
+// update its blacksand-t3 updater only queued comes back as "requested", quiet or not, and settles
 // its Update everything row as requested.
 import { RegistryContext } from "@effect/atom-react";
 import { AuthSessionState, EnvironmentId } from "@t3tools/contracts";

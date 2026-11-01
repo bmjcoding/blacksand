@@ -6,7 +6,7 @@
 // name (lib/files/blacksandWebRtcWindow.ts, rules desktop/webrtc-window*): it alone gets the
 // default policy back, never leaves about:blank, and closes with its page.
 // With BLACKSAND_T3_TEST_ELECTRON=<an Electron binary> it also runs a real probe: an agent's HTML
-// preview (a sandboxed, opaque-origin frame under Blacksand T3's sandbox CSP) aims STUN, TURN and
+// preview (a sandboxed, opaque-origin frame under blacksand-t3's sandbox CSP) aims STUN, TURN and
 // ICE at local UDP and TCP listeners while the app page beside it receives a device-style
 // WebRTC video stream from a separate process.
 import { test } from "node:test";

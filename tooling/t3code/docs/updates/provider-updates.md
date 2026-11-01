@@ -50,6 +50,6 @@ Code's background auto-updater while blacksand-t3 runs it.
 ACP Registry agents install only as npm or PyPI packages, through `npx` or `uvx`. They
 are held to the same 3 days. npm runs with `--before`, and uv with `--exclude-newer`
 (rule `acp-registry/installs-minimum-age`). The app marks an agent that ships only a
-prebuilt binary as "not supported in Blacksand T3". blacksand-t3 never downloads such
+prebuilt binary as "not supported in T3 Code (blacksand)". blacksand-t3 never downloads such
 a binary, reuses one from an earlier download, or puts one on the terminal's `PATH`
 (rule `acp-registry/no-prebuilt-binaries`).

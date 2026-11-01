@@ -6,7 +6,7 @@
 // checkout that isn't an install); the build account's home is closed to every
 // account but it and yours, and what runs as another account starts in /, since
 // the clone it's run from is in your private home; Node and git meet their
-// security floors, in install.sh and before every git Blacksand T3 runs; and pnpm
+// security floors, in install.sh and before every git blacksand-t3 runs; and pnpm
 // is the pinned one, laid out from tarballs checked against their digests
 // (lib/pnpm.mjs). Nothing here needs root, the network or a real build account.
 import { spawnSync } from "node:child_process";
@@ -584,7 +584,7 @@ const VERSIONS = [
 test("git needs 2.55.0 or later (every advisory's fix, the last CVE-2024-52005's sideband filtering); Apple's 2.54.0 doesn't pass", () => {
   for (const version of VERSIONS.slice(0, 5)) assert.equal(gitProblem(version), "OK", version);
   for (const version of VERSIONS.slice(5, -1)) {
-    assert.match(gitProblem(version), /^git 2\.\d+\.\d+ is too old: Blacksand T3 needs 2\.55\.0 or later, for security fixes \(CVE-2024-52005\)$/, version);
+    assert.match(gitProblem(version), /^git 2\.\d+\.\d+ is too old: blacksand-t3 needs 2\.55\.0 or later, for security fixes \(CVE-2024-52005\)$/, version);
   }
   assert.match(gitProblem("hub version 2.14.2"), /can't read git's version \(hub version 2\.14\.2\)/);
   assert.match(gitProblem("", 127), /no git found/);
@@ -657,7 +657,7 @@ test("if Homebrew can't bring git up to the floor, install.sh stops with a short
   const stuck = macSetup({ brewGit: "2.54.0", upgrades: false });
   assert.equal(stuck.result.status, 1);
   assert.doesNotMatch(stuck.result.stdout, /^PATH=/m);
-  assert.match(stuck.result.stderr, /git 2\.54\.0 is too old: Blacksand T3 needs 2\.55\.0 or later, for security fixes \(CVE-2024-52005\) \(git on PATH: .*\/homebrew\/bin\/git\)\. Run: brew install git/);
+  assert.match(stuck.result.stderr, /git 2\.54\.0 is too old: blacksand-t3 needs 2\.55\.0 or later, for security fixes \(CVE-2024-52005\) \(git on PATH: .*\/homebrew\/bin\/git\)\. Run: brew install git/);
 });
 
 test("homebrew_first puts Homebrew's bin first, even when PATH repeats /usr/bin after it", () => {
@@ -673,7 +673,7 @@ test("homebrew_first puts Homebrew's bin first, even when PATH repeats /usr/bin 
   assert.equal(run("/bin:/usr/sbin"), `${bin}:/bin:/usr/sbin`, "no /usr/bin at all");
 });
 
-test("every git Blacksand T3 runs is checked first, on whatever PATH the run has (yours, the job's, the build account's)", () => {
+test("every git blacksand-t3 runs is checked first, on whatever PATH the run has (yours, the job's, the build account's)", () => {
   const dir = tmp();
   const repo = path.join(dir, "local.git");
   assert.equal(spawnSync("git", ["init", "--quiet", "--bare", repo]).status, 0);
@@ -689,7 +689,7 @@ test("every git Blacksand T3 runs is checked first, on whatever PATH the run has
   const old = shim("2.54.0 (Apple Git-157)");
   const refused = publicGit(["ls-remote", repo], { url: repo, env: old.env, timeout: 30_000 });
   assert.equal(refused.status, 128);
-  assert.match(gitFailure(refused, 30_000), /^fatal: git 2\.54\.0 is too old: Blacksand T3 needs 2\.55\.0 or later, for security fixes \(CVE-2024-52005\); install a newer git \(macOS: brew install git, with Homebrew first on PATH\)$/);
+  assert.match(gitFailure(refused, 30_000), /^fatal: git 2\.54\.0 is too old: blacksand-t3 needs 2\.55\.0 or later, for security fixes \(CVE-2024-52005\); install a newer git \(macOS: brew install git, with Homebrew first on PATH\)$/);
   assert.equal(old.used(), false, "the old git ran nothing");
   const current = shim("2.56.0");
   const ok = publicGit(["ls-remote", repo], { url: repo, env: current.env, timeout: 30_000 });

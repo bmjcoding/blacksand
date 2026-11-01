@@ -1,5 +1,5 @@
 [Unit]
-Description=Update Blacksand T3 to the pinned upstream release
+Description=Update blacksand-t3 to the pinned upstream release
 
 [Service]
 Type=oneshot

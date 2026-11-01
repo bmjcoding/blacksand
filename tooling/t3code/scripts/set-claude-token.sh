@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Stores a Claude Code token (from `claude setup-token`) for the Blacksand T3
+# Stores a Claude Code token (from `claude setup-token`) for the blacksand-t3
 # server in this account, in ~/.blacksand/t3/server.env (owner only), which the
 # SSH runner loads (lib/files/ssh-runner-blacksand.sh). SSH sessions can't unlock
 # the login Keychain, where Claude Code keeps its usual login.

@@ -1,4 +1,4 @@
-# Blacksand T3: run only the Blacksand build installed on this host, never a
+# blacksand-t3: run only the Blacksand build installed on this host, never a
 # downloaded release.
 # (Injected into a TypeScript template literal: keep \${ and \\n escaped, and
 # no backslash at a line's end.)
@@ -19,7 +19,7 @@ if [ -z "$T3B_ELECTRON" ] && [ -x "$T3B_LINUX_APP/t3code" ]; then
   T3B_ASAR="$T3B_LINUX_APP/resources/app.asar"
 fi
 if [ -z "$T3B_ELECTRON" ]; then
-  printf 'Blacksand T3 is not installed on this host. Run install.sh --role host there first.\\n' >&2
+  printf 'blacksand-t3 is not installed on this host. Run install.sh --role host there first.\\n' >&2
   exit 1
 fi
 T3B_SERVER="$T3B_ASAR/apps/server/dist/bin.mjs"
@@ -154,7 +154,7 @@ case "\${1:-}" in
         if t3b_stop "$T3B_PID" "$T3B_REC_STARTED" "$T3B_REC_ARGS" "$T3B_REC_RUNNER"; then
           rm -f "$T3B_RECORD"
         else
-          printf 'Blacksand T3 server %s still runs a build this host has replaced and did not stop; stop it (kill -9 %s) and connect again.\\n' "$T3B_PID" "$T3B_PID" >&2
+          printf 'blacksand-t3 server %s still runs a build this host has replaced and did not stop; stop it (kill -9 %s) and connect again.\\n' "$T3B_PID" "$T3B_PID" >&2
           T3B_FAILED=1
         fi
       fi
@@ -172,7 +172,7 @@ case "\${1:-}" in
     T3B_DEADLINE=$(($(date +%s) + T3B_DAEMON_WAIT))
     while ! t3b_daemon_settled; do
       if [ "$(date +%s)" -ge "$T3B_DEADLINE" ]; then
-        printf 'The Blacksand T3 server launchd runs for this account (scripts/add-phone-service.sh) is still starting; connect again in a minute. Its log: %s/phone/server.log\\n' "$T3B_HOME" >&2
+        printf 'The blacksand-t3 server launchd runs for this account (scripts/add-phone-service.sh) is still starting; connect again in a minute. Its log: %s/phone/server.log\\n' "$T3B_HOME" >&2
         exit 75
       fi
       sleep 0.2
