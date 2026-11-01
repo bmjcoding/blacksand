@@ -52,7 +52,7 @@ jobs:
       # shell its shebang names.
       - name: Shell scripts
         run: |
-          scripts="blacksand .githooks/pre-push packages/t3/install.sh packages/t3/scripts/*.sh"
+          scripts="blacksand .githooks/pre-push packages/t3/install.sh packages/t3/scripts/*.sh packages/substrate-k8s/images/agent-tools.sh packages/substrate-k8s/sandbox/steps.sh"
           for script in $scripts; do
             case "$(head -n 1 "$script")" in
               *bash*) bash -n "$script" ;;
