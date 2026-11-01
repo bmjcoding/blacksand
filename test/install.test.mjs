@@ -458,7 +458,11 @@ function layout() {
   return { dir, clone, fromPrivateHome, starts };
 }
 
-test("the fixture's folder really is one another account couldn't open (positive control)", () => {
+// Linux's getcwd(2) answers from the kernel whatever the folders above allow, so
+// there the folder stays one a command can start in; the failure is macOS's.
+const macCwd = { skip: process.platform !== "darwin" && "macOS getcwd: an unreadable folder above fails it (EACCES)" };
+
+test("the fixture's folder really is one another account couldn't open (positive control)", macCwd, () => {
   const l = layout();
   const result = l.fromPrivateHome("sudo -u someone true");
   assert.equal(result.status, 0, result.stderr);
@@ -505,7 +509,7 @@ test("the smoke-tested server starts in its own folder, so Node's --require prel
   );
   const result = l.fromPrivateHome(`${JSON.stringify(process.execPath)} ${JSON.stringify(helper)}`);
   assert.equal(result.status, 0, result.stdout + result.stderr);
-  assert.match(result.stdout, /^inherited 1 true$/m, "positive control: the failure the VMs saw");
+  if (!macCwd.skip) assert.match(result.stdout, /^inherited 1 true$/m, "positive control: the failure the VMs saw");
   assert.equal(fs.readFileSync(marker, "utf8"), fs.realpathSync(os.tmpdir()), "the server ran, in the temporary folder");
   const smoke = fs.readFileSync(path.join(ROOT, "lib", "smoke.mjs"), "utf8");
   assert.match(smoke, /await observeServer\(\{\n\s+args: \[entry,[^\n]*\n\s+cwd: home,/, "smokeTest starts it in its scratch home");

@@ -183,7 +183,7 @@ test("install.sh's build_tools_problem runs lib/pnpm.mjs's check, then checks wh
     assert.match(tree.stdout, new RegExp(`${STAND_IN_BUILDER} can change: [\\s\\S]*status 1`), "these files are this account's to change");
     // The account runs as the build account's own setup does, before its ready marker.
     const setup = INSTALL_SH.slice(0, INSTALL_SH.indexOf('  as_builder touch "$BUILDER_HOME/.t3blackout-builder"'));
-    assert.ok(setup.lastIndexOf("\n  install_build_pnpm\n") > setup.lastIndexOf("setup_builder"), "install_build_pnpm runs in the build account's setup, before its marker");
+    assert.ok(setup.lastIndexOf("\n  install_build_pnpm sudo\n") > setup.lastIndexOf("setup_builder"), "install_build_pnpm runs in the build account's setup, before its marker");
     assert.doesNotMatch(INSTALL_SH, /install_pnpm "\$BUILDER_HOME\/\.local"/);
   } finally {
     fs.rmSync(t.dir, { recursive: true, force: true });
@@ -479,9 +479,12 @@ test("the installing shell holds the lock itself: with every process it started 
     // The lock's helper: macOS's own perl, checked; busy (75) apart from an error, which stops the install.
     assert.match(INSTALL_SH, /^TOOLS_PERL=\/usr\/bin\/perl$/m);
     assert.match(INSTALL_SH, /\[\[ -x "\$TOOLS_PERL" \]\] \|\| return 3/);
-    const failing = installSh(`${passStubs(t)}\nTOOLS_PERL=${JSON.stringify(path.join(t.dir, "no-perl"))}\nset -e\nhold_tools_lock; echo "status $?"`);
+    // Elsewhere it's flock(1) at a fixed path, so a stub stands in for its absence.
+    const noHelper = process.platform === "darwin" ? `TOOLS_PERL=${JSON.stringify(path.join(t.dir, "no-perl"))}` : "tools_flock() { return 3; }";
+    const failing = installSh(`${passStubs(t)}\n${noHelper}\nset -e\nhold_tools_lock; echo "status $?"`);
     assert.equal(failing.status, 1);
-    assert.match(failing.stderr, process.platform === "darwin" ? /couldn't take the build tools' lock .*: neither .*no-perl \(macOS\) nor util-linux flock is there to take it with/ : /./);
+    assert.match(failing.stderr, /couldn't take the build tools' lock .*: neither .*perl \(macOS\) nor util-linux flock is there to take it with/);
+    if (process.platform === "darwin") assert.match(failing.stderr, /neither .*no-perl \(macOS\)/);
   } finally {
     fs.writeFileSync(gate, "");
     await Promise.all(runs.map((run) => run.stop()));

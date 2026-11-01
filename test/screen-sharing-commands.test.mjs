@@ -257,7 +257,7 @@ test("setup says Done only once its check turned Screen Sharing on, it answered 
   }
 });
 
-test("setup's self-test needs screensharingd's RFB greeting on loopback, not just an open port", async () => {
+test("setup's self-test needs screensharingd's RFB greeting on loopback, not just an open port", { skip: !isMac && "macOS nc (-G is its connect timeout)" }, async () => {
   for (const [greeting, want] of [["RFB 003.889\n", "yes"], ["HTTP/1.1 400\r\n", "no"], ["", "no"]]) {
     const server = await new Promise((resolve) => {
       const s = net.createServer((socket) => {

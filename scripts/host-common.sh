@@ -259,6 +259,7 @@ tailnet_status() { localapi /localapi/v0/status && [[ $LAPI_CODE == 200 ]] && pr
 
 # This node's MagicDNS name (status 1, and a warning, when Tailscale isn't up);
 # with "https", also that the tailnet can issue it certificates.
+# shellcheck disable=SC2120 # add-phone-service.sh, which sources this, passes "https"
 tailnet_name() {
   local status dns
   status="$(tailnet_status)" || { warn "tailscaled didn't answer ($TS_SOCKET, ${TS_TIMEOUT}s): is it running and this Mac logged in?"; return 1; }

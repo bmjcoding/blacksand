@@ -656,7 +656,7 @@ setup_builder() {
     fi
     [[ -x "$BUILDER_HOME/.cargo/bin/cargo" ]] || install_rust as_builder
   fi
-  install_build_pnpm
+  install_build_pnpm sudo
   as_builder node -e "$NODE_CHECK" "$NODE_PATCHED" "$NODE_MAJOR" ||
     die "$BUILDER's Node ($(as_builder node --version 2>&1)) isn't Node $NODE_MAJOR+ with the Oct 2026 security fixes"
   as_builder cargo --version >/dev/null || die "$BUILDER can't run cargo (on macOS it uses Homebrew's: brew install rust)"
