@@ -71,12 +71,14 @@ test("as root, a symbolic link anywhere on the path is refused, even one pointin
   const lstat = tree({ ...SYSTEM, "/usr/local": [0, 0o40755], "/usr/local/bin": [0, 0o40755], "/usr/local/bin/true": [0, 0o120755], "/usr/sbin": [0, 0o120755] });
   assert.equal(rootRunProblem("/usr/local/bin/true", { lstat, acl: noAcl }), "/usr/local/bin/true is a symbolic link");
   assert.equal(rootRunProblem("/usr/sbin/sshd", { lstat, acl: noAcl }), "/usr/sbin is a symbolic link");
-  // The real thing: a link this account made, to /usr/bin/true.
+  // The real thing: a link this account made, to /usr/bin/true. Refused for the
+  // first problem on the way down: a link (macOS's /var), an owner, or Linux's
+  // world-writable /tmp.
   const dir = mkdtempSync(join(tmpdir(), "blacksand-link-"));
   try {
     symlinkSync("/usr/bin/true", join(dir, "true"));
-    assert.match(rootRunProblem(join(dir, "true")) ?? "", /is a symbolic link|isn't root's/);
-    assert.match(rootRunProblem(`${realpathSync(dir)}/true`) ?? "", /isn't root's/);
+    assert.match(rootRunProblem(join(dir, "true")) ?? "", /is a symbolic link|isn't root's|is writable by others/);
+    assert.match(rootRunProblem(`${realpathSync(dir)}/true`) ?? "", /isn't root's|is writable by others/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

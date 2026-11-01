@@ -33,6 +33,19 @@ test("for a plan, sshd is evaluated as every account that can log in, and each t
   assert.deepEqual(m.sshd.value.connections.filter((c) => c.settings?.passwordauthentication?.[0] === "yes").map((c) => [c.user, c.addr]), [["agent", "192.168.1.2"]]);
 });
 
+test("the Match blocks sshd reports reading are found in both OpenSSH 10's and 9.6's wording; no debug output at all is 'didn't say', never 'none'", () => {
+  const ddd = "/usr/sbin/sshd -G -ddd -f /etc/ssh/sshd_config";
+  const matchesFrom = (stderr: string) => {
+    const m = observe(fakeHost({ ...MAC, programs: { ...MAC.programs, [ddd]: { stdout: sshdDump(), stderr } } }), { jobs: [], sshdUsers: [] });
+    if (m.sshd.state !== "present") throw new Error(JSON.stringify(m.sshd));
+    return { matches: m.sshd.value.matches, silent: m.sshd.value.uncovered.includes("sshd didn't say which Match blocks it read") };
+  };
+  assert.deepEqual(matchesFrom("debug3: checking syntax for 'Match Host peer.example' on line 3\n"), { matches: ["Match Host peer.example (line 3)"], silent: false });
+  assert.deepEqual(matchesFrom("debug3: checking syntax for 'Match Host peer.example'\n"), { matches: ["Match Host peer.example"], silent: false });
+  assert.deepEqual(matchesFrom("debug3: /etc/ssh/sshd_config:1 setting UseDNS no\n"), { matches: [], silent: false });
+  assert.deepEqual(matchesFrom(""), { matches: [], silent: true });
+});
+
 test("an sshd without -G (OpenSSH before 9.3), or one that refuses its config, leaves sshd unknown: nothing reads the files instead", () => {
   for (const [stderr, why] of [["sshd: illegal option -- G\nusage: sshd [-46DdeiqTt] …", /no -G \(OpenSSH before 9\.3\)/], ["/etc/ssh/sshd_config line 3: Bad configuration option: Bogus", /Bad configuration option/]] as const) {
     const programs = { ...MAC.programs, "/usr/sbin/sshd -G -f /etc/ssh/sshd_config": { status: 255, stderr } };

@@ -55,11 +55,15 @@ export function sshdUsers(users: Observed<User[]>, wanted: readonly string[] | n
   return present([...new Set([...wanted, ...login])].sort());
 }
 
-/** The Match predicates sshd reports checking while it reads `config`, with their line numbers; null when it won't say. */
+/**
+ * The Match predicates sshd reports checking while it reads `config`, with
+ * their line numbers where it gives them (OpenSSH 10 does, 9.6 doesn't); null
+ * when it won't say, including when it printed no debug output at all.
+ */
 function matchBlocks(host: Host, config: string): string[] | null {
   const out = host.exec(SSHD, ["-G", "-ddd", "-f", config]);
-  if (out.status !== 0) return null;
-  return [...out.stderr.matchAll(/^debug3: checking syntax for '(Match [^\n]*)' on line (\d+)$/gm)].map(([, match, line]) => `${match} (line ${line})`);
+  if (out.status !== 0 || !/^debug3: /m.test(out.stderr)) return null;
+  return [...out.stderr.matchAll(/^debug3: checking syntax for '(Match [^\n]*)'(?: on line (\d+))?$/gm)].map(([, match = "", line]) => (line ? `${match} (line ${line})` : match));
 }
 
 /**

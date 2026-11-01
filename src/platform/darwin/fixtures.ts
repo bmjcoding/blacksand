@@ -99,7 +99,7 @@ export const MAC: FakeMachine = {
     "/opt/homebrew/bin/tailscale version": "1.104.4\n  tailscale commit: 0\n",
     "/usr/sbin/sshd -G -f /etc/ssh/sshd_config": sshdDump(),
     // With -ddd sshd also says, on stderr, which Match blocks it read: none here.
-    "/usr/sbin/sshd -G -ddd -f /etc/ssh/sshd_config": { stdout: sshdDump(), stderr: "debug2: load_server_config: filename /etc/ssh/sshd_config\n" },
+    "/usr/sbin/sshd -G -ddd -f /etc/ssh/sshd_config": { stdout: sshdDump(), stderr: "debug2: load_server_config: filename /etc/ssh/sshd_config\ndebug3: /etc/ssh/sshd_config:1 setting UseDNS no\n" },
     // The accounts that can log in (owner's zsh, root's sh), and any a plan names, are evaluated per connection.
     ...sshdConnections(["owner", "root"]),
   },

@@ -103,7 +103,8 @@ jobs:
           node bin/t3blackout check --ref "$sha"
 
   # Signed git histories, installer and script runs, real timeouts and property
-  # sweeps (tools/test.ts). Node strips the types itself: no install step.
+  # sweeps (tools/test.ts). Node strips the types itself; the install is only
+  # for fast-check, which the property sweeps import.
   deep:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -115,6 +116,9 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
+
+      - name: Dev dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Tests (deep tier)
         run: node tools/test.ts deep
