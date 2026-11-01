@@ -86,9 +86,8 @@ the agent's changes as a patch, and the run's record.
 
 ## Documentation
 
-Each component has its own README: Blacksand T3 in [`tooling/t3code/`](tooling/t3code/README.md)
-and the Kubernetes sandbox in [`substrates/kubernetes/`](substrates/kubernetes/README.md).
-Guides are in [`docs/`](docs/README.md).
+Start with the [documentation index](docs/README.md). Each component's guides live
+beside its code, and the index links them all.
 
 ## Security
 

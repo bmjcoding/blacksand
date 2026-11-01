@@ -13,7 +13,7 @@ The cluster needs:
 - [agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) v1beta1;
 - gVisor;
 - a NetworkPolicy controller that enforces policies;
-- this package's egress floor on every node that runs sandboxes. The floor is a
+- this component's egress floor on every node that runs sandboxes. The floor is a
   default-deny nftables rule set, described under [Setup](#setup).
 
 It runs on k3s today. EKS support comes later.
