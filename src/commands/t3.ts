@@ -1,7 +1,9 @@
 // blacksand t3 …: the t3 package's own CLI (packages/t3/bin/t3), with
 // every argument after `t3` passed through, its own --json (event lines, not
-// an envelope) included.
+// an envelope) included. It runs from a clone (the package keeps its state
+// there and builds with Node), so a single binary refuses it.
 
+import { isSea } from "node:sea";
 import { fileURLToPath } from "node:url";
 
 import type { Command } from "../core/command.ts";
@@ -15,6 +17,11 @@ export const t3: Command = {
   usage: "blacksand t3 <command> [options]",
   passthrough: true,
   async run(args, ctx) {
+    // In a single binary, process.execPath is blacksand itself, not Node, and there's no packages/t3 beside it.
+    if (isSea()) {
+      ctx.io.err("blacksand: blacksand t3 runs from a clone of the repository (its ./blacksand), not from this single binary\n");
+      return EXIT.refused;
+    }
     const { status } = ctx.run(process.execPath, [T3_CLI, ...args]);
     return status ?? EXIT.refused;
   },

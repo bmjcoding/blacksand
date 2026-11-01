@@ -49,7 +49,7 @@ release, and say which upstream commit moved the code.
 Once per clone:
 
 ```sh
-npm ci                                # TypeScript and fast-check, for the type check and tests: pinned, no install scripts
+npm ci                                # TypeScript, fast-check and esbuild, for the type check, tests and binary: pinned, no install scripts
 git config core.hooksPath .githooks   # the pre-push hook below
 ```
 
@@ -62,6 +62,13 @@ npm run typecheck    # tsc --noEmit, for src/ and tools/, then packages/t3's Typ
 npm test             # the fast tier: under 10 s
 npm run test:deep    # signed histories, installer runs, real timeouts, property sweeps
 ```
+
+To build the single executable for this machine, run
+`node tools/build-sea.ts --node PATH`. PATH must be the official Node 26.13.0 from
+nodejs.org, because Homebrew's Node can't build one. The script pins each supported
+platform's official `bin/node` by SHA-256 and refuses any other bytes. A comment beside
+the pins says how to authenticate a new one from the signed `SHASUMS256.txt`. The script
+writes `dist/blacksand` and runs it from outside the repository.
 
 A test file named `*.deep.test.*` is in the deep tier. Every other `*.test.*` file is
 in the fast tier. [tools/test.ts](tools/test.ts) says what belongs where. CI runs both.

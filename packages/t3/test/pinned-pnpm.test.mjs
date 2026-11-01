@@ -108,7 +108,7 @@ test("a release that asks for the pinned pnpm builds; one that asks for any othe
   ]) {
     assert.match(pnpmPinProblem(text) ?? "", says, text);
   }
-  assert.match(RAISE_PNPM, /PNPM_VERSION and PNPM_TARBALL_SHA512 in lib\/pnpm\.mjs[\s\S]*3 days[\s\S]*PNPM_BINARY_SHA256 \(`node lib\/pnpm\.mjs digests`/);
+  assert.match(RAISE_PNPM, /PNPM_VERSION and PNPM_TARBALL_SHA512 in lib\/pnpm\.mjs[\s\S]*3 days[\s\S]*PNPM_BINARY_SHA256 \(`node lib\/pnpm-cli\.mjs digests`/);
 });
 
 test("pnpmPinProblemIn reads the checkout's root package.json", () => {
@@ -468,7 +468,7 @@ test("real pnpm: the pinned binary verifies, and with the build's settings a pro
 });
 
 test("online: PNPM_BINARY_SHA256 is what the pinned tarballs carry", { skip: process.env.BLACKSAND_T3_PNPM_DIGESTS_ONLINE !== "1" && "set BLACKSAND_T3_PNPM_DIGESTS_ONLINE=1 (downloads four pnpm tarballs)" }, () => {
-  const result = spawnSync(process.execPath, [new URL("../lib/pnpm.mjs", import.meta.url).pathname, "digests"], { encoding: "utf8", timeout: 300_000 });
+  const result = spawnSync(process.execPath, [new URL("../lib/pnpm-cli.mjs", import.meta.url).pathname, "digests"], { encoding: "utf8", timeout: 300_000 });
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(JSON.parse(result.stdout), PNPM_BINARY_SHA256);
 });

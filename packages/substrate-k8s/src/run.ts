@@ -15,6 +15,7 @@ import { createHash, randomBytes } from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { getAsset, isSea } from "node:sea";
 
 import { blacksandInfo } from "../../../src/core/envelope.ts";
 import { agentEnv, agentNamed, type AgentName } from "./agents.ts";
@@ -28,7 +29,8 @@ import { assertModel, canonical, DEFAULT_LIMITS, proxyConfig, sha256, type Allow
 import { recordProblems, RUN_SCHEMA, type Artifact, type RunRecord } from "./record.ts";
 
 const SANDBOX_DIR = new URL("../sandbox/", import.meta.url);
-export const sandboxFile = (name: string) => fs.readFileSync(new URL(name, SANDBOX_DIR), "utf8");
+/** A file from sandbox/: on disk beside this module, or, in a single binary, the copy tools/build-sea.ts embedded as `sandbox/NAME`. */
+export const sandboxFile = (name: string) => (isSea() ? getAsset(`sandbox/${name}`, "utf8") : fs.readFileSync(new URL(name, SANDBOX_DIR), "utf8"));
 
 export interface RunSpec {
   /** A local git repository (its committed HEAD) or an https URL, cloned here, outside the sandbox. */

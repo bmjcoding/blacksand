@@ -1,6 +1,6 @@
 // The pnpm a build runs: the one pinned here, and nothing else. install.sh
 // installs PNPM_VERSION for builds from the registry tarballs this file pins by
-// digest (`node lib/pnpm.mjs fetch`). Every pnpm the build runs (the lockfile re-resolution, the installs,
+// digest (`node lib/pnpm-cli.mjs fetch`). Every pnpm the build runs (the lockfile re-resolution, the installs,
 // the staged install's guard and its pnpm shim, CI's stripped tests) is that
 // file, by absolute path, its bytes checked against the binary those tarballs
 // carry each time it's about to run (verifiedPnpm): never a `pnpm` found on
@@ -21,7 +21,6 @@ import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { tryFlock } from "./lock.mjs";
 import { BUILDER_USER, IS_BUILDER } from "./util.mjs";
@@ -34,7 +33,7 @@ import { BUILDER_USER, IS_BUILDER } from "./util.mjs";
  * build, which replaces the wrapper's placeholders, as pnpm's own install script
  * does); PNPM_BINARY_SHA256 is the native binary they carry, the only bytes a
  * build runs, checked before each run. Raising it: the version and the tarball
- * digests by hand, then `node lib/pnpm.mjs digests` prints the binaries' digests,
+ * digests by hand, then `node lib/pnpm-cli.mjs digests` prints the binaries' digests,
  * from those tarballs.
  */
 export const PNPM_VERSION = "12.14.0";
@@ -198,7 +197,7 @@ export function verifiedPnpm({ file = pinnedPnpmPath(), target = pnpmTarget(), d
 
 /** What to do when upstream moves to another pnpm. */
 export const RAISE_PNPM =
-  "Raise PNPM_VERSION and PNPM_TARBALL_SHA512 in lib/pnpm.mjs to the pnpm upstream asks for once it is at least 3 days old, then PNPM_BINARY_SHA256 (`node lib/pnpm.mjs digests` prints them); rerun ./install.sh, then rerun.";
+  "Raise PNPM_VERSION and PNPM_TARBALL_SHA512 in lib/pnpm.mjs to the pnpm upstream asks for once it is at least 3 days old, then PNPM_BINARY_SHA256 (`node lib/pnpm-cli.mjs digests` prints them); rerun ./install.sh, then rerun.";
 
 /** Each package manager `manifest` (a parsed package.json) asks for: [field, what it says, the pnpm version or null]. */
 function requests(manifest) {
@@ -340,7 +339,7 @@ async function unpackTarball(target, dir, tarballs) {
 }
 
 /**
- * `node lib/pnpm.mjs fetch <dir>`: the pinned pnpm for this machine, from its
+ * `node lib/pnpm-cli.mjs fetch <dir>`: the pinned pnpm for this machine, from its
  * registry tarballs (no install script runs), laid out in <dir>/pnpm as npm -g
  * lays it out under a prefix, and a Vite+ home holding the same binary in
  * <dir>/vite-plus (seedVitePlusHome). install.sh copies them where they go.
@@ -364,8 +363,8 @@ export async function fetchPinnedPnpm(dir, { target = pnpmTarget(), tarballs = P
   seedVitePlusHome(path.join(dir, "vite-plus"), verifiedPnpm({ file: path.join(pkg, "pnpm"), target, digests, rootOwned: false }));
 }
 
-/** `node lib/pnpm.mjs digests`: PNPM_BINARY_SHA256 for PNPM_VERSION, from the pinned tarballs. Run it when raising the pin. */
-async function printBinaryDigests() {
+/** `node lib/pnpm-cli.mjs digests`: PNPM_BINARY_SHA256 for PNPM_VERSION, from the pinned tarballs. Run it when raising the pin. */
+export async function printBinaryDigests() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "blacksand-pnpm-"));
   try {
     const out = {};
@@ -495,12 +494,12 @@ export async function holdBuildTools({ report, builder = runsAsBuilder(), ...opt
 }
 
 /**
- * `node lib/pnpm.mjs check-tools-lock <file> <build account> [fd]`: install.sh's
+ * `node lib/pnpm-cli.mjs check-tools-lock <file> <build account> [fd]`: install.sh's
  * check of the tools' lock, and, with `fd`, that its own descriptor is on it.
  * Prints why not: status 2 when the directories above it aren't root's alone (so
  * install.sh touches nothing there), 1 for the lock itself.
  */
-function checkToolsLock(file, builder, fd) {
+export function checkToolsLock(file, builder, fd) {
   const above = rootOwnedProblem(path.dirname(file));
   if (above) {
     console.error(`the directories above ${file}: ${above}`);
@@ -511,8 +510,8 @@ function checkToolsLock(file, builder, fd) {
   return problem ? 1 : 0;
 }
 
-/** `node lib/pnpm.mjs check-pnpm <file>`: install.sh's check that the pnpm at <file> is the pinned binary. Prints why not. */
-function checkPnpm(file) {
+/** `node lib/pnpm-cli.mjs check-pnpm <file>`: install.sh's check that the pnpm at <file> is the pinned binary. Prints why not. */
+export function checkPnpm(file) {
   try {
     verifiedPnpm({ file, rootOwned: false });
     return 0;
@@ -523,11 +522,11 @@ function checkPnpm(file) {
 }
 
 /**
- * `node lib/pnpm.mjs check-build-tools <dir>`: install.sh's check of root's tools in
+ * `node lib/pnpm-cli.mjs check-build-tools <dir>`: install.sh's check of root's tools in
  * <dir> (pnpm/ and vite-plus/), staged or in place, before it hands them to the build
  * account: what the build account's check before each build requires. Prints why not.
  */
-function checkBuildTools(dir) {
+export function checkBuildTools(dir) {
   try {
     verifiedPnpm({ file: path.join(dir, "pnpm", "lib", "node_modules", "pnpm", "pnpm"), rootOwned: true });
     checkVitePlusHome(path.join(dir, "vite-plus"), { rootOwned: true });
@@ -536,21 +535,4 @@ function checkBuildTools(dir) {
     console.error(error.message);
     return 1;
   }
-}
-
-/** Whether this file is the one node was asked to run (not imported, as by `node -e` with arguments of its own). */
-const isMain = () => {
-  try {
-    return fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
-  } catch {
-    return false;
-  }
-};
-
-if (process.argv[1] && isMain()) {
-  if (process.argv[2] === "digests") await printBinaryDigests();
-  else if (process.argv[2] === "fetch" && process.argv[3]) await fetchPinnedPnpm(process.argv[3]);
-  else if (process.argv[2] === "check-pnpm" && process.argv[3]) process.exitCode = checkPnpm(process.argv[3]);
-  else if (process.argv[2] === "check-build-tools" && process.argv[3]) process.exitCode = checkBuildTools(process.argv[3]);
-  else if (process.argv[2] === "check-tools-lock" && process.argv[3] && process.argv[4]) process.exitCode = checkToolsLock(process.argv[3], process.argv[4], process.argv[5]);
 }

@@ -174,7 +174,7 @@ test("install.sh's build_tools_problem runs lib/pnpm.mjs's check, then checks wh
   const t = buildToolsScratch();
   try {
     // lib/pnpm.mjs's own check, as install.sh runs it: tools that aren't root's are refused here, at install.
-    const lib = installSh(`${t.stubs()}\nPNPM_CHECK=${JSON.stringify(new URL("../lib/pnpm.mjs", import.meta.url).pathname)}\nmkdir -p "$BUILD_TOOLS/pnpm/lib/node_modules/pnpm"\nbuild_tools_problem "$BUILD_TOOLS"; echo "status $?"`);
+    const lib = installSh(`${t.stubs()}\nPNPM_CHECK=${JSON.stringify(new URL("../lib/pnpm-cli.mjs", import.meta.url).pathname)}\nmkdir -p "$BUILD_TOOLS/pnpm/lib/node_modules/pnpm"\nbuild_tools_problem "$BUILD_TOOLS"; echo "status $?"`);
     assert.match(lib.stdout + lib.stderr, /must be root's and only root's to change|isn't root's/);
     assert.match(lib.stdout, /status 1/);
     // With that check passed (stubbed: these scratch files can't be root's), what the account can do decides.

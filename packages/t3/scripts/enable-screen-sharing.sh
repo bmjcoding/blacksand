@@ -578,7 +578,7 @@ lock_take() {
 # signalled, never the caller's (an admin's terminal, say). WORKER names it
 # while it runs, for on_signal.
 bounded() {
-  local secs="$1" status=0 timer
+  local secs="$1" status=0 timer i
   shift
   set -m
   ("$@") </dev/null &
@@ -591,6 +591,15 @@ bounded() {
   wait "$WORKER" 2>/dev/null || status=$?
   # A signal interrupts that wait: wait for the killed worker itself.
   [[ -z $SIGNALLED ]] || wait "$WORKER" 2>/dev/null || true
+  # Killing a group can miss a process it was starting at that moment (macOS,
+  # under load), which then runs on: a killed worker's group is killed again
+  # until nothing is left in it (for at most a second).
+  if [[ -n $SIGNALLED ]] || ((status == 137)); then
+    for ((i = 0; i < 100; i++)); do
+      kill -KILL -- "-$WORKER" 2>/dev/null || break
+      command sleep 0.01
+    done
+  fi
   WORKER=""
   kill -KILL -- "-$timer" 2>/dev/null || true
   wait "$timer" 2>/dev/null || true

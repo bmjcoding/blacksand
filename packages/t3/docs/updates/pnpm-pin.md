@@ -14,7 +14,7 @@ Raise the pin once that pnpm is at least 3 days old:
 1. In `packages/t3/lib/pnpm.mjs`, set `PNPM_VERSION`, and `PNPM_TARBALL_SHA512` for the wrapper
    package and each platform's `@pnpm/exe.<platform>` tarball, as hex. The
    registry's `dist.integrity` for each tarball is that SHA-512, base64-encoded.
-2. Run `node packages/t3/lib/pnpm.mjs digests`. It downloads each platform's tarball, checks it
+2. Run `node packages/t3/lib/pnpm-cli.mjs digests`. It downloads each platform's tarball, checks it
    against its pinned SHA-512, and prints the native binary's SHA-256 as JSON. Paste
    those into `PNPM_BINARY_SHA256`. (`install.sh` checks the wrapper's digest when it
    installs.)

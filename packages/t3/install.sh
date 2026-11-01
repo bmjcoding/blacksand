@@ -38,8 +38,8 @@
 
 set -euo pipefail
 cd "$(dirname "$0")"
-# lib/pnpm.mjs: the pinned pnpm, and the checks of root's build tools and their lock.
-PNPM_CHECK="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/pnpm.mjs"
+# lib/pnpm-cli.mjs (lib/pnpm.mjs's commands): the pinned pnpm, and the checks of root's build tools and their lock.
+PNPM_CHECK="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/pnpm-cli.mjs"
 
 # Output and the legacy install refusal (shared with the setup scripts).
 # shellcheck source=scripts/host-common.sh

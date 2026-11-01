@@ -40,12 +40,21 @@ export const UPDATE_REQUESTS =
   process.env.BLACKSAND_T3_UPDATE_REQUESTS ??
   (process.platform === "darwin" ? "/Users/Shared/blacksand/update-requests" : "/var/tmp/blacksand-update-requests");
 
-fs.mkdirSync(STATE, { recursive: true });
+/**
+ * STATE, made if it isn't there yet. Only what writes state calls it (bin/t3 as
+ * it starts, and log), never an import: blacksand's other commands load these
+ * modules, and loading them changes nothing on disk.
+ */
+export function makeState() {
+  fs.mkdirSync(STATE, { recursive: true });
+  return STATE;
+}
 
 export function log(message) {
   const line = `[blacksand-t3 ${new Date().toISOString()}] ${message}`;
   console.log(line);
   // Owner-only: commands and their errors end up here.
+  makeState();
   fs.appendFileSync(path.join(STATE, "blacksand-t3.log"), line + "\n", { mode: 0o600 });
 }
 

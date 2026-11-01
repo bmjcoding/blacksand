@@ -183,8 +183,8 @@ export interface HeadCheck {
 }
 
 /**
- * Whether the clone at `git` runs owner-signed code: HEAD's history taken from
- * its first commit, every time, recording nothing, and the working tree
+ * Whether the clone at `git` runs signed code: HEAD's history taken from its
+ * first commit (judged by its own list), every time, recording nothing, and the working tree
  * compared with that commit's tree, file by file. HEAD is read again at the end:
  * a checkout while this ran is refused, never reported as the commit it left.
  * What `blacksand verify` reports. A record is a shortcut the clone's own user

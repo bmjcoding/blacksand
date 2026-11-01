@@ -77,7 +77,7 @@ import { preview } from "../lib/preview.mjs";
 import { selfUpdate, verifyHead } from "../lib/selfupdate.mjs";
 import { smokeTest } from "../lib/smoke.mjs";
 import { SOAK_HOURS, cliChannel, commitDetails, commitTime, fetchUpstreamHere, githubWebUrl, hasMirror, mirrorTags, parseCommitLines, previousTag, releaseNotes, resolveRef, revParse, soakedTags, upstreamCommits, upstreamWebUrl, versionOf } from "../lib/upstream.mjs";
-import { BUILDER_MARKER, BUILDER_USER, IS_BUILDER, LAUNCHER, MIRROR, ROOT, STATE, T3B_HOME, USE_BUILDER, log, mirrorGit, readJson, sleep, stableNodePath } from "../lib/util.mjs";
+import { BUILDER_MARKER, BUILDER_USER, IS_BUILDER, LAUNCHER, MIRROR, ROOT, STATE, T3B_HOME, USE_BUILDER, log, makeState, mirrorGit, readJson, sleep, stableNodePath } from "../lib/util.mjs";
 
 // The app never fetches this at runtime (rule server/litellm-rates-off). Each
 // update downloads it once and seeds the app's rate cache, so usage cost
@@ -104,6 +104,8 @@ let isRerun = false;
 const ACTIVATION = path.join(STATE, "activation.json");
 const DRIFT_DIR = path.join(STATE, "drift");
 const VERDICTS = path.join(STATE, "verdicts.json");
+// Every command here may write state (its records, its lock, the log): the folder they go in.
+makeState();
 /** How many releases back an update looks for one its strict rules still apply to. */
 const MAX_FALLBACK = 5;
 
