@@ -11,7 +11,7 @@ npm run test:deep   # the deep tier: signed histories, installer runs, property 
 ```
 
 It needs Node 24 or later and git 2.55.0 or later. The deep tier takes about a minute
-on a recent Mac; [CONTRIBUTING.md](../../CONTRIBUTING.md) says what belongs in each. It works in throwaway folders, repositories and SSH keys, with local fakes
+on a recent Mac; [CONTRIBUTING.md](../../../../CONTRIBUTING.md) says what belongs in each. It works in throwaway folders, repositories and SSH keys, with local fakes
 for npm, GitHub, OSV and tailscaled. It doesn't touch your clone, `~/.ssh`,
 `~/.blacksand/t3` or the installed app. CI runs it on every push and pull request (`ci.yml`), and again
 before each evaluation (`evaluate.yml`).

@@ -2,7 +2,7 @@
 # Screen Sharing on the always-on host, for your admin account only: reachable
 # from this Mac's loopback and, through Tailscale Serve, from the devices your
 # tailnet policy allows; never from your local network
-# (docs/remote-access/screen-sharing.md). Run with sudo from that admin account:
+# (packages/t3/docs/remote-access/screen-sharing.md). Run with sudo from that admin account:
 #
 #   sudo scripts/enable-screen-sharing.sh               # set up and on, or put back
 #   sudo scripts/enable-screen-sharing.sh --no-serve    # the same, loopback only (an SSH tunnel)

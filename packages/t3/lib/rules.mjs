@@ -2827,7 +2827,7 @@ export const makeRules = ({ updater, build }) => [
     edits: [
       {
         find: 'export const PRIVACY_POLICY_URL = "https://t3.codes/privacy-policy";',
-        replace: 'export const PRIVACY_POLICY_URL = "https://github.com/bmjcoding/blacksand/blob/main/docs/security/privacy.md";',
+        replace: 'export const PRIVACY_POLICY_URL = "https://github.com/bmjcoding/blacksand/blob/main/packages/t3/docs/security/privacy.md";',
       },
     ],
   },

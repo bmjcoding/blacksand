@@ -17,7 +17,7 @@ scripts run in an unprivileged account. On a host, agents run in standard
 accounts that log in over SSH with one key only. It doesn't limit what the agents
 reach on the network, audit upstream's code, or protect a machine whose admin
 account is compromised. The full picture is in the
-[threat model](../../docs/security/threat-model.md).
+[threat model](docs/security/threat-model.md).
 
 ## What it removes, and what still connects out
 
@@ -44,7 +44,7 @@ What still connects out:
   if you use it; and the pages you open in the preview browser
 
 How each of these is enforced and checked, and how to check it yourself:
-[privacy](../../docs/security/privacy.md).
+[privacy](docs/security/privacy.md).
 
 ## Platforms and roles
 
@@ -54,12 +54,12 @@ How each of these is enforced and checked, and how to check it yourself:
 | Always-on host: agent accounts reached over SSH | `--role host` | Yes | Not yet |
 | Desktop with a standby agent account | `--role both` | Yes | Not yet |
 
-[Roles and platforms](../../docs/getting-started/roles.md) explains each role, and lists
+[Roles and platforms](docs/getting-started/roles.md) explains each role, and lists
 what Linux would need for the others.
 
 ## Quick start
 
-Check the [prerequisites](../../docs/getting-started/prerequisites.md) first. Git must be
+Check the [prerequisites](docs/getting-started/prerequisites.md) first. Git must be
 2.55.0 or later before you clone. Then:
 
 ```sh
@@ -67,9 +67,9 @@ git clone https://github.com/bmjcoding/blacksand.git
 cd blacksand
 ```
 
-Before running any script, [put the clone at the full commit SHA you trust](../../docs/install/clone.md#put-it-at-the-commit-you-trust).
+Before running any script, [put the clone at the full commit SHA you trust](docs/install/clone.md#put-it-at-the-commit-you-trust).
 Then run `packages/t3/install.sh`. For a desktop plus an always-on host, follow
-[the worked example](../../docs/getting-started/example-desktop-and-host.md).
+[the worked example](docs/getting-started/example-desktop-and-host.md).
 
 ## If the app won't start
 
@@ -80,11 +80,11 @@ The app's startup error links here.
   `blacksand t3 update --force`.
 - The last update's log is `packages/t3/state/blacksand-t3.log` in your clone.
 
-More in [troubleshooting](../../docs/troubleshooting.md).
+More in [troubleshooting](docs/troubleshooting.md).
 
 ## Documentation
 
-Start with the [documentation map](../../docs/README.md). To report a vulnerability, see
+Start with the [documentation map](docs/README.md). To report a vulnerability, see
 [SECURITY.md](../../SECURITY.md). To contribute, see [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
 ## License

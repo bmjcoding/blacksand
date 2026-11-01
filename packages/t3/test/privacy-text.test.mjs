@@ -69,7 +69,7 @@ test("the privacy sentences say Blacksand T3 collects no usage data, and the lin
   assert.doesNotMatch(all, /t3\.codes/);
   assert.doesNotMatch(all, /privacy policy|View policy/);
   assert.doesNotMatch(all, /T3 Code/, "nothing left for brand/name to turn into a false sentence");
-  assert.match(read("apps/web/src/legalLinks.ts"), /"https:\/\/github\.com\/bmjcoding\/blacksand\/blob\/main\/docs\/security\/privacy\.md"/);
+  assert.match(read("apps/web/src/legalLinks.ts"), /"https:\/\/github\.com\/bmjcoding\/blacksand\/blob\/main\/packages\/t3\/docs\/security\/privacy\.md"/);
   assert.match(read("apps/web/src/components/onboarding/WelcomeWizard.tsx"), /Blacksand T3 collects no usage data/);
   assert.match(read("apps/web/src/components/onboarding/WelcomeWizard.tsx"), /href=\{PRIVACY_POLICY_URL\}[\s\S]*Blacksand T3 README\n {10}<\/a>/, "the import stays used");
   assert.match(read("apps/web/src/components/settings/SettingsPanels.tsx"), /description="Blacksand T3 collects no usage data\./);

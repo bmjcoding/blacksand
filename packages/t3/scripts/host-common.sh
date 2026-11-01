@@ -54,7 +54,7 @@ legacy_install() {
 refuse_legacy_install() {
   local found
   if found="$(legacy_install)"; then
-    die "this machine has a legacy T3 Blackout install ($found). Blacksand installs on a rebuilt machine, not beside or over one: remove the legacy install first (docs/getting-started/rebuilding.md). Nothing was changed."
+    die "this machine has a legacy T3 Blackout install ($found). Blacksand installs on a rebuilt machine, not beside or over one: remove the legacy install first (packages/t3/docs/getting-started/rebuilding.md). Nothing was changed."
   fi
 }
 

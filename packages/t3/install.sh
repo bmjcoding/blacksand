@@ -7,7 +7,7 @@
 #
 # Run it as yourself, not with sudo: it asks for sudo for the steps that need it.
 #
-# Roles (docs/getting-started/roles.md):
+# Roles (packages/t3/docs/getting-started/roles.md):
 #   ui    (default) the desktop app you work in.
 #   host  macOS only. Agents run here in their own accounts, reached over SSH;
 #         the app is installed for them in /Applications and not opened, and the
@@ -447,7 +447,7 @@ mac_setup() {
       bin/t3 signing adopt --vault "$VAULT"
     else
       say "No Apple Development certificate found; creating a self-signed one in \"$VAULT\""
-      say "Keychain will ask again after each update until you run: blacksand t3 signing adopt --vault \"$VAULT\" (docs/install/signing-macos.md)"
+      say "Keychain will ask again after each update until you run: blacksand t3 signing adopt --vault \"$VAULT\" (packages/t3/docs/install/signing-macos.md)"
       bin/t3 signing init --vault "$VAULT"
     fi
   else
@@ -497,7 +497,7 @@ linux_setup() {
   have curl || common+=(curl)
   have git || common+=(git)
   # Upstream's Linux build needs a C toolchain, libsecret headers, pkg-config and
-  # ImageMagick (docs/operations/development.md, "Linux AppImage prerequisites").
+  # ImageMagick (upstream's docs/operations/development.md, "Linux AppImage prerequisites").
   say "Installing system packages (${PRETTY_NAME:-$ID})"
   case "$family" in
     arch)
@@ -734,7 +734,7 @@ main() {
     host)
       cat <<'NEXT'
 
-Next, for each account agents run in (docs/accounts/agent-accounts.md), e.g.:
+Next, for each account agents run in (packages/t3/docs/accounts/agent-accounts.md), e.g.:
   sudo scripts/add-agent-account.sh agent-claude --key ~/.ssh/blacksand.pub
 then turn on Remote Login and run that command again. Signed in as the account
 (ssh agent-claude@localhost): install the provider CLIs on its own PATH, run
@@ -746,7 +746,7 @@ NEXT
       cat <<'NEXT'
 
 Open "Blacksand T3" from your app launcher, or run: blacksand t3 launch
-For the local standby lane (docs/install/standby.md), e.g.:
+For the local standby lane (packages/t3/docs/install/standby.md), e.g.:
   sudo scripts/add-agent-account.sh agent-standby --loopback-only --key ~/.ssh/blacksand.pub
 NEXT
       ;;

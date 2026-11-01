@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Sets up a macOS account that coding agents run in, reached from a Blacksand T3
-# desktop over SSH (docs/accounts/agent-accounts.md). Run once per account, with sudo, from
+# desktop over SSH (packages/t3/docs/accounts/agent-accounts.md). Run once per account, with sudo, from
 # the admin account that ran install.sh; rerun it any time, it puts everything
 # back the way it describes:
 #
@@ -641,7 +641,7 @@ NEXT
 
 Done. Next, as $NAME (ssh $( ((LOOPBACK)) && echo "-p $LOOPBACK_PORT ")$NAME@localhost, or log in at the screen):
   1. Install the provider CLIs it should run (Claude Code, Codex, ...) on its own PATH
-     (docs/accounts/providers.md).
+     (packages/t3/docs/accounts/providers.md).
   2. codex login                       (Codex keeps its login in a file)
   3. claude setup-token                (SSH sessions can't unlock the Keychain)
   4. $HELPER   (stores it, owner only)

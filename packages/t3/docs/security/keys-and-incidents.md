@@ -148,7 +148,7 @@ guarantee they will, so the alert job keeps checking what's already pinned.
 
 ### A vulnerability report arrives
 
-Reports come through GitHub's private vulnerability reporting ([SECURITY.md](../../SECURITY.md)).
+Reports come through GitHub's private vulnerability reporting ([SECURITY.md](../../../../SECURITY.md)).
 
 1. Acknowledge within 7 days.
 2. Reproduce it on the current `main`. Decide severity by what an attacker needs

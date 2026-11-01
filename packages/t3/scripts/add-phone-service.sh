@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Lets your phone reach one agent account's Blacksand T3 server over Tailscale,
-# with no relay (docs/remote-access/phone.md). Run on the always-on host, with sudo,
+# with no relay (packages/t3/docs/remote-access/phone.md). Run on the always-on host, with sudo,
 # from the admin account, after scripts/add-agent-account.sh made the account:
 #
 #   sudo scripts/add-phone-service.sh agent-claude                  # install, or put back

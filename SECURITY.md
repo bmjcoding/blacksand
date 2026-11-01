@@ -25,7 +25,7 @@ In scope: the code and configuration in this repository.
 - self-update and the commit and pin trust rules (`packages/t3/lib/selfupdate.mjs`, `.allowed_signers`)
 - the CI workflows and their scripts (`.github/`)
 - the setup scripts (`install.sh`, `packages/t3/scripts/`)
-- instructions in `docs/` that, followed as written, would weaken a machine's
+- instructions in any `docs/` folder that, followed as written, would weaken a machine's
   security
 
 Examples: a way for an agent account, a LAN peer or a tailnet peer to gain access
@@ -40,7 +40,7 @@ Out of scope (report these upstream):
 - the agent CLIs, Tailscale, macOS, Homebrew, npm packages and other third-party
   software
 - the non-goals and accepted limits in the
-  [threat model](docs/security/threat-model.md#non-goals) (for example: runtime
+  [threat model](packages/t3/docs/security/threat-model.md#non-goals) (for example: runtime
   network enforcement, root or the admin account on a host, power loss in the
   documented windows)
 
@@ -55,14 +55,14 @@ Out of scope (report these upstream):
 ## Supported versions
 
 Only `main`. Every machine follows `main` through
-[self-update](docs/updates/self-update.md). Fixes ship as signed commits there;
+[self-update](packages/t3/docs/updates/self-update.md). Fixes ship as signed commits there;
 there are no release branches.
 
 ## Security documentation
 
-- [Threat model](docs/security/threat-model.md)
-- [Privacy](docs/security/privacy.md)
-- [Supply chain](docs/security/supply-chain.md)
-- [Keys and incidents](docs/security/keys-and-incidents.md)
-- [Host hardening and the CIS Benchmark](docs/security/hardening-cis.md)
-- [Testing](docs/security/testing.md)
+- [Threat model](packages/t3/docs/security/threat-model.md)
+- [Privacy](packages/t3/docs/security/privacy.md)
+- [Supply chain](packages/t3/docs/security/supply-chain.md)
+- [Keys and incidents](packages/t3/docs/security/keys-and-incidents.md)
+- [Host hardening and the CIS Benchmark](packages/t3/docs/security/hardening-cis.md)
+- [Testing](packages/t3/docs/security/testing.md)

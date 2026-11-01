@@ -7,7 +7,7 @@ Issues and pull requests are welcome. Report vulnerabilities privately
 
 Every machine running Blacksand T3 fast-forwards to `main` only when every new
 commit, on side branches too, carries an SSH signature from a key listed in
-`.allowed_signers` ([self-update](docs/updates/self-update.md)). That list holds
+`.allowed_signers` ([self-update](packages/t3/docs/updates/self-update.md)). That list holds
 the owner's key and the CI evaluator's key, which may sign only pin moves. So:
 
 - **Pull requests aren't merged as they are.** A contributor's commits aren't
@@ -63,7 +63,7 @@ the command that replays it ([tools/fuzz.ts](tools/fuzz.ts)).
 Changes under `packages/t3/bin/`, `packages/t3/lib/` or `packages/t3/test/stripped/`
 also need a full build: `BLACKSAND_T3_UNISOLATED_BUILD=1 blacksand t3 check --build`
 (in a checkout that isn't an install), or let the `build.yml` workflow run.
-[Testing](docs/security/testing.md) describes the suite.
+[Testing](packages/t3/docs/security/testing.md) describes the suite.
 
 - One change per pull request. A commit message describes the behaviour, not the
   process that led to it.
