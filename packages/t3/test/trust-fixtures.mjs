@@ -7,6 +7,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { after } from "node:test";
+import { inspect } from "node:util";
 import assert from "node:assert/strict";
 
 // The tests' git must not pick up this machine's signing program, hooks or log settings.
@@ -14,6 +15,9 @@ process.env.GIT_CONFIG_GLOBAL = "/dev/null";
 process.env.GIT_CONFIG_NOSYSTEM = "1";
 
 const { BOT_PRINCIPAL, selfUpdate, verifyHead } = await import("../lib/selfupdate.mjs");
+const { checkTip, verifyHead: verifyHeadTs } = await import("../../../src/trust/check.ts");
+const { localGit } = await import("../../../src/trust/git.ts");
+const { t3Gates } = await import("../lib/trust-gates.mjs");
 
 export const DAY = 86_400_000;
 export const scratch = [];
@@ -114,9 +118,10 @@ export function fixture({ knownHosts = "", knownTools = "", locks = [OLD_DEPS, O
   // The dependency-closure review runs npm; lib/device-tools.mjs's own tests cover it, so it passes here unless a test says otherwise.
   // Self-update fetches only from GitHub unless told where (`remote`): here, the local origin.
   // The registry's clock agrees with the test's `now` unless a test says otherwise (lib/selfupdate.mjs clockProblem).
-  const update = (opts = {}) => selfUpdate({ repo: clone, remote: origin, upstream, report: (line) => logs.push(line), reviewClosure: passClosure, clock: async () => opts.now ?? Date.now(), ...opts });
+  // Both run the old verifier and the new one (src/trust) on the same clone, and fail on any difference (bothUpdate, bothVerify).
+  const update = (opts = {}) => bothUpdate({ repo: clone, remote: origin, upstream, report: (line) => logs.push(line), reviewClosure: passClosure, clock: async () => opts.now ?? Date.now(), ...opts });
   /** verifyHead on `repo`, as bin/t3blackout's update runs it, with no advisories open. */
-  const verify = (repo, opts = {}) => verifyHead({ repo, upstream, report: (line) => logs.push(line), reviewClosure: passClosure, advisories: async () => [], clock: async () => opts.now ?? Date.now(), ...opts });
+  const verify = (repo, opts = {}) => bothVerify({ repo, upstream, report: (line) => logs.push(line), reviewClosure: passClosure, advisories: async () => [], clock: async () => opts.now ?? Date.now(), ...opts });
   /** A new clone of origin as it is now (what install.sh's first build builds); `args` such as --depth go to git clone. */
   const fresh = (name = "fresh", args = []) => {
     const target = path.join(dir, name);
@@ -133,6 +138,128 @@ export function fixture({ knownHosts = "", knownTools = "", locks = [OLD_DEPS, O
 }
 
 const passClosure = async (pin) => ({ ok: true, pin, reasons: [], notes: [] });
+
+// ------------------------------------------------- old and new verifiers --
+// lib/selfupdate.mjs is the oracle until the cutover: src/trust must give the
+// same verdict, the same message, the same notes and the same record. The old
+// verifier runs first, against the test's mocks; the new one then gets replays
+// of exactly what the old one was answered (npm, the advisory sources, the
+// registry's clock, the closure review), so a test sees each call once, and a
+// call only the new verifier makes, or one it doesn't, is a disagreement.
+
+/** What a promise came to: { value } or { threw: its message }. */
+const settle = (promise) => promise.then((value) => ({ value }), (error) => ({ threw: String(error?.message ?? error) }));
+
+/** The file `repo` records its verified HEAD in, and what it holds (null when absent). */
+const recordFile = (repo) => path.resolve(run(repo, ["rev-parse", "--path-format=absolute", "--git-path", "t3blackout-verified"]));
+const readRecord = (file) => (fs.existsSync(file) ? fs.readFileSync(file, "utf8") : null);
+const putRecord = (file, text) => (text === null ? fs.rmSync(file, { force: true }) : fs.writeFileSync(file, text, { mode: 0o600 }));
+
+const REPLAYED = ["advisories", "reviewClosure", "isKnownHost", "clock"];
+
+/** A fresh Response with `response`'s status and headers and body `bytes`. */
+const copyOf = ({ bytes, response }) => new Response([101, 204, 205, 304].includes(response.status) || !bytes.length ? null : bytes, { status: response.status, statusText: response.statusText, headers: response.headers });
+
+/**
+ * A tape of the calls the old verifier makes to the functions in `options` and
+ * to fetch: `record(run)` runs it with recording versions, `replay(run)` with
+ * versions answering from the tape; `unplayed()` lists the calls the replay never made.
+ */
+function tape(options) {
+  const calls = [];
+  const show = (name, args) => `${name}(${args.map((arg) => inspect(arg, { depth: Infinity, breakLength: Infinity, sorted: true })).join(", ")})`;
+  const recording = (name, fn) => (...args) => {
+    const entry = { name, shown: show(name, name === "fetch" ? [String(args[0])] : args), used: false };
+    calls.push(entry);
+    entry.result = fn(...args);
+    // A response is read once and served as a copy to each verifier: a clone's body would keep the
+    // other's cancel() waiting for ever (a tee is cancelled only once both of its branches are).
+    if (name === "fetch") entry.result = entry.result.then(async (response) => ((entry.copy = { bytes: Buffer.from(await response.arrayBuffer()), response }), copyOf(entry.copy)));
+    return entry.result;
+  };
+  const replaying = (name) => (...args) => {
+    const key = name === "fetch" ? [String(args[0])] : args;
+    // By what the arguments show: callbacks among them (a waiver, a host check) are each run's own closures.
+    const shown = show(name, key);
+    const entry = calls.find((call) => !call.used && call.shown === shown);
+    if (!entry) throw new Error(`only the new verifier calls ${shown}`);
+    entry.used = true;
+    return name === "fetch" ? entry.result.then(() => copyOf(entry.copy)) : entry.result;
+  };
+  const using = async (wrap, body) => {
+    const fetch = globalThis.fetch;
+    globalThis.fetch = wrap("fetch", fetch);
+    try {
+      return await body(Object.fromEntries(REPLAYED.filter((name) => typeof options[name] === "function").map((name) => [name, wrap(name, options[name])])));
+    } finally {
+      globalThis.fetch = fetch;
+    }
+  };
+  return {
+    record: (body) => using(recording, body),
+    replay: (body) => using((name) => replaying(name), body),
+    // Not fetches: the gates' code is shared, and its npm cache answers the second verifier from the first one's.
+    unplayed: () => calls.filter((call) => !call.used && call.name !== "fetch").map((call) => call.shown),
+  };
+}
+
+/** The new verifier's gates, from verifyHead's options (src/trust/check.ts PinGates by lib/trust-gates.mjs). */
+const gatesOf = (options, now, report) => t3Gates({ ...options, now, report });
+
+/**
+ * verifyHead by the old verifier, then (from the same record) by the new one:
+ * { old, new }, each { value } or { threw }, with the record it left, the notes
+ * it reported and (the new one) the outside calls it didn't make. The record is
+ * left as the old verifier left it.
+ */
+export async function verifyBoth({ repo, report = () => {}, now = Date.now(), ...options }) {
+  const file = recordFile(repo);
+  const before = readRecord(file);
+  const heard = { new: [], old: [] };
+  const calls = tape(options);
+  const old = await calls.record((recorded) => settle(verifyHead({ repo, now, ...options, ...recorded, report: (line) => (heard.old.push(line), report(line)) })));
+  const left = readRecord(file);
+  putRecord(file, before);
+  const fresh = await calls.replay((replayed) => settle(verifyHeadTs({ repo, now, gates: gatesOf({ ...options, ...replayed }, now, (line) => heard.new.push(line)) })));
+  const theirs = { ...fresh, record: readRecord(file), reports: heard.new, unplayed: calls.unplayed() };
+  putRecord(file, left);
+  return { old: { ...old, record: left, reports: heard.old, unplayed: [] }, new: theirs };
+}
+
+/** verifyBoth, failing on any difference; the old verifier's verdict. */
+export async function bothVerify(options) {
+  const both = await verifyBoth(options);
+  assert.deepEqual(both.new, both.old, `the new verifier disagrees with the old one on ${options.repo}`);
+  if ("threw" in both.old) throw new Error(both.old.threw);
+  return both.old.value;
+}
+
+/** Messages self-update logs before it gets to the check the verifiers share (lib/selfupdate.mjs selfUpdate). */
+const BEFORE_CHECK = /^self-update (?:skipped: (?:not on main|uncommitted changes|couldn't fetch \()|refused: origin\/main \(\w+\) isn't a fast-forward)/;
+
+/**
+ * Hourly self-update by the old verifier; when it got as far as the shared check
+ * (checkTip, from the HEAD it had to the tip it fetched: `remote`'s main), the
+ * new verifier's checkTip must reach the same verdict, with the same notes and
+ * outside calls.
+ */
+export async function bothUpdate({ repo, report = () => {}, now = Date.now(), ...options }) {
+  const rev = (at, name) => spawnSync("git", ["-C", at, "rev-parse", "--verify", "--quiet", `${name}^{commit}`], { encoding: "utf8" }).stdout.trim() || null;
+  const head = rev(repo, "HEAD");
+  const tip = options.remote ? rev(options.remote, "main") : null;
+  const heard = [];
+  const calls = tape(options);
+  const result = await calls.record((recorded) => selfUpdate({ repo, now, ...options, ...recorded, report: (line) => (heard.push(line), report(line)) }));
+  const last = heard.at(-1) ?? "";
+  const checked = result === "updated" ? { result: "verified" } : /^self-update (refused|held|skipped): /.test(last) && !BEFORE_CHECK.test(last) ? { result: last.split(" ")[1].slice(0, -1), message: last.slice(last.indexOf(": ") + 2) } : null;
+  if (checked && tip) {
+    const notes = [];
+    const fresh = await calls.replay((replayed) => checkTip(localGit(repo), { tip, start: head, gates: gatesOf({ ...options, ...replayed }, now, (line) => notes.push(line)) }));
+    const verdict = fresh.result === "verified" ? { result: "verified" } : fresh;
+    assert.deepEqual({ ...verdict, reports: notes, unplayed: calls.unplayed() }, { ...checked, reports: heard.slice(0, -1), unplayed: [] }, `the new verifier's check disagrees with self-update's on ${repo}`);
+  }
+  return result;
+}
 
 /** The commit recorded as verified in `repo` (the record is "<sha> <when>"), or null. */
 export function recorded(repo) {

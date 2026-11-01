@@ -8,7 +8,7 @@
 // evaluator commit that approves one, dependencies once. A shallow or incomplete
 // clone is refused; an age is taken only by a clock no more than 10 minutes ahead
 // of the registry's; what's verified is recorded, and a record dated after the
-// clock is checked again. (test/pin-trust.test.mjs: what the built pin rests
+// clock is checked again. (test/pin-trust.deep.test.mjs: what the built pin rests
 // on.) Throwaway repositories and keys (test/trust-fixtures.mjs); npm and the
 // advisory sources are mocked, and so is the registry's clock unless a test says
 // otherwise.

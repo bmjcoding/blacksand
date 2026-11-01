@@ -161,7 +161,7 @@ const REGULAR = "100644";
  * (null when absent). The pin must stay a regular file: a symlink's text is the
  * name of what it points at, so a checkout wouldn't read the pin verified here.
  */
-function botShape({ parents, files, after, before, afterMode = REGULAR, beforeMode = REGULAR }) {
+export function botShape({ parents, files, after, before, afterMode = REGULAR, beforeMode = REGULAR }) {
   if (parents !== 1) return "is a merge or a root commit";
   if (files.length !== 1 || files[0] !== PIN_FILE) return `changes ${files.join(", ") || "nothing"}, not just ${PIN_FILE}`;
   if (after !== null && afterMode !== REGULAR) return `makes ${PIN_FILE} mode ${afterMode}; it must stay a regular file (${REGULAR})`;
@@ -335,7 +335,7 @@ function takeHistory(git, revs, { root = null } = {}) {
 }
 
 /** Device tools `next` approves, or locks, that `previous` didn't. */
-const addedApprovals = (previous, next) =>
+export const addedApprovals = (previous, next) =>
   new Set([
     ...next.deviceTools.filter((tool) => !previous.deviceTools.includes(tool)),
     ...Object.keys(next.deviceToolLocks ?? {}).filter((tool) => !Object.hasOwn(previous.deviceToolLocks ?? {}, tool)),
@@ -389,7 +389,7 @@ const toolOverridesAt = (out, at) => {
  * closure (a young version only through the tool's fast lane). Returns {
  * result, message } or null.
  */
-async function reviewApprovals({ short, before, after, moved, snapshot, out, at, isKnownHost, reviewClosure, advisories, now, report }) {
+export async function reviewApprovals({ short, before, after, moved, snapshot, out, at, isKnownHost, reviewClosure, advisories, now, report }) {
   const approved = [...addedApprovals(before, after)];
   const raise = toolOverridesAt(out, at);
   const pinned = new Set(moved.flatMap(([, entry]) => deviceToolsInUse(snapshot.show(entry.sha, DEVICE_TOOL_PINS), raise)));
@@ -425,7 +425,7 @@ async function reviewApprovals({ short, before, after, moved, snapshot, out, at,
  * result, message } or null; `aged` hears whether any version was added (an
  * admission resting on this machine's clock).
  */
-async function checkDependencies({ short, before, moved, snapshot, out, at, advisories, now, report, aged }) {
+export async function checkDependencies({ short, before, moved, snapshot, out, at, advisories, now, report, aged }) {
   for (const [channel, entry] of moved) {
     const previous = before.channels[channel];
     const [baseLock, lock] = [snapshot.show(previous.sha, "pnpm-lock.yaml"), snapshot.show(entry.sha, "pnpm-lock.yaml")];
@@ -484,7 +484,7 @@ function pinAt(out, rev) {
  * tag points at upstream; the owner's overrides and lists as `at` has them.
  * { result: "refused" | "held" | "skipped", message } or null.
  */
-async function pinGates(git, { short, before, after, upstream, check, ...rest }) {
+export async function pinGates(git, { short, before, after, upstream, check, ...rest }) {
   const moved = Object.entries(after.channels).filter(([channel, entry]) => before.channels[channel].ref !== entry.ref || before.channels[channel].sha !== entry.sha);
   if (!moved.length) return null;
   try {
@@ -519,7 +519,7 @@ async function pinGates(git, { short, before, after, upstream, check, ...rest })
  * lib/gates.mjs registryTime), else "held" (a clock behind only holds more
  * back), or "skipped" when the registry can't be asked.
  */
-async function clockProblem(clock, now) {
+export async function clockProblem(clock, now) {
   let at;
   try {
     at = await clock();
@@ -542,7 +542,7 @@ async function clockProblem(clock, now) {
  * through an owner merge that changes pin.json over its first parent, so no
  * commit off the chain vouches for one on it. `of`: takeHistory's commits by sha.
  */
-function pinBasis(chain, of) {
+export function pinBasis(chain, of) {
   let trusted = chain[0];
   const bot = [];
   for (const sha of chain.slice(1)) {
