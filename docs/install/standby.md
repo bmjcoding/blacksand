@@ -8,11 +8,11 @@ The desktop app reaches it over SSH on its own loopback. macOS's Remote Login ca
 be limited to loopback, because launchd owns its listening socket. So the standby
 lane gets its own SSH server, and **Remote Login stays off on the desktop Mac**.
 
-Install the desktop with `./install.sh --role both` ([desktop](desktop.md)), which
+Install the desktop with `packages/t3/install.sh --role both` ([desktop](desktop.md)), which
 puts the app in `/Applications`, shared with the standby account. Then:
 
 ```sh
-sudo scripts/add-agent-account.sh agent-standby --loopback-only --key ~/.ssh/t3blackout.pub
+sudo packages/t3/scripts/add-agent-account.sh agent-standby --loopback-only --key ~/.ssh/t3blackout.pub
 ```
 
 macOS asks you to choose the account's password. The script does everything

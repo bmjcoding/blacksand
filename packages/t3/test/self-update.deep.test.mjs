@@ -3,8 +3,8 @@
 // origin's main, and the gates this machine works out again for an evaluator
 // pin, however its key was used. Upstream is a local repository with release
 // tags; npm and the advisory sources are mocked. Nothing here touches this clone
-// or ~/.ssh. (test/commit-trust.test.mjs: the history walk shared with a fresh
-// clone's check; test/git-isolation.test.mjs: where main is fetched from.)
+// or ~/.ssh. (test/commit-trust.deep.test.mjs: the history walk shared with a fresh
+// clone's check; test/git-isolation.deep.test.mjs: where main is fetched from.)
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { test } from "node:test";

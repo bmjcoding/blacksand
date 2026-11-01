@@ -3,7 +3,7 @@
 // supervisor runs a fake installed app's server as you, unprivileged, in a
 // scratch home; the rendered runner's __blackout-stop-stale-server runs against
 // the same home. Opt-in, a real packed build:
-//   T3BLACKOUT_TEST_PACKED_APP="/path/to/T3 Blackout.app" node --test test/phone-server.test.mjs
+//   T3BLACKOUT_TEST_PACKED_APP="/path/to/T3 Blackout.app" node --test test/phone-server.deep.test.mjs
 import { spawn, spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -11,7 +11,7 @@ import * as path from "node:path";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { decodeTemplate } from "../.github/scripts/render-runner.mjs";
+import { decodeTemplate } from "../ci/render-runner.mjs";
 
 const ROOT = path.dirname(path.dirname(new URL(import.meta.url).pathname));
 const SUPERVISOR = path.join(ROOT, "scripts", "phone-server.sh");

@@ -253,7 +253,7 @@ test("with --unisolated-build saved, builds may run as you, and status says so",
 });
 
 test("CI's workflows say T3BLACKOUT_UNISOLATED_BUILD=1 on every step that checks, builds or evaluates", () => {
-  const workflows = path.join(ROOT, ".github", "workflows");
+  const workflows = path.join(ROOT, "..", "..", ".github", "workflows");
   let steps = 0;
   for (const file of fs.readdirSync(workflows)) {
     const text = fs.readFileSync(path.join(workflows, file), "utf8");

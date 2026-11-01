@@ -2,15 +2,15 @@
 
 > **Applies to:** every role, macOS and Linux.
 
-Each machine gets one role, which you pick when you run `./install.sh --role …`.
+Each machine gets one role, which you pick when you run `packages/t3/install.sh --role …`.
 Every machine builds and checks its own copy of the pinned release. A machine never
 installs another machine's build.
 
 | Role | Command | What it sets up | macOS | Linux |
 |---|---|---|---|---|
-| Desktop | `./install.sh` (`--role ui`) | the app you work in; an hourly updater that runs while you're logged in | Yes | Yes |
-| Always-on host | `./install.sh --role host` | the app in `/Applications` for agent accounts; an hourly updater that runs with nobody logged in | Yes | Not yet |
-| Desktop with standby | `./install.sh --role both` | the desktop app, plus one agent account behind a loopback-only SSH server | Yes | Not yet |
+| Desktop | `packages/t3/install.sh` (`--role ui`) | the app you work in; an hourly updater that runs while you're logged in | Yes | Yes |
+| Always-on host | `packages/t3/install.sh --role host` | the app in `/Applications` for agent accounts; an hourly updater that runs with nobody logged in | Yes | Not yet |
+| Desktop with standby | `packages/t3/install.sh --role both` | the desktop app, plus one agent account behind a loopback-only SSH server | Yes | Not yet |
 
 ## Desktop
 
@@ -59,12 +59,12 @@ Sharing are macOS-only. Supporting them on Linux would need:
 - **Host updater:** a systemd system service that runs as the installing user with
   nobody logged in, plus a shared update-request folder the agent accounts can write.
 - **Agent accounts:** `useradd` accounts in a group, an sshd drop-in like
-  `scripts/add-agent-account.sh` writes (root-owned keys, loopback-only forwarding, a
+  `packages/t3/scripts/add-agent-account.sh` writes (root-owned keys, loopback-only forwarding, a
   source filter), and the app installed where every account can read it. The SSH
   runner already finds a Linux install in the connecting account's own data folder,
   but nothing installs one there for an agent account.
 - **Standby:** a loopback-only sshd as a systemd unit.
 - **Phone service:** a systemd unit per account, and tailscaled's Linux LocalAPI
-  socket in `scripts/host-common.sh`.
+  socket in `packages/t3/scripts/host-common.sh`.
 - **Screen Sharing:** a VNC or RDP server bound to loopback, with the same
-  hold/park/check design as `scripts/enable-screen-sharing.sh`.
+  hold/park/check design as `packages/t3/scripts/enable-screen-sharing.sh`.

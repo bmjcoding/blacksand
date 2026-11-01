@@ -1,0 +1,7 @@
+// The package's TypeScript tests (the property tests). They import its .mjs
+// modules, whose types are inferred (allowJs), not checked (checkJs stays off).
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": { "allowJs": true, "checkJs": false },
+  "include": ["test/*.ts"]
+}

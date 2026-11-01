@@ -4,8 +4,8 @@
 // ssh/runner-installed-blackout-only), so its text is template source: `\${`
 // and `\\n` are escapes, and an unescaped `${` or backtick would break the
 // template. Rendering decodes it the way JavaScript does.
-//   node .github/scripts/render-runner.mjs fragment <ssh-runner-blackout.sh> <out>
-//   node .github/scripts/render-runner.mjs tunnel <stripped tunnel.ts> <out>   (the whole runner)
+//   node packages/t3/ci/render-runner.mjs fragment <ssh-runner-blackout.sh> <out>
+//   node packages/t3/ci/render-runner.mjs tunnel <stripped tunnel.ts> <out>   (the whole runner)
 
 import * as fs from "node:fs";
 
@@ -41,7 +41,7 @@ export function decodeTemplate(source) {
 /** The whole runner from a stripped tunnel.ts: REMOTE_RUNNER_SCRIPT, placeholders filled with harmless values. */
 export function runnerFromTunnel(tunnel) {
   const start = tunnel.indexOf("const REMOTE_RUNNER_SCRIPT = `");
-  if (start === -1) throw new Error("tunnel.ts has no REMOTE_RUNNER_SCRIPT anymore; update .github/scripts/render-runner.mjs");
+  if (start === -1) throw new Error("tunnel.ts has no REMOTE_RUNNER_SCRIPT anymore; update ci/render-runner.mjs");
   const body = tunnel.slice(start + "const REMOTE_RUNNER_SCRIPT = `".length);
   const end = body.search(/(?<!\\)`/);
   if (end === -1) throw new Error("REMOTE_RUNNER_SCRIPT doesn't end");

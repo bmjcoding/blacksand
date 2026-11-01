@@ -45,7 +45,7 @@ Set up the host first, because the desktop's SSH steps need it running.
       **(you: sign in)**.
 3. **The host:**
    1. [power, FileVault and network settings](../install/host.md), then
-      [clone and check the clone](../install/clone.md), then `./install.sh --role
+      [clone and check the clone](../install/clone.md), then `packages/t3/install.sh --role
       host` **(you: approve 1Password and sudo)**;
    2. optional: [Screen Sharing](../remote-access/screen-sharing.md), now, before any
       agent account;
@@ -56,7 +56,7 @@ Set up the host first, because the desktop's SSH steps need it running.
    5. more accounts, the same way;
    6. optional: [your phone](../remote-access/phone.md) **(you: the phone)**.
 4. **The desktop:**
-   1. [clone and check the clone](../install/clone.md), then `./install.sh --role
+   1. [clone and check the clone](../install/clone.md), then `packages/t3/install.sh --role
       both` ([desktop](../install/desktop.md));
    2. optional: [restore your own threads](../install/desktop.md#before-the-first-launch-your-own-threads-optional),
       before the first launch;
@@ -72,7 +72,7 @@ Set up the host first, because the desktop's SSH steps need it running.
 
 | Where | Check | Expected |
 |---|---|---|
-| Both | `bin/t3blackout status` | the pinned release installed, `builds: as _t3blackout`, `signing: Apple Development: …`, the schedule line for the role |
+| Both | `packages/t3/bin/t3blackout status` | the pinned release installed, `builds: as _t3blackout`, `signing: Apple Development: …`, the schedule line for the role |
 | Both | `git --version` (new Terminal window) | 2.55.0 or later, Homebrew's |
 | Both | `sudo /usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate`; `csrutil status`; `spctl --status` | firewall enabled; SIP enabled; assessments enabled |
 | Host | `pmset -g` | `sleep 0` |
@@ -86,7 +86,7 @@ Set up the host first, because the desktop's SSH steps need it running.
 | Host | `sudo ls -led /Users/agent-claude` | no ACL line but `0: group:everyone deny delete` |
 | Host | `sudo fdesetup list` | your admin account; no agent accounts |
 | Host | phone: `sudo lsof -nP -iTCP:4773 -sTCP:LISTEN`; `tailscale serve status` | `127.0.0.1:4773` only; your HTTPS name → `http://127.0.0.1:4773`, nothing on Funnel |
-| Host | Screen Sharing: `sudo scripts/enable-screen-sharing.sh --status` | on, from the script's own plist; answers on loopback; capture granted; 15900 held by launchd (or screensharingd during a session) on 127.0.0.1 and ::1 only; the parking job on 15901; 5900 by tailscaled; the forward to 15900; the switch off; no problem. After `--off`: the forward parked on 15901 |
+| Host | Screen Sharing: `sudo packages/t3/scripts/enable-screen-sharing.sh --status` | on, from the script's own plist; answers on loopback; capture granted; 15900 held by launchd (or screensharingd during a session) on 127.0.0.1 and ::1 only; the parking job on 15901; 5900 by tailscaled; the forward to 15900; the switch off; no problem. After `--off`: the forward parked on 15901 |
 | LAN device | Screen Sharing: `nc -z -G 3 <host's LAN address> 5900` | refused or times out |
 | Desktop | `nc -z -G 2 127.0.0.1 22` | refused (Remote Login off) |
 | Desktop | `sudo lsof -nP -iTCP:2222 -sTCP:LISTEN` | loopback only |
@@ -106,6 +106,6 @@ Once, while you're at the host, run `sudo fdesetup authrestart` there.
 
 - From the desktop, `nc -z -G 5 t3b-host 22` succeeds again within a few minutes.
 - The host's environment reconnects. Switch it off and on if it doesn't on its own.
-- The host's `bin/t3blackout status` still shows the LaunchDaemon schedule line.
+- The host's `packages/t3/bin/t3blackout status` still shows the LaunchDaemon schedule line.
 - With the phone service, its server is back within seconds of boot, with nobody
   logged in.

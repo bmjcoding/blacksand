@@ -16,24 +16,24 @@ The app's startup error suggests these Terminal commands:
 - **Rebuild the release you're on:** quit the app, then run
   `~/.t3blackout/bin/t3blackout update --force`. Plain `update` builds only when
   there's a newer pin or a newer T3 Blackout commit. If the app is still running, the
-  build waits; `bin/t3blackout launch` installs it and opens the app.
+  build waits; `packages/t3/bin/t3blackout launch` installs it and opens the app.
 
 ## When an update fails
 
 You get a desktop notification, and the installed build is untouched. The update
 button offers the release again.
 
-- **A strict rule no longer matches:** upstream changed that code. `bin/t3blackout
-  drift` shows how; update the anchor in `lib/rules.mjs` ([upstream rules](updates/upstream-rules.md#fixing-a-rule)).
+- **A strict rule no longer matches:** upstream changed that code. `packages/t3/bin/t3blackout
+  drift` shows how; update the anchor in `packages/t3/lib/rules.mjs` ([upstream rules](updates/upstream-rules.md#fixing-a-rule)).
   Feature rules never fail an update; they're left out instead.
 - **The smoke test saw outbound traffic:** upstream added a network call. The host is
   in the error. Add a rule that disables it.
 - **"The packaged server reached out while it was photographed":** the same, seen in
   the packaged app. Nothing was installed.
 - **An unknown host in upstream's source:** look at what talks to it (the error names
-  the file and line). Then add a rule, or list it in `lib/known-hosts.txt` with a note.
+  the file and line). Then add a rule, or list it in `packages/t3/lib/known-hosts.txt` with a note.
 - **The typecheck failed outside a feature:** upstream changed an interface a strict
-  file uses, such as the updater interface `lib/files/BlackoutUpdater.ts` implements.
+  file uses, such as the updater interface `packages/t3/lib/files/BlackoutUpdater.ts` implements.
   Update that file to match.
 - **A device tool has no reviewed lockfile, or an unlisted install script:** the error
   says which ([device tools](building/device-tools.md)).
@@ -41,13 +41,13 @@ button offers the release again.
   something changed, removed or added files in the packager's staged install after the
   guard installed it, beyond what packaging is known to add. If upstream changed how it
   packages, look at the files named and update `stageChanges` in
-  `lib/stage-install.mjs`. "t3blackout refused … in the packager's stage" means
+  `packages/t3/lib/stage-install.mjs`. "t3blackout refused … in the packager's stage" means
   upstream runs a new package-manager command there.
 - **New stock-T3 wording** (`stock/no-stock-guidance`): add a rule that replaces it,
-  before `brand/name` in `lib/rules.mjs`.
+  before `brand/name` in `packages/t3/lib/rules.mjs`.
 - **Upstream asks for another pnpm** (the build stops naming the version): raise the
   pin once that pnpm is at least 3 days old ([pnpm pin](updates/pnpm-pin.md)). A pnpm
-  whose bytes don't match the pin is refused the same way; rerunning `./install.sh`
+  whose bytes don't match the pin is refused the same way; rerunning `packages/t3/install.sh`
   reinstalls it.
 - **GitHub's API rate limit** ("… rate limit …" from an advisory check): this address
   used its 60 requests for the hour. The next hourly run tries again. A token in
@@ -57,19 +57,19 @@ button offers the release again.
 - **"Update not applied: the staged build was made with T3 Blackout …"** (or "staged
   build not installed" in the log after `launch`): the waiting build came from another
   T3 Blackout commit than this clone's. The installed build keeps running.
-  `bin/t3blackout update`, or the next hourly run, rebuilds it.
+  `packages/t3/bin/t3blackout update`, or the next hourly run, rebuilds it.
 - **Every git call fails, saying git is missing security fixes or is too old:** the
   `git` on this machine's `PATH` is older than 2.55.0 (Apple's came first, say). On
   macOS, `brew install git`, put Homebrew's `bin` first (the `eval` line in
   `~/.zprofile`), open a new Terminal window, check `git --version`, and rerun
-  `./install.sh --role …`, which reschedules with the current `PATH`.
+  `packages/t3/install.sh --role …`, which reschedules with the current `PATH`.
 - **Builds refused because this install builds only as its build account** (the
   `builds:` line in `status` says so): the build account is gone, sudo can't switch to
-  it, or `state/install.json` is missing. Rerun `./install.sh` (it needs sudo once).
+  it, or `state/install.json` is missing. Rerun `packages/t3/install.sh` (it needs sudo once).
 - **A build gives up waiting for the build tools' lock:** `install.sh` was replacing
   the tools, or something else holds their lock. `sudo lsof` on the file the message
   names shows the holder. Rerun once it's gone. When the tools' checks say to rerun
-  `./install.sh`, do it: it puts them back or repairs them.
+  `packages/t3/install.sh`, do it: it puts them back or repairs them.
 - **`status` shows `interrupted:`:** an install or rollback was cut off. The next
   update or rollback finishes it, or puts the previous build back, first. If that stops
   with "`state/activation.json` is damaged (…)" or "says its build went in, but nothing
@@ -78,11 +78,11 @@ button offers the release again.
   `.pending` copies beside it) with `state/current.json` by hand, so that `T3
   Blackout.app` is the build that file names. Then remove `state/activation.json`.
 - **Every command stops with an error about `state/install.json`:** the file is
-  unreadable or invalid. `bin/t3blackout configure --role ui` (or `host`, `both`)
+  unreadable or invalid. `packages/t3/bin/t3blackout configure --role ui` (or `host`, `both`)
   writes a new one.
 - **Every command stops with "… is this clone (…) or inside it" or "… isn't an
   absolute path":** a location variable in the environment can't be used. Unset it, or
-  set it to an absolute path outside the clone, and rerun `./install.sh --role …`.
+  set it to an absolute path outside the clone, and rerun `packages/t3/install.sh --role …`.
 
 ## Self-update
 
@@ -107,7 +107,7 @@ These appear in the log; only "refused" also notifies.
 - **An update (or `install.sh`'s first build) says it's not building because `pin.json`
   can't be verified yet:** a pin in this clone hasn't passed this machine's own checks.
   Held: wait until the named dependency is old enough, or fix the clock. Skipped: a
-  source wasn't reachable. On a first install, rerun `./install.sh --role …`; later,
+  source wasn't reachable. On a first install, rerun `packages/t3/install.sh --role …`; later,
   the hourly run retries. Refused: a shallow clone needs `git fetch --unshallow`;
   otherwise don't build it. A commit you sign that sets `pin.json` replaces the pin.
 
@@ -120,14 +120,14 @@ These appear in the log; only "refused" also notifies.
   ([prerequisites](getting-started/prerequisites.md#linux)), then rerun it.
 - **`signing init` fails over SSH with "The authorization was denied since no user
   interaction was possible":** run `install.sh` (or `signing init`) in Terminal at the Mac.
-- **"T3 Blackout is not installed on this host":** run `./install.sh --role host`
+- **"T3 Blackout is not installed on this host":** run `packages/t3/install.sh --role host`
   there. The app must be in `/Applications`.
-- **The host doesn't update:** check `bin/t3blackout status` (the schedule line),
+- **The host doesn't update:** check `packages/t3/bin/t3blackout status` (the schedule line),
   `sudo launchctl print system/dev.t3blackout.update`, and the two logs. A clone inside
   `~/Documents`, `~/Desktop` or `~/Downloads` is blocked for the daemon: move it and
-  rerun `./install.sh --role host`.
+  rerun `packages/t3/install.sh --role host`.
 - **"This host has no T3 Blackout update agent":** the host's request folder is
-  missing. Run `bin/t3blackout schedule` as the installing admin there.
+  missing. Run `packages/t3/bin/t3blackout schedule` as the installing admin there.
 
 ## SSH
 

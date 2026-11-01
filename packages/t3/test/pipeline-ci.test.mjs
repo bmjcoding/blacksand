@@ -1,4 +1,4 @@
-// node --test test/*.test.mjs: CI's own checks (.github/scripts/): action pins
+// node --test test/*.test.mjs: CI's own checks (ci/): action pins
 // read from parsed YAML, the runner fragment, stripped tests' destinations,
 // entry points found through symlinked paths, which channels a pin change
 // builds, newer upstream releases, and which channels a machine builds
@@ -11,11 +11,11 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { channelsToBuild } from "../.github/scripts/build-channels.mjs";
-import { checkFiles, unpinned, usesValues } from "../.github/scripts/check-action-pins.mjs";
-import { isMain } from "../.github/scripts/is-main.mjs";
-import { decodeTemplate, runnerFromTunnel } from "../.github/scripts/render-runner.mjs";
-import { destinationOf } from "../.github/scripts/stripped-tests.mjs";
+import { channelsToBuild } from "../ci/build-channels.mjs";
+import { checkFiles, unpinned, usesValues } from "../ci/check-action-pins.mjs";
+import { isMain } from "../ci/is-main.mjs";
+import { decodeTemplate, runnerFromTunnel } from "../ci/render-runner.mjs";
+import { destinationOf } from "../ci/stripped-tests.mjs";
 import { channelPolicy, unpinnedProblem } from "../lib/channels.mjs";
 import { newerReleases } from "../lib/evaluate.mjs";
 import { parseYaml } from "../lib/yaml.mjs";
@@ -135,7 +135,7 @@ test("YAML the checker can't read fails the check instead of hiding a `uses`", (
 });
 
 test("the repo's own workflows parse, and every action in them is pinned", () => {
-  const dir = path.join(ROOT, ".github", "workflows");
+  const dir = path.join(ROOT, "..", "..", ".github", "workflows");
   const files = fs.readdirSync(dir).filter((f) => /\.ya?ml$/.test(f)).map((f) => path.join(dir, f));
   assert.ok(files.length >= 3);
   assert.deepEqual(checkFiles(files), []);
@@ -163,7 +163,7 @@ test("CI scripts run when invoked through a symlinked path, as /tmp is on macOS"
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "t3b-is-main-"));
   try {
     const link = path.join(dir, "scripts");
-    fs.symlinkSync(path.join(ROOT, ".github", "scripts"), link);
+    fs.symlinkSync(path.join(ROOT, "ci"), link);
     // Without its checkout argument it must complain, not exit 0 having done nothing.
     const stripped = spawnSync(process.execPath, [path.join(link, "stripped-tests.mjs")], { encoding: "utf8" });
     assert.equal(stripped.status, 2, stripped.stderr);
@@ -175,8 +175,8 @@ test("CI scripts run when invoked through a symlinked path, as /tmp is on macOS"
     const runner = spawnSync(process.execPath, [path.join(link, "render-runner.mjs")], { encoding: "utf8" });
     assert.notEqual(runner.status, 0, "no arguments is an error, not a silent no-op");
     // Imported, it's not the entry point.
-    assert.equal(isMain(pathToFileURL(path.join(ROOT, ".github", "scripts", "stripped-tests.mjs")).href, [process.execPath, path.join(link, "check-action-pins.mjs")]), false);
-    assert.equal(isMain(pathToFileURL(path.join(ROOT, ".github", "scripts", "stripped-tests.mjs")).href, [process.execPath]), false);
+    assert.equal(isMain(pathToFileURL(path.join(ROOT, "ci", "stripped-tests.mjs")).href, [process.execPath, path.join(link, "check-action-pins.mjs")]), false);
+    assert.equal(isMain(pathToFileURL(path.join(ROOT, "ci", "stripped-tests.mjs")).href, [process.execPath]), false);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -194,9 +194,9 @@ test("a pin-only change builds the channels it moved; anything else builds every
   assert.deepEqual(channelsToBuild({ pin: before, basePin: null, changedFiles: null }), ["nightly", "stable"], "no base: everything");
   const added = { ...before, channels: { ...before.channels, preview: entry("v0.1.7-preview.20261031.1") } };
   assert.deepEqual(channelsToBuild({ pin: added, basePin: before, changedFiles: ["pin.json"] }), ["preview"]);
-  const workflow = fs.readFileSync(path.join(ROOT, ".github", "workflows", "build.yml"), "utf8");
+  const workflow = fs.readFileSync(path.join(ROOT, "..", "..", ".github", "workflows", "build.yml"), "utf8");
   const on = parseYaml(workflow, { blockScalars: true })[0].on;
-  for (const trigger of ["push", "pull_request"]) assert.ok(on[trigger].paths.includes("pin.json"), trigger);
+  for (const trigger of ["push", "pull_request"]) assert.ok(on[trigger].paths.includes("packages/t3/pin.json"), trigger);
 });
 
 test("newer releases are every release tag on the channel past the pin, however many", () => {

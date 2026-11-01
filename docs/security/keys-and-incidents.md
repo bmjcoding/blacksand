@@ -9,7 +9,7 @@
 |---|---|---|---|
 | **Owner SSH signing key** | sign any commit every machine takes: the root of trust | your SSH agent or hardware key; its public half in `.allowed_signers` | add the new key in a commit the old key signs; sign the next commit with the new key, removing the old one ([below](#rotating-the-owner-key)) |
 | **Evaluator key** (`t3blackout-evaluator`) | sign `pin.json`-only, forward moves to real upstream releases, which machines re-check | the `T3BLACKOUT_EVALUATOR_SIGNING_KEY` repository Actions secret; its public half in `.allowed_signers` | new key pair; replace the secret; replace its line in `.allowed_signers` in an owner-signed commit |
-| **SSH key agent accounts accept** | log in to every agent account | your SSH agent; its public half in root's `/etc/ssh/t3blackout/authorized_keys/<account>` on each machine | rerun `sudo scripts/add-agent-account.sh <account> --key <new.pub>` for every account; the file is rewritten |
+| **SSH key agent accounts accept** | log in to every agent account | your SSH agent; its public half in root's `/etc/ssh/t3blackout/authorized_keys/<account>` on each machine | rerun `sudo packages/t3/scripts/add-agent-account.sh <account> --key <new.pub>` for every account; the file is rewritten |
 | **Claude Code token** (`claude setup-token`) | use your Claude subscription from that agent account | `~/.t3blackout/server.env` in the agent account (owner only) | yearly: `claude setup-token`, then `/usr/local/libexec/t3blackout/set-claude-token`; switch the environment off and on; revoke the old token |
 | **Codex login** | use your OpenAI account from that agent account | `~/.codex/auth.json` in the agent account | `codex logout`, `codex login` |
 | **GitHub CLI login** (yours) | push; with `workflow` scope, change workflows (and so read the evaluator key) | your account only, never an agent account | revoke at GitHub → Settings → Applications when you rebuild a machine |
@@ -76,7 +76,7 @@ code every machine runs at its next update.
 
 1. **Stop machines taking new commits.** Self-update runs whenever `update` or
    `poll` does: the scheduled job (and a host's update requests), the update button,
-   **Update everything**, or by hand. On each machine, run `bin/t3blackout
+   **Update everything**, or by hand. On each machine, run `packages/t3/bin/t3blackout
    unschedule`, and use none of the others.
 2. **Secure the GitHub account:** change its password, revoke tokens, check its SSH
    and signing keys, sessions and deploy keys. The ruleset already blocks force-push
@@ -91,7 +91,7 @@ code every machine runs at its next update.
 5. **Machines that may have taken a hostile commit:** treat them as compromised. A
    commit runs as the installing account at the next update. Rebuild from a fresh
    clone at a reviewed commit ([cloning](../install/clone.md)).
-6. Reschedule (`bin/t3blackout schedule`) once `main` is clean.
+6. Reschedule (`packages/t3/bin/t3blackout schedule`) once `main` is clean.
 
 ### A machine was lost or stolen
 
@@ -118,7 +118,7 @@ The 3-day age gate is there for this: it gives the registry and security researc
 time to find and pull a hijacked version before any machine installs it. It doesn't
 guarantee they will, so the alert job keeps checking what's already pinned.
 
-1. **Stop update activity if the bad version may be pinned:** run `bin/t3blackout
+1. **Stop update activity if the bad version may be pinned:** run `packages/t3/bin/t3blackout
    unschedule` on each machine, and don't run `update` or `poll`, press the update
    button or **Update everything** until the pin is clean. Unscheduling alone doesn't
    disable those.

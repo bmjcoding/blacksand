@@ -24,7 +24,7 @@ phone's tag only. Serve forwards it to that account's server on the host's loopb
 2. On the host, from your admin account, in the clone:
 
    ```sh
-   sudo scripts/add-phone-service.sh agent-claude
+   sudo packages/t3/scripts/add-phone-service.sh agent-claude
    ```
 
    It installs the job, checks the server listens on 127.0.0.1 only (a first start
@@ -35,7 +35,7 @@ phone's tag only. Serve forwards it to that account's server on the host's loopb
    server for the desktop and asks you to rerun once Tailscale is up.
 3. Install the Tailscale app on the phone and sign in. In the admin console:
    **Machines →** the phone **→ … → Edit ACL tags → `tag:t3b-phone`**.
-4. Pair. `sudo scripts/add-phone-service.sh agent-claude --pair` prints a one-time
+4. Pair. `sudo packages/t3/scripts/add-phone-service.sh agent-claude --pair` prints a one-time
    code, valid for 5 minutes (`--ttl 10m` for longer, at most 60m). Or make one in the
    desktop app: this environment **→ Settings → Sharing & access → Create link**. In
    the T3 Code app on the phone: **Add environment →** Address

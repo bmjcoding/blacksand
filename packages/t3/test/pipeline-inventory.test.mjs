@@ -8,7 +8,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { reconcileAdvisories } from "../.github/scripts/reconcile.mjs";
+import { reconcileAdvisories } from "../ci/reconcile.mjs";
 import { lockEntry } from "../lib/device-tools.mjs";
 import { advisoryReport, evaluateChannel } from "../lib/evaluate.mjs";
 import { alertInventory, checkStageRecord, readStageRecord, stagePlatform, stageRecord, toolClosurePackages } from "../lib/inventory.mjs";

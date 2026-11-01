@@ -20,11 +20,11 @@ There's no bug bounty.
 
 In scope: the code and configuration in this repository.
 
-- the strip rules and the files they inject (`lib/rules.mjs`, `lib/files/`)
-- the build, verification and install pipeline (`bin/`, `lib/`)
-- self-update and the commit and pin trust rules (`lib/selfupdate.mjs`, `.allowed_signers`)
+- the strip rules and the files they inject (`packages/t3/lib/rules.mjs`, `packages/t3/lib/files/`)
+- the build, verification and install pipeline (`packages/t3/bin/`, `packages/t3/lib/`)
+- self-update and the commit and pin trust rules (`packages/t3/lib/selfupdate.mjs`, `.allowed_signers`)
 - the CI workflows and their scripts (`.github/`)
-- the setup scripts (`install.sh`, `scripts/`)
+- the setup scripts (`install.sh`, `packages/t3/scripts/`)
 - instructions in `docs/` that, followed as written, would weaken a machine's
   security
 

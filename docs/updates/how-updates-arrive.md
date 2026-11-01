@@ -39,8 +39,8 @@ same release with it. Before building, it takes new signed commits from `main`
 
 - If the app is closed, the new build installs right away.
 - If it's open, the build waits, and the update button offers a restart into it.
-- To change the schedule, run `bin/t3blackout schedule --day daily` (or a weekday, and
-  `--hour`). `bin/t3blackout unschedule` stops scheduled updates.
+- To change the schedule, run `packages/t3/bin/t3blackout schedule --day daily` (or a weekday, and
+  `--hour`). `packages/t3/bin/t3blackout unschedule` stops scheduled updates.
 
 The app's automatic checks (at startup and every 4 minutes) only read local state:
 a build waiting from the scheduled run, or a newer tag that run already fetched. Only
@@ -62,7 +62,7 @@ The button is in the sidebar, the app menu, and **Settings → About**.
 
 A waiting build made by a different T3 Blackout commit than this clone's is offered
 as a download, which rebuilds it, not as a restart. That happens, for example, when a
-self-update landed and its rebuild failed. Neither a restart nor `bin/t3blackout
+self-update landed and its rebuild failed. Neither a restart nor `packages/t3/bin/t3blackout
 launch` installs it.
 
 ## Review before you restart
@@ -70,7 +70,7 @@ launch` installs it.
 While a build waits, the version stamp's hover card offers **Preview** and **What
 changed**.
 
-- **Preview** (`bin/t3blackout preview`) opens the waiting build in a Chrome window of
+- **Preview** (`packages/t3/bin/t3blackout preview`) opens the waiting build in a Chrome window of
   its own, against a copy of your profile: your projects, threads and settings,
   without your secrets. Chrome or Chromium must be installed. On macOS, its server
   runs in a `sandbox-exec` sandbox:
@@ -81,7 +81,7 @@ changed**.
 
   Linux has no sandbox for it yet, so there the preview gets an empty profile.
 - **What changed** opens the [build report](upstream-rules.md#the-build-report).
-  `bin/t3blackout review` gathers the report and every upstream commit since your
+  `packages/t3/bin/t3blackout review` gathers the report and every upstream commit since your
   build, for an agent to read. Ask it what you'd notice and where to look in the
   preview, and, for each feature left out, whether to re-hook it, retire it or wait.
 

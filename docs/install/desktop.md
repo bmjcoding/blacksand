@@ -7,13 +7,13 @@ After the [prerequisites](../getting-started/prerequisites.md), the
 [base system](base-system.md) (macOS) and [cloning](clone.md):
 
 ```sh
-./install.sh
+packages/t3/install.sh
 ```
 
 Run it as yourself, not with sudo. It refuses root and asks for your password when
 it needs it, and it's safe to rerun. Run it in a terminal at the machine, not over
 SSH: on macOS, 1Password and, for a self-signed certificate, Keychain ask in
-dialogs. With a standby lane on a Mac, use `./install.sh --role both`
+dialogs. With a standby lane on a Mac, use `packages/t3/install.sh --role both`
 ([standby](standby.md)).
 
 ## What it does
@@ -57,13 +57,13 @@ On both platforms:
 - does no signing, because Linux keyrings don't tie access to an app's signature.
 
 To change when updates run: `T3BLACKOUT_UPDATE_DAY=daily` (or a weekday) and
-`T3BLACKOUT_UPDATE_HOUR=6` before `./install.sh`, or later with `bin/t3blackout
+`T3BLACKOUT_UPDATE_HOUR=6` before `packages/t3/install.sh`, or later with `packages/t3/bin/t3blackout
 schedule --day daily --hour 6`.
 
 ## Check it
 
 ```sh
-bin/t3blackout status
+packages/t3/bin/t3blackout status
 ```
 
 It shows the installed pinned release, `role: ui` (or `both`), `builds: as
@@ -74,12 +74,12 @@ on macOS. On a Mac, `signing:` names an Apple Development certificate.
 
 If you backed up your own `~/.t3blackout`, restore it now, before you open the app
 for the first time and before a standby server ever runs. Then run
-`bin/t3blackout status` once; it rewrites `~/.t3blackout/bin/t3blackout` for this
+`packages/t3/bin/t3blackout status` once; it rewrites `~/.t3blackout/bin/t3blackout` for this
 clone. Those threads belong to the Local environment.
 
 ## Open the app
 
-Run `bin/t3blackout launch`, or open T3 Blackout from Applications or your launcher.
+Run `packages/t3/bin/t3blackout launch`, or open T3 Blackout from Applications or your launcher.
 On macOS, after the first build signed with the shared certificate, macOS asks twice
 for the app's Keychain item. Click **Always Allow** both times.
 
@@ -89,8 +89,8 @@ restored threads are hidden while it's off).
 
 ## Changing role or locations
 
-- **Role:** rerun `./install.sh --role <role>`. `bin/t3blackout configure --role`
-  only saves the role; the scheduled job changes at the next `bin/t3blackout
+- **Role:** rerun `packages/t3/install.sh --role <role>`. `packages/t3/bin/t3blackout configure --role`
+  only saves the role; the scheduled job changes at the next `packages/t3/bin/t3blackout
   schedule`, which `install.sh` runs.
 - **Locations:** `T3BLACKOUT_HOME`, `T3BLACKOUT_APPS`, `T3BLACKOUT_UPDATE_REQUESTS`,
   `XDG_DATA_HOME` and `XDG_CONFIG_HOME`. An empty value counts as unset. A relative

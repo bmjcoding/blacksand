@@ -53,7 +53,7 @@
 
 import { createHash } from "node:crypto";
 
-import { RANKED, isAlerting, rankOf } from "../../lib/advisories.mjs";
+import { RANKED, isAlerting, rankOf } from "../lib/advisories.mjs";
 
 export const BOT = "github-actions[bot]";
 const CHANNELS = new Set(["nightly", "preview", "stable"]);

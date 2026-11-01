@@ -5,10 +5,10 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { getDesktopUpdateReleaseHistoryUrl, getDesktopUpdateReleaseUrl } from "./desktopUpdate.logic.ts";
 
-/** lib/rules.mjs's STOCK_GUIDANCE, passed in by .github/scripts/stripped-tests.mjs. */
+/** lib/rules.mjs's STOCK_GUIDANCE, passed in by ci/stripped-tests.mjs. */
 function stockIn(text: string): Array<string> {
   const json = process.env.T3BLACKOUT_STOCK_GUIDANCE;
-  if (!json) throw new Error("run this through .github/scripts/stripped-tests.mjs, which passes lib/rules.mjs's STOCK_GUIDANCE");
+  if (!json) throw new Error("run this through ci/stripped-tests.mjs, which passes lib/rules.mjs's STOCK_GUIDANCE");
   const patterns = JSON.parse(json) as Array<{ label: string; source: string; flags: string }>;
   return patterns.filter(({ source, flags }) => new RegExp(source, flags).test(text)).map(({ label }) => label);
 }

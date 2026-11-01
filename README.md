@@ -68,7 +68,7 @@ cd t3blackout
 ```
 
 Before running any script, [put the clone at the full commit SHA you trust](docs/install/clone.md#put-it-at-the-commit-you-trust).
-Then run `./install.sh`. For a desktop plus an always-on host, follow
+Then run `packages/t3/install.sh`. For a desktop plus an always-on host, follow
 [the worked example](docs/getting-started/example-desktop-and-host.md).
 
 ## If the app won't start
@@ -78,7 +78,7 @@ The app's startup error links here.
 - **Go back one build:** `~/.t3blackout/bin/t3blackout rollback`.
 - **Rebuild the release you're on:** quit the app, then run
   `~/.t3blackout/bin/t3blackout update --force`.
-- The last update's log is `state/t3blackout.log` in your clone.
+- The last update's log is `packages/t3/state/t3blackout.log` in your clone.
 
 More in [troubleshooting](docs/troubleshooting.md).
 

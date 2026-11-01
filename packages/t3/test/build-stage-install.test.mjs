@@ -5,103 +5,18 @@
 // lockfile like WORK's, then installs it frozen; shims refuse every other package-manager
 // command aimed at the stage; and before packaging the build checks the staged files
 // byte for byte against what the guard installed (lib/build.mjs verifyStageInstalls).
-import { spawnSync } from "node:child_process";
+// The case run with the real npm is in build-stage-install.deep.test.mjs.
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { verifyStageInstalls } from "../lib/build.mjs";
 import { makeRules } from "../lib/rules.mjs";
-import { classify, findOnPath, guardedInstall, installedPackages, main, releaseAgeConfig, shimEnv, stageChanges, stageContents, stageDigest } from "../lib/stage-install.mjs";
+import { classify, installedPackages, main, releaseAgeConfig, shimEnv, stageChanges, stageContents, stageDigest } from "../lib/stage-install.mjs";
 import { applyRules } from "../lib/strip-engine.mjs";
+import { fakeStage, lockfile, quietly, scratch } from "./stage-fixtures.mjs";
 
-const scratch = (name) => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), `t3b-stage-${name}-`)));
-
-/** A pnpm 9.0 lockfile (as pnpm 12 writes it) with `packages` (name@version) as direct dependencies. */
-function lockfile(packages) {
-  const split = (pkg) => [pkg.slice(0, pkg.lastIndexOf("@")), pkg.slice(pkg.lastIndexOf("@") + 1)];
-  const quote = (key) => (key.startsWith("@") ? `'${key}'` : key);
-  return [
-    "lockfileVersion: '9.0'",
-    "",
-    "settings:",
-    "  autoInstallPeers: true",
-    "  excludeLinksFromLockfile: false",
-    "",
-    "importers:",
-    "",
-    "  .:",
-    "    dependencies:",
-    ...packages.flatMap((pkg) => [`      ${quote(split(pkg)[0])}:`, `        specifier: ${split(pkg)[1]}`, `        version: ${split(pkg)[1]}`]),
-    "",
-    "packages:",
-    "",
-    ...packages.flatMap((pkg) => [`  ${quote(pkg)}:`, "    resolution: {integrity: sha512-AAAA}", ""]),
-    "snapshots:",
-    "",
-    ...packages.flatMap((pkg) => [`  ${quote(pkg)}: {}`, ""]),
-  ].join("\n");
-}
-
-/**
- * A stage folder in a build's temp folder, with a fake vp: its lockfile-only resolution
- * writes `resolved`, its frozen install lays `installed` out as pnpm does. It records its
- * calls. The verified lockfile it's checked against has is-number@7.0.0.
- */
-function fakeStage(resolved = lockfile(["is-number@7.0.0"]), installed = { "is-number": "7.0.0" }) {
-  const root = scratch("root");
-  const app = path.join(root, "t3code-desktop-mac-stage-x", "app");
-  fs.mkdirSync(app, { recursive: true });
-  fs.writeFileSync(path.join(app, "package.json"), '{"name":"t3blackout","dependencies":{"is-number":"^7.0.0"}}\n');
-  fs.writeFileSync(path.join(app, "pnpm-workspace.yaml"), "supportedArchitectures:\n  os:\n    - darwin\n");
-  const vp = path.join(root, "real-vp.cjs");
-  fs.writeFileSync(
-    vp,
-    `const fs = require("node:fs");
-fs.appendFileSync(${JSON.stringify(path.join(root, "calls.log"))}, process.argv.slice(2).join(" ") + "\\n");
-if (process.argv.includes("--lockfile-only")) fs.writeFileSync("pnpm-lock.yaml", ${JSON.stringify(resolved)});
-else {
-  for (const [name, version] of Object.entries(${JSON.stringify(installed)})) {
-    const store = "node_modules/.pnpm/" + name + "@" + version + "/node_modules/" + name;
-    fs.mkdirSync(store, { recursive: true });
-    fs.writeFileSync(store + "/package.json", JSON.stringify({ name, version }));
-    fs.writeFileSync(store + "/index.js", "module.exports = (n) => typeof n === 'number';\\n");
-    fs.symlinkSync(".pnpm/" + name + "@" + version + "/node_modules/" + name, "node_modules/" + name);
-  }
-  fs.writeFileSync("node_modules/.pnpm/lock.yaml", "lockfileVersion: '9.0'");
-}`,
-  );
-  const real = path.join(root, "vp");
-  fs.writeFileSync(real, `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(vp)} "$@"\n`, { mode: 0o755 });
-  fs.writeFileSync(path.join(root, "verified.yaml"), lockfile(["is-number@7.0.0"]));
-  const env = {
-    PATH: process.env.PATH,
-    T3BLACKOUT_REAL_VP: real,
-    T3BLACKOUT_REAL_NPM: findOnPath("npm", process.env.PATH, "/nonexistent") ?? "",
-    T3BLACKOUT_SHIM_DIR: path.join(root, "shims"),
-    T3BLACKOUT_STAGE_ROOT: root,
-    T3BLACKOUT_VERIFIED_LOCK: path.join(root, "verified.yaml"),
-    T3BLACKOUT_STAGE_RECORD: path.join(root, "record.jsonl"),
-  };
-  const calls = () => fs.readFileSync(path.join(root, "calls.log"), "utf8").trim().split("\n");
-  // Runs the guard on `dir` (the app folder by default), quietly: it reports what it checked.
-  const install = (dir = app, options = env) => quietly(() => guardedInstall(dir, options, { installer: () => real }));
-  return { root, app, env, calls, install, stages: { tmpdir: root } };
-}
-
-/** Runs `step` with console.log and console.error quiet. */
-async function quietly(step) {
-  const { log, error } = console;
-  console.log = () => {};
-  console.error = () => {};
-  try {
-    return await step();
-  } finally {
-    Object.assign(console, { log, error });
-  }
-}
 
 test("an install aimed at the stage is refused however it's spelled; reading what's installed, and anything elsewhere, passes", () => {
   const root = scratch("classify");
@@ -229,33 +144,6 @@ test("the build refuses a stage installed around the guard, or changed after its
   // The manifest the check was for isn't the one there now.
   fs.writeFileSync(path.join(stage.app, "package.json"), '{"name":"t3blackout","dependencies":{"is-number":"^7.0.0","evil":"*"}}\n');
   assert.throws(() => verifyStageInstalls(stage.stages, record), /isn't the one checked/);
-});
-
-test("a package replaced under its own name and version through npm: refused by the shim, and failing the build when run past it", async (t) => {
-  const npm = findOnPath("npm", process.env.PATH, "/nonexistent");
-  if (!npm) return t.skip("no npm on PATH");
-  const stage = fakeStage();
-  await stage.install();
-  verifyStageInstalls(stage.stages, stage.env.T3BLACKOUT_STAGE_RECORD);
-  // is-number@7.0.0 again, same name and version, other bytes and an install script.
-  const pkg = path.join(stage.root, "fixture", "package");
-  fs.mkdirSync(pkg, { recursive: true });
-  const marker = path.join(stage.root, "script-ran");
-  fs.writeFileSync(path.join(pkg, "package.json"), JSON.stringify({ name: "is-number", version: "7.0.0", scripts: { install: "node install.cjs" } }));
-  fs.writeFileSync(path.join(pkg, "install.cjs"), `require("node:fs").writeFileSync(${JSON.stringify(marker)}, "ran");\n`);
-  fs.writeFileSync(path.join(pkg, "index.js"), "module.exports = () => 'unreviewed replacement';\n");
-  const tarball = path.join(stage.root, "replacement.tgz");
-  assert.equal(spawnSync("tar", ["-czf", tarball, "-C", path.dirname(pkg), "package"]).status, 0);
-  const args = ["ins", "--no-save", "--package-lock=false", "--no-audit", "--no-fund", "--offline", "--cache", path.join(stage.root, "npm-cache"), tarball];
-  // Through the shim (the PATH the packager has): refused before npm runs.
-  assert.equal(await quietly(() => main("npm", args, { cwd: stage.app, env: stage.env })), 1);
-  assert.equal(fs.existsSync(marker), false);
-  verifyStageInstalls(stage.stages, stage.env.T3BLACKOUT_STAGE_RECORD);
-  // By absolute path, past the shims: npm replaces the package's files under the same name and version.
-  const real = spawnSync(npm, [...args.slice(0, -1), "--ignore-scripts", tarball], { cwd: stage.app, encoding: "utf8", env: { ...process.env, npm_config_update_notifier: "false" } });
-  assert.equal(real.status, 0, real.stderr);
-  assert.match(fs.readFileSync(path.join(stage.app, "node_modules", "is-number", "index.js"), "utf8"), /unreviewed replacement/);
-  assert.throws(() => verifyStageInstalls(stage.stages, stage.env.T3BLACKOUT_STAGE_RECORD), /isn't what was installed from its checked lockfile: node_modules\/.*is-number/);
 });
 
 test("a stage record that doesn't list the installed files fails the build instead of passing unchecked", async () => {

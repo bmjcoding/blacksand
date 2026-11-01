@@ -12,7 +12,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { reconcileAdvisories } from "../.github/scripts/reconcile.mjs";
+import { reconcileAdvisories } from "../ci/reconcile.mjs";
 import { advisoryReport, evaluateChannel } from "../lib/evaluate.mjs";
 import { blackoutDigest, checkResolvedLock, stageRecord, stagedDependencies } from "../lib/inventory.mjs";
 import { parseYaml } from "../lib/yaml.mjs";
@@ -237,7 +237,7 @@ test("what an evaluation keeps is handed on as it goes, so a later failure doesn
 });
 
 test("the workflow uploads what a failed or timed-out evaluation left, and the alert job runs without it", () => {
-  const workflow = parseYaml(fs.readFileSync(new URL("../.github/workflows/evaluate.yml", import.meta.url), "utf8"), { blockScalars: true })[0];
+  const workflow = parseYaml(fs.readFileSync(new URL("../../../.github/workflows/evaluate.yml", import.meta.url), "utf8"), { blockScalars: true })[0];
   const { evaluate, alerts } = workflow.jobs;
   // Each step that can take long has a limit, together under the job's, so a stuck
   // step fails the job (alerts run) instead of the job being cancelled (they don't).

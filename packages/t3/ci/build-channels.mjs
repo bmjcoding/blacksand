@@ -2,10 +2,11 @@
 // pin.json alone builds the channels whose pin changed (all of them when what it
 // approves for every channel, its device tools, changed); any other change, or a
 // base that can't be read, builds every pinned channel. Never fewer than changed.
-// Usage: node .github/scripts/build-channels.mjs [base commit]   prints a JSON list
+// Usage (in packages/t3): node ci/build-channels.mjs [base commit]   prints a JSON list
 
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
+import * as path from "node:path";
 
 import { isMain } from "./is-main.mjs";
 
@@ -36,13 +37,17 @@ if (isMain(import.meta.url)) {
   let basePin = null;
   let changedFiles = null;
   if (/^[0-9a-f]{40}$/.test(base) && !/^0+$/.test(base)) {
-    const text = git(["show", `${base}:pin.json`]);
+    // ./pin.json: this package's, read from where it's run.
+    const text = git(["show", `${base}:./pin.json`]);
     try {
       basePin = text === null ? null : JSON.parse(text);
     } catch {
       basePin = null;
     }
-    changedFiles = git(["diff", "--name-only", base, "HEAD"])?.split("\n").filter(Boolean) ?? null;
+    // Relative to here, as pin.json is: anything outside the package starts with ../ and never passes for it.
+    const here = git(["rev-parse", "--show-prefix"])?.trim();
+    const files = here === undefined ? null : git(["diff", "--name-only", base, "HEAD"])?.split("\n").filter(Boolean);
+    changedFiles = files?.map((file) => path.posix.relative(here || ".", file)) ?? null;
   }
   console.log(JSON.stringify(channelsToBuild({ pin, basePin, changedFiles })));
 }

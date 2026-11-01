@@ -7,7 +7,7 @@
 // marker, reconcile.mjs) finds it isn't there, and never blindly. Injectable
 // fetch and sleep for tests (test/alerts-client.test.mjs).
 
-import { retryAfterMs } from "../../lib/http.mjs";
+import { retryAfterMs } from "../lib/http.mjs";
 
 const PER_PAGE = 100;
 const MAX_PAGES = 100;

@@ -3,18 +3,18 @@
 // belongs ("// Copied to <dir>/ in a stripped upstream checkout"); a test that
 // needs a real host (an e2e test) skips itself unless its variable is set, and a
 // *.browser.test.tsx runs in upstream's headless Chromium project.
-// Usage: node .github/scripts/stripped-tests.mjs <stripped checkout>
+// Usage: node packages/t3/ci/stripped-tests.mjs <stripped checkout>
 
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { PNPM_ENV, seedVitePlusHome, verifiedPnpm } from "../../lib/pnpm.mjs";
-import { STOCK_GUIDANCE } from "../../lib/rules.mjs";
+import { PNPM_ENV, seedVitePlusHome, verifiedPnpm } from "../lib/pnpm.mjs";
+import { STOCK_GUIDANCE } from "../lib/rules.mjs";
 import { isMain } from "./is-main.mjs";
 
-const TESTS = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "test", "stripped");
+const TESTS = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "test", "stripped");
 
 /** Where a stripped test goes, from its first line; throws when it doesn't say. */
 export function destinationOf(text, name) {

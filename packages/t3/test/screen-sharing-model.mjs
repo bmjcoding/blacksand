@@ -255,7 +255,7 @@ lsof() {
   [[ -n "$out" ]] || return 1
   printf '%s' "$out"
 }
-# Tailscale Serve over the mapping file (the real LocalAPI calls: test/tailscale-serve.test.mjs):
+# Tailscale Serve over the mapping file (the real LocalAPI calls: test/tailscale-serve.deep.test.mjs):
 # its inventory (TCP 5900's handler; other handlers mentioning 15900 or 15901) and the exact setter.
 tailscaled_up() { [[ ! -f $S/ts_absent ]]; }
 serve_inventory() {

@@ -153,7 +153,7 @@ test("the build account's runs and the CI build get the token too", () => {
   // The account makes its handoff with the same writer as any: exclusive, no link followed.
   assert.match(builder, /asBuilder\(\[builderNode\(\), "-e", HANDOFF_WRITER_SCRIPT, parent\], \{ input: `\$\{token\}\\n` \}\)/);
   assert.doesNotMatch(builder, /cat > /);
-  const workflow = fs.readFileSync(new URL("../.github/workflows/build.yml", import.meta.url), "utf8");
+  const workflow = fs.readFileSync(new URL("../../../.github/workflows/build.yml", import.meta.url), "utf8");
   const step = /- name: Build the pinned release\n {8}env:\n((?: {10}\S[^\n]*\n)+) {8}run:/.exec(workflow);
   assert.ok(step, "build.yml's build step and its env");
   assert.match(step[1], /^ {10}T3BLACKOUT_GITHUB_TOKEN: \$\{\{ github\.token \}\}$/m);

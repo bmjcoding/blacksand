@@ -5,11 +5,13 @@
 ## Run it
 
 ```sh
-node --test test/*.test.mjs
+npm ci              # once: the pinned dev dependencies, no install scripts
+npm test            # the fast tier, a few seconds
+npm run test:deep   # the deep tier: signed histories, installer runs, property sweeps
 ```
 
-It needs Node 24 or later and git 2.55.0 or later, and takes one to two minutes on a
-recent Mac. It works in throwaway folders, repositories and SSH keys, with local fakes
+It needs Node 24 or later and git 2.55.0 or later. The deep tier takes about a minute
+on a recent Mac; [CONTRIBUTING.md](../../CONTRIBUTING.md) says what belongs in each. It works in throwaway folders, repositories and SSH keys, with local fakes
 for npm, GitHub, OSV and tailscaled. It doesn't touch your clone, `~/.ssh`,
 `~/.t3blackout` or the installed app. CI runs it on every push and pull request (`ci.yml`), and again
 before each evaluation (`evaluate.yml`).
@@ -23,9 +25,9 @@ Five tests are skipped unless you opt in:
 | `T3BLACKOUT_TEST_PACKED_APP=<T3 Blackout.app>` | runs the phone service's supervisor, the SSH runner sharing its server, an update, and shutdown, against a real packed build |
 | `T3BLACKOUT_PNPM_DIGESTS_ONLINE=1` | downloads the four pinned pnpm tarballs, and checks `PNPM_BINARY_SHA256` against them |
 
-The tests in `test/stripped/` run inside a stripped upstream checkout, in upstream's
+The tests in `packages/t3/test/stripped/` run inside a stripped upstream checkout, in upstream's
 own Vitest and Playwright setup. `build.yml` runs them after each build
-(`node .github/scripts/stripped-tests.mjs build/work`). They cover the injected files:
+(`node ci/stripped-tests.mjs build/work`, from `packages/t3`). They cover the injected files:
 the CSP in each place it's applied, the WebRTC window, provider and ACP Registry
 release ages, device tools, release links, update requests, the SSH runner, the CLI's
 routes, and the interface settings.

@@ -1,9 +1,9 @@
 # Upstream rules and drift
 
-> **Applies to:** every build, macOS and Linux. Code: `lib/rules.mjs`,
-> `lib/features.mjs`, `lib/strip-engine.mjs`, `lib/drift.mjs`, `lib/looks.mjs`.
-> Tests: `test/strip-rules.test.mjs`, `test/build-strip-engine.test.mjs`,
-> `test/app-rules.test.mjs`, `test/app-stock-guidance.test.mjs`.
+> **Applies to:** every build, macOS and Linux. Code: `packages/t3/lib/rules.mjs`,
+> `packages/t3/lib/features.mjs`, `packages/t3/lib/strip-engine.mjs`, `packages/t3/lib/drift.mjs`, `packages/t3/lib/looks.mjs`.
+> Tests: `packages/t3/test/strip-rules.test.mjs`, `packages/t3/test/build-strip-engine.test.mjs`,
+> `packages/t3/test/app-rules.test.mjs`, `packages/t3/test/app-stock-guidance.test.mjs`.
 
 Each rule is a small, anchored source edit applied to every upstream checkout. It
 states how many times its anchor must match. What happens when upstream moves that
@@ -13,8 +13,8 @@ code depends on the rule.
 
 - **Strict rules** stop the update, and the installed build stays. These cover
   privacy, identity, the updater, the CSP, and stock-T3 guidance. Every rule is
-  strict unless `lib/features.mjs` says otherwise.
-- **Feature rules** are grouped into features in `lib/features.mjs`. They cover the
+  strict unless `packages/t3/lib/features.mjs` says otherwise.
+- **Feature rules** are grouped into features in `packages/t3/lib/features.mjs`. They cover the
   look, the usage-limits fix, host update requests, the PDF preview, the update-track
   note and the privacy text. If one stops matching, or stops compiling, the build
   leaves that whole feature out, plus any feature that requires it, and installs
@@ -43,7 +43,7 @@ custom theme to change the accent.
 
 ## The build report
 
-Every build writes a report (`lib/drift.mjs`, `lib/looks.mjs`). It opens with
+Every build writes a report (`packages/t3/lib/drift.mjs`, `packages/t3/lib/looks.mjs`). It opens with
 screenshots. Your installed build and the new one each boot offline, with an empty
 profile and the default theme in dark mode. Headless Chrome photographs the same
 screens in both, and the report shows them side by side, with what changed
@@ -55,19 +55,19 @@ For each feature left out, the report lists the upstream commits and pull reques
 that touched its code, and the diff with the lines the rule hooked into highlighted. It
 also shows where those lines live now, if upstream moved them. A strict failure gets
 its own report: which strict rules stopped the update, and how to get updates going
-again. Open it from the version stamp's hover card, or with `bin/t3blackout drift`.
+again. Open it from the version stamp's hover card, or with `packages/t3/bin/t3blackout drift`.
 Beside it are the report's data and screenshots as files (`<version>.json`,
-`<version>/`), which `bin/t3blackout review` gathers for an agent to read.
+`<version>/`), which `packages/t3/bin/t3blackout review` gathers for an agent to read.
 
 ## Fixing a rule
 
-1. `bin/t3blackout drift` shows what upstream changed.
-2. Update the anchor in `lib/rules.mjs`. `bin/t3blackout check` dry-runs the rules
+1. `packages/t3/bin/t3blackout drift` shows what upstream changed.
+2. Update the anchor in `packages/t3/lib/rules.mjs`. `packages/t3/bin/t3blackout check` dry-runs the rules
    against the pinned release (`--ref` for any), so you can iterate quickly.
-   `bin/t3blackout check --build` also builds, scans and smoke-tests it, without
+   `packages/t3/bin/t3blackout check --build` also builds, scans and smoke-tests it, without
    installing.
 3. Commit it, signed. The rules are a repo file, so a change needs the owner's
    signature to reach any machine.
 
 New stock-T3 wording needs a rule that replaces it, placed before `brand/name` in
-`lib/rules.mjs`.
+`packages/t3/lib/rules.mjs`.

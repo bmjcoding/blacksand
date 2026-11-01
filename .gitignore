@@ -1,6 +1,6 @@
-/upstream/
-/build/
-/state/
+/packages/t3/upstream/
+/packages/t3/build/
+/packages/t3/state/
 node_modules/
 *.log
 .DS_Store

@@ -82,13 +82,18 @@ export const rankOf = (severity) => RANKED.indexOf(RANKED.includes(severity) ? s
 /** The most alarming of `severities` by RANKED; UNKNOWN when there are none. */
 const highest = (severities) => [...severities].sort((a, b) => rankOf(b) - rankOf(a)).map((s) => (RANKED.includes(s) ? s : "UNKNOWN"))[0] ?? "UNKNOWN";
 
-/** High, critical, or unrated: what notifies (a package named by one gets an issue, .github/scripts/reconcile.mjs). */
+/** High, critical, or unrated: what notifies (a package named by one gets an issue, ci/reconcile.mjs). */
 export const isAlerting = (severity) => severity === "HIGH" || severity === "CRITICAL" || severity === "UNKNOWN";
 
-/** `versions` deduplicated, lowest first (anything that isn't SemVer last). */
+/**
+ * `versions` deduplicated, lowest first (anything that isn't SemVer last).
+ * Versions of equal precedence (1.0.1 and 1.0.1+build) go in code-point order,
+ * so the result never depends on the order the sources answered in.
+ */
 const sortVersions = (versions) => {
   const valid = (v) => parseVersion(v) !== null;
-  return [...new Set(versions)].sort((a, b) => (valid(a) && valid(b) ? compareVersions(a, b) : valid(a) ? -1 : valid(b) ? 1 : a.localeCompare(b)));
+  const byText = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+  return [...new Set(versions)].sort((a, b) => (valid(a) && valid(b) ? compareVersions(a, b) : valid(a) ? -1 : valid(b) ? 1 : a.localeCompare(b)) || byText(a, b));
 };
 
 /** Versions an OSV record says fix `name` (npm), lowest first (anything that isn't SemVer last). */
@@ -381,7 +386,7 @@ async function repositoryAdvisories(list, watch, { meta = npmMeta } = {}) {
  * can't quiet it), and the advisory's is the most alarming of those; and its
  * own `records`, [{ id, severity }]: the id of every source record that names
  * it, with that record's own rating (the most alarming, when two sources
- * publish one id), which is what its issue lists (.github/scripts/reconcile.mjs). The lead
+ * publish one id), which is what its issue lists (ci/reconcile.mjs). The lead
  * record, whose id and summary the advisory takes, is OSV's, else GitHub
  * database's, else a repository's; `origins` binds every id in the group to
  * the source (and repository) that published it, for links, and the summary

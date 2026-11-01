@@ -5,7 +5,7 @@
 // so an owner pin on a merged side branch vouches for nothing on main; device
 // tools are checked for each evaluator commit that approves one, against the
 // release it moves to; dependencies once, from the pin trusted on the line to the
-// pin built. (test/commit-trust.test.mjs: who may sign along the history.)
+// pin built. (test/commit-trust.deep.test.mjs: who may sign along the history.)
 // Throwaway repositories and keys (test/trust-fixtures.mjs); npm is mocked.
 import * as fs from "node:fs";
 import * as path from "node:path";

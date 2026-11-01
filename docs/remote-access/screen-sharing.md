@@ -9,7 +9,7 @@ Set it up right after [installing the host](../install/host.md), before any agen
 account exists.
 
 ```sh
-sudo scripts/enable-screen-sharing.sh
+sudo packages/t3/scripts/enable-screen-sharing.sh
 ```
 
 ## How it stays off your local network
@@ -78,7 +78,7 @@ the host's admin account. Use Standard mode only: Serve forwards TCP, and High
 Performance mode needs UDP. **System Settings shows Screen Sharing as off while it
 runs.** Leave it so.
 
-| Command (`sudo scripts/enable-screen-sharing.sh …`) | What it does |
+| Command (`sudo packages/t3/scripts/enable-screen-sharing.sh …`) | What it does |
 |---|---|
 | `--status` | whether it's on, whether macOS granted capture, who holds each port, where the forward points, the switch, and any problem |
 | `--off` / `--on` | turn it off (the forward stays parked) or on again. Each reports success only when the state is verified; otherwise it names what remains |

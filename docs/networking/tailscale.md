@@ -30,9 +30,9 @@ device in the tailnet gets no access until you add a grant for it.
   "grants": [
     // The desktop may open SSH on the host.
     { "src": ["tag:t3b-desktop"], "dst": ["tag:t3b-host"], "ip": ["tcp:22"] },
-    // Screen Sharing (scripts/enable-screen-sharing.sh --print-policy). Delete it, and its tests, if unused.
+    // Screen Sharing (packages/t3/scripts/enable-screen-sharing.sh --print-policy). Delete it, and its tests, if unused.
     { "src": ["tag:t3b-desktop"], "dst": ["tag:t3b-host"], "ip": ["tcp:5900"] },
-    // The phone (scripts/add-phone-service.sh --print-policy). Delete it, and its tests, if unused.
+    // The phone (packages/t3/scripts/add-phone-service.sh --print-policy). Delete it, and its tests, if unused.
     { "src": ["tag:t3b-phone"], "dst": ["tag:t3b-host"], "ip": ["tcp:443"] }
   ],
   "tests": [

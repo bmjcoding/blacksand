@@ -19,7 +19,7 @@ import { makeFastLane } from "../lib/fastlane.mjs";
 import { reviewAddedDeviceTools } from "../lib/gates.mjs";
 import { request } from "../lib/http.mjs";
 import { inRange } from "../lib/semver.mjs";
-import { reconcileAdvisories } from "../.github/scripts/reconcile.mjs";
+import { reconcileAdvisories } from "../ci/reconcile.mjs";
 import { ago, mockFetch as mockRoutes, npm } from "./trust-fixtures.mjs";
 
 const fixture = (name) => JSON.parse(fs.readFileSync(new URL(`./fixtures/advisories/${name}`, import.meta.url), "utf8"));

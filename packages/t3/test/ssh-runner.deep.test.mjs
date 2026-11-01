@@ -16,7 +16,7 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 
 import { makeRules } from "../lib/rules.mjs";
-import { decodeTemplate } from "../.github/scripts/render-runner.mjs";
+import { decodeTemplate } from "../ci/render-runner.mjs";
 
 // -------------------------------------------------------- running the server --
 

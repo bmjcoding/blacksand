@@ -1,8 +1,8 @@
 # Self-update and commit trust
 
-> **Applies to:** every role, macOS and Linux. Code: `lib/selfupdate.mjs`,
-> `lib/git.mjs`, `lib/pin.mjs`. Tests: `test/self-update.test.mjs`,
-> `test/commit-trust.test.mjs`, `test/pin-trust.test.mjs`, `test/git-isolation.test.mjs`.
+> **Applies to:** every role, macOS and Linux. Code: `packages/t3/lib/selfupdate.mjs`,
+> `packages/t3/lib/git.mjs`, `packages/t3/lib/pin.mjs`. Tests: `packages/t3/test/self-update.deep.test.mjs`,
+> `packages/t3/test/commit-trust.deep.test.mjs`, `packages/t3/test/pin-trust.deep.test.mjs`, `packages/t3/test/git-isolation.deep.test.mjs`.
 
 Before building, every update fast-forwards the clone to origin's `main`, under the
 update lock. That's how a rule fix pushed from one machine reaches the others,
@@ -121,7 +121,7 @@ rule as self-update.
 - The URL is read as the clone's own `.git/config` writes it, so no `insteadOf`
   rule, global, local or in the environment, can change which repository is fetched.
 - Every git call against github.com, for this repository or upstream, goes through
-  `lib/git.mjs`:
+  `packages/t3/lib/git.mjs`:
   - HTTPS only (`GIT_ALLOW_PROTOCOL`, which a repository's own `protocol.*.allow`
     can't widen);
   - the machine's global and system git configuration ignored (rewrites, credential

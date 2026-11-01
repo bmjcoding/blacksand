@@ -1,11 +1,11 @@
-// node --test test/: the alert job's GitHub client (.github/scripts/github.mjs):
+// node --test test/: the alert job's GitHub client (ci/github.mjs):
 // every page is read, rate limits are waited out as GitHub asks, and a creation
 // whose answer was lost is looked for before it's repeated, never blindly.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { githubClient } from "../.github/scripts/github.mjs";
-import { BOT, markerOf, reconcileAdvisories } from "../.github/scripts/reconcile.mjs";
+import { githubClient } from "../ci/github.mjs";
+import { BOT, markerOf, reconcileAdvisories } from "../ci/reconcile.mjs";
 
 const bot = { login: BOT, type: "Bot" };
 

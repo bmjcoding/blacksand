@@ -9,7 +9,7 @@ each part is enforced, and how you can check it yourself.
 
 The [strip rules](../updates/upstream-rules.md) remove, from every build:
 
-| Removed | Rules (in `lib/rules.mjs`) |
+| Removed | Rules (in `packages/t3/lib/rules.mjs`) |
 |---|---|
 | PostHog analytics and OTLP export | `server/analytics-noop-layer`, `server/analytics-defaults` |
 | T3 Connect, Clerk, the relay and its browser-side tracing (Axiom) | `server/cloud-public-config-off`, `server/cloud-reconcile-off`, `server/relay-awareness-off`, `web/build-defines-empty`, `server/build-defines-empty` |
@@ -26,7 +26,7 @@ the welcome screen and **Settings → About** say it collects no usage data.
 
 ## The agent CLIs
 
-The boot environment (`lib/files/boot-env.ts`, rule `desktop/boot-env`) runs first in
+The boot environment (`packages/t3/lib/files/boot-env.ts`, rule `desktop/boot-env`) runs first in
 the app:
 
 - it switches T3's telemetry off a second time;
@@ -44,7 +44,7 @@ A server started without the desktop app (on an SSH host) gets the same switches
 
 **Content-Security-Policy.** The UI can only talk to loopback, so remote images, CDN
 icons and anything upstream adds to the page fail into their existing fallbacks. One
-policy (`lib/files/t3blackoutCsp.ts`) is applied by the page itself, by the server's
+policy (`packages/t3/lib/files/t3blackoutCsp.ts`) is applied by the page itself, by the server's
 static responses and by the desktop's app protocol. Files the server serves from your
 projects get the same policy. Agent-written HTML, MCP apps, SVGs and downloads keep
 upstream's sandbox policy, plus a second one with the same loopback-only reach (their
@@ -114,7 +114,7 @@ Every build, on every machine, runs these before installing
 ([build pipeline](../building/pipeline.md)):
 
 1. **The host scan:** URL literals in selected upstream app source are checked
-   against `lib/known-hosts.txt`, excluding reserved names and loopback. An unlisted
+   against `packages/t3/lib/known-hosts.txt`, excluding reserved names and loopback. An unlisted
    host stops the update. Calls to listed hosts, runtime-assembled names and files
    outside the scan can escape it ([limits](../building/pipeline.md#limits)).
 2. **Strict strip rules:** a privacy rule that no longer matches stops the update.
@@ -122,24 +122,24 @@ Every build, on every machine, runs these before installing
 4. **The network tripwire smoke test:** zero non-loopback connections, DNS lookups or
    UDP sends from the built server in its first 20 seconds.
 
-Tests: `test/strip-rules.test.mjs`, `test/build-strip-engine.test.mjs`,
-`test/build-tripwire.test.mjs`, `test/build-tripwire-exec.test.mjs`,
-`test/app-webrtc.test.mjs`, `test/app-stock-guidance.test.mjs`,
-`test/privacy-text.test.mjs`, and `test/stripped/blackout*Csp.test.ts` (run inside the
+Tests: `packages/t3/test/strip-rules.test.mjs`, `packages/t3/test/build-strip-engine.test.mjs`,
+`packages/t3/test/build-tripwire.test.mjs`, `packages/t3/test/build-tripwire-exec.test.mjs`,
+`packages/t3/test/app-webrtc.test.mjs`, `packages/t3/test/app-stock-guidance.test.mjs`,
+`packages/t3/test/privacy-text.test.mjs`, and `packages/t3/test/stripped/blackout*Csp.test.ts` (run inside the
 stripped checkout).
 
 ## Check it yourself
 
-- **The rules against a release:** `bin/t3blackout check` applies them to the pinned
-  release without building; `bin/t3blackout check --build` also builds, scans and runs
+- **The rules against a release:** `packages/t3/bin/t3blackout check` applies them to the pinned
+  release without building; `packages/t3/bin/t3blackout check --build` also builds, scans and runs
   the smoke test, without installing.
-- **The smoke test on your last build:** `bin/t3blackout smoke`.
+- **The smoke test on your last build:** `packages/t3/bin/t3blackout smoke`.
 - **Watch the running app.** Use a per-process firewall or monitor (Little Snitch,
   LuLu, or `nettop -p <pid>` on macOS; `ss -tpn` on Linux). Then compare what the app
   and its servers connect to with the table above. Expect your providers, plus
   whatever you opened in the preview browser.
-- **Read the rules.** Each rule in `lib/rules.mjs` has an id, the anchor it must match,
-  and a `why`. `lib/known-hosts.txt` says why each listed host is fine.
+- **Read the rules.** Each rule in `packages/t3/lib/rules.mjs` has an id, the anchor it must match,
+  and a `why`. `packages/t3/lib/known-hosts.txt` says why each listed host is fine.
 
 ## Limits
 

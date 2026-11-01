@@ -19,9 +19,9 @@
   scripts from, and your commit-signing key's fingerprint. A fresh clone of a `main`
   that has moved runs whatever is there; [cloning](../install/clone.md) puts the new
   clone at exactly the recorded commit.
-- **The signing certificate (macOS).** If `bin/t3blackout status` shows `signing:`
+- **The signing certificate (macOS).** If `packages/t3/bin/t3blackout status` shows `signing:`
   with `(self-signed: …)` or `ad-hoc`, create the Apple Development certificate now
-  and run `bin/t3blackout signing adopt --vault Personal`
+  and run `packages/t3/bin/t3blackout signing adopt --vault Personal`
   ([signing](../install/signing-macos.md)). The rebuilt machines then import it.
 - **Tailnet Lock.** If it's on and this machine is a signing node, hold a
   disablement secret somewhere that isn't on these machines. Or keep another signing

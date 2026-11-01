@@ -61,7 +61,7 @@ nothing is built or scheduled, and it says which case it is:
 
 - **held:** a dependency is under 3 days old, or the clock is ahead. Fix the clock,
   or wait until the named dependency is old enough. Then rerun
-  `./install.sh --role …`.
+  `packages/t3/install.sh --role …`.
 - **skipped:** npm, GitHub or upstream wasn't reachable. Rerun.
 - **refused:** for a shallow clone, run `git fetch --unshallow` and rerun.
   Otherwise stop, and treat it like a clone that doesn't match what you recorded.

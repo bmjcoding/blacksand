@@ -1,10 +1,10 @@
 # Security fast lane, advisories and overrides
 
 > **Applies to:** the evaluator, self-update and every build, macOS and Linux. Code:
-> `lib/fastlane.mjs`, `lib/advisories.mjs`, `lib/overrides.mjs`, `lib/overrides.json`.
-> Tests: `test/advisories.test.mjs`, `test/trust-supply.test.mjs`,
-> `test/trust-runtime.test.mjs`, `test/dependency-identity.test.mjs`,
-> `test/device-tool-overrides.test.mjs`.
+> `packages/t3/lib/fastlane.mjs`, `packages/t3/lib/advisories.mjs`, `packages/t3/lib/overrides.mjs`, `packages/t3/lib/overrides.json`.
+> Tests: `packages/t3/test/advisories.test.mjs`, `packages/t3/test/trust-supply.test.mjs`,
+> `packages/t3/test/trust-runtime.test.mjs`, `packages/t3/test/dependency-identity.test.mjs`,
+> `packages/t3/test/device-tool-overrides.test.mjs`.
 
 New dependency versions wait 3 days. A security fix shouldn't, so two mechanisms let
 one through: the fast lane, for a fix upstream already ships, and overrides, for a fix
@@ -70,7 +70,7 @@ previous reviewed version's closure.
 
 ## Security overrides
 
-For an advisory upstream hasn't fixed, `lib/overrides.json` replaces an exact
+For an advisory upstream hasn't fixed, `packages/t3/lib/overrides.json` replaces an exact
 vulnerable version with the lowest same-major version that fixes it, vetted for
 publisher and provenance (rule `deps/security-overrides`). Every build applies the
 overrides through pnpm's `overrides`, raises matching catalog entries, and resolves

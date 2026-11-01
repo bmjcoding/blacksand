@@ -176,8 +176,8 @@ test("a checkout's node_modules/.bin/pnpm or Corepack setup never runs: the buil
 test("no build path finds pnpm by name: lockfile resolution, installs, store pruning, the stage, the stripped tests", () => {
   const build = read("lib/build.mjs");
   const stage = read("lib/stage-install.mjs");
-  const stripped = read(".github/scripts/stripped-tests.mjs");
-  for (const [name, text] of [["lib/build.mjs", build], ["lib/stage-install.mjs", stage], [".github/scripts/stripped-tests.mjs", stripped]]) {
+  const stripped = read("ci/stripped-tests.mjs");
+  for (const [name, text] of [["lib/build.mjs", build], ["lib/stage-install.mjs", stage], ["ci/stripped-tests.mjs", stripped]]) {
     assert.doesNotMatch(text, /\b(?:run|runTail|spawnSync|execFileSync)\("pnpm"/, `${name} runs pnpm by name`);
   }
   assert.equal((build.match(/run\(verifiedPnpm\(\), \[/g) ?? []).length, 2, "the frozen install and the store prune");
@@ -427,11 +427,11 @@ test("every build checks Vite+'s home before the install and after packaging; on
   assert.ok(at("checkVitePlusHome(VITE_PLUS_HOME);") < install, "before the install");
   const after = body.indexOf("checkVitePlusHome(VITE_PLUS_HOME);", install);
   assert.ok(after > at("await packageApp(") && after < at("scanDist();"), "and after packaging, before the scans");
-  assert.match(read(".github/scripts/stripped-tests.mjs"), /Object\.assign\(env, seedVitePlusHome\(/);
+  assert.match(read("ci/stripped-tests.mjs"), /Object\.assign\(env, seedVitePlusHome\(/);
 });
 
 test("CI installs the pinned pnpm through install.sh, never Corepack", () => {
-  for (const name of [".github/workflows/evaluate.yml", ".github/workflows/build.yml"]) {
+  for (const name of ["../../.github/workflows/evaluate.yml", "../../.github/workflows/build.yml"]) {
     const text = read(name);
     assert.doesNotMatch(text.replace(/^\s*#.*$/gm, ""), /corepack/, name);
     const workflow = parseYaml(text, { blockScalars: true })[0];

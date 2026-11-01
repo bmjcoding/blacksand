@@ -1022,7 +1022,7 @@ async function cmdDeviceToolLock(opts) {
  * it and its staged production install (--resolved, checked against upstream
  * and npm; missing when the evaluation failed), and each device tool's frozen
  * closure (pin.json). What it couldn't check is listed as a gap. JSON to --out,
- * for .github/scripts/security-issues.mjs.
+ * for ci/security-issues.mjs.
  */
 async function cmdAdvisories(opts) {
   if (!opts.out) throw new Error("pass --out <file>");
@@ -1046,7 +1046,7 @@ async function cmdAdvisories(opts) {
 /**
  * CI, the alert job: upstream's release tags on --channel newer than main's pin,
  * read from upstream itself, not from the evaluate job. JSON to --out, for
- * .github/scripts/security-issues.mjs: the held issue closes when there are none
+ * ci/security-issues.mjs: the held issue closes when there are none
  * or a pin was actually published, never on the evaluate job's exit code.
  */
 function cmdReleases(opts) {
@@ -1205,7 +1205,7 @@ function cmdStatus() {
   console.log(`role:      ${installConfig?.role ?? "ui"}${installConfig ? "" : " (no state/install.json; ./install.sh saves it)"}`);
   if (fs.existsSync(ACTIVATION)) console.log("interrupted: an install or rollback didn't finish; the next update or rollback finishes it");
   console.log(`builds:    ${buildsLine()}`);
-  console.log(`self-update: ${fs.existsSync(path.join(ROOT, ".allowed_signers")) ? "signed commits from origin/main" : "off (no .allowed_signers)"}`);
+  console.log(`self-update: ${fs.existsSync(path.join(ROOT, "..", "..", ".allowed_signers")) ? "signed commits from origin/main" : "off (no .allowed_signers)"}`);
   for (const line of platform.statusLines()) console.log(line);
 }
 

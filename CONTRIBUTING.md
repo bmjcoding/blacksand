@@ -25,27 +25,45 @@ to them needs a reason in the pull request, and the owner's signature to land:
 
 | File | What it controls |
 |---|---|
-| `lib/rules.mjs`, `lib/features.mjs` | what is stripped and replaced, and which rules may be left out |
-| `lib/known-hosts.txt` | hosts upstream's source may name without failing the update |
+| `packages/t3/lib/rules.mjs`, `packages/t3/lib/features.mjs` | what is stripped and replaced, and which rules may be left out |
+| `packages/t3/lib/known-hosts.txt` | hosts upstream's source may name without failing the update |
 | `.allowed_signers` | who may sign commits machines take |
-| `lib/native-assets.json`, `lib/known-device-tools.txt` | prebuilt files and device tool versions the app may install |
-| `lib/overrides.json`, `lib/known-resolutions.txt` | security overrides, and non-registry dependency sources |
-| `lib/pnpm.mjs` | the pinned pnpm and its digests |
+| `package.json`, `package-lock.json`, `.npmrc` | the dev dependencies (TypeScript and Node's types), pinned with integrity hashes |
+| `packages/t3/lib/native-assets.json`, `packages/t3/lib/known-device-tools.txt` | prebuilt files and device tool versions the app may install |
+| `packages/t3/lib/overrides.json`, `packages/t3/lib/known-resolutions.txt` | security overrides, and non-registry dependency sources |
+| `packages/t3/lib/pnpm.mjs` | the pinned pnpm and its digests |
 
-For a rule change, include the output of `bin/t3blackout check` against the pinned
+For a rule change, include the output of `blacksand t3 check` against the pinned
 release, and say which upstream commit moved the code.
 
 ## Before you open a pull request
 
+Once per clone:
+
 ```sh
-node --test test/*.test.mjs
-shellcheck -S warning install.sh scripts/*.sh
+npm ci                                # TypeScript and fast-check, for the type check and tests: pinned, no install scripts
+git config core.hooksPath .githooks   # the pre-push hook below
 ```
 
-Changes under `bin/`, `lib/` or `test/stripped/` also need a full build:
-`T3BLACKOUT_UNISOLATED_BUILD=1 bin/t3blackout check --build` (in a checkout that
-isn't an install), or let the `build.yml` workflow run. [Testing](docs/security/testing.md)
-describes the suite.
+The hook runs the type check, the fast tests and shellcheck on the shell scripts
+the push changes, in a few seconds (`git push --no-verify` skips it once). By hand:
+
+```sh
+npm run typecheck    # tsc --noEmit, for src/ and tools/, then packages/t3's TypeScript tests
+npm test             # the fast tier: under 10 s
+npm run test:deep    # signed histories, installer runs, real timeouts, property sweeps
+```
+
+A test file named `*.deep.test.*` is in the deep tier; every other `*.test.*` file
+is fast ([tools/test.ts](tools/test.ts) says what belongs where). CI runs both.
+Property tests (fast-check, `fuzz-*.ts` and `*-property.test.ts`) run a fixed seed
+in the fast tier and a fresh one in the deep tier; a failure prints the seed and
+the command that replays it ([tools/fuzz.ts](tools/fuzz.ts)).
+
+Changes under `packages/t3/bin/`, `packages/t3/lib/` or `packages/t3/test/stripped/`
+also need a full build: `T3BLACKOUT_UNISOLATED_BUILD=1 packages/t3/bin/t3blackout check --build`
+(in a checkout that isn't an install), or let the `build.yml` workflow run.
+[Testing](docs/security/testing.md) describes the suite.
 
 - One change per pull request. A commit message describes the behaviour, not the
   process that led to it.

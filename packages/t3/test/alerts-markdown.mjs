@@ -1,4 +1,4 @@
-// What the alert job writes to GitHub issues (.github/scripts/reconcile.mjs), read
+// What the alert job writes to GitHub issues (ci/reconcile.mjs), read
 // with a real CommonMark and GitHub Flavored Markdown parser (marked 15.0.12,
 // vendored under test/vendor/marked), not with patterns. GitHub renders links,
 // autolinks, images, HTML, link definitions, mentions and formatting from that

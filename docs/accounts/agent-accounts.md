@@ -68,7 +68,7 @@ so treat it accordingly ([keys and incidents](../security/keys-and-incidents.md)
 On the host, from your admin account, in the clone:
 
 ```sh
-sudo scripts/add-agent-account.sh agent-claude --key ~/.ssh/t3blackout.pub
+sudo packages/t3/scripts/add-agent-account.sh agent-claude --key ~/.ssh/t3blackout.pub
 ```
 
 macOS asks you to choose the new account's password. Keep it in your password
@@ -128,7 +128,7 @@ SSH in any more:
 ```sh
 read -r "T3B_DESKTOP_IPV4?Paste the desktop's Tailscale IPv4 address: "
 read -r "T3B_DESKTOP_IPV6?Paste the desktop's Tailscale IPv6 address: "
-sudo scripts/add-agent-account.sh agent-claude --key ~/.ssh/t3blackout.pub --allow-from "$T3B_DESKTOP_IPV4,$T3B_DESKTOP_IPV6"
+sudo packages/t3/scripts/add-agent-account.sh agent-claude --key ~/.ssh/t3blackout.pub --allow-from "$T3B_DESKTOP_IPV4,$T3B_DESKTOP_IPV6"
 sudo sshd -T -C "user=agent-claude,host=desktop,addr=$T3B_DESKTOP_IPV4" | grep -i '^denyusers'
 sudo sshd -T -C user=agent-claude,host=other,addr=100.101.1.1 | grep -i '^denyusers'
 ```

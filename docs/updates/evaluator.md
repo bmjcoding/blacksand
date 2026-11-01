@@ -1,9 +1,9 @@
 # The CI evaluator and alerts
 
 > **Applies to:** the repository's GitHub Actions. Code:
-> `.github/workflows/evaluate.yml`, `lib/evaluate.mjs`, `lib/pincheck.mjs`,
-> `.github/scripts/reconcile.mjs`. Tests: `test/pipeline-*.test.mjs`,
-> `test/dependency-inventory.test.mjs`, `test/alerts-*.test.mjs`.
+> `.github/workflows/evaluate.yml`, `packages/t3/lib/evaluate.mjs`, `packages/t3/lib/pincheck.mjs`,
+> `packages/t3/ci/reconcile.mjs`. Tests: `packages/t3/test/pipeline-*.test.mjs`,
+> `packages/t3/test/dependency-inventory.test.mjs`, `packages/t3/test/alerts-*.test.mjs`.
 
 Every CI result is advisory. Each machine checks and builds a pin itself before
 installing it ([self-update](self-update.md)).
@@ -14,8 +14,8 @@ The work is split so the signing key never shares a runner with upstream code.
 
 | Job | Runs | Token and secrets | Output |
 |---|---|---|---|
-| `evaluate` | `bin/t3blackout evaluate` on each new upstream nightly release, newest first: builds and smoke-tests them | read-only `contents`, plus `actions: read` for the last run's stage records; no secrets | a proposed `pin.json`, a report, resolved lockfiles and stage records, uploaded as an artifact whatever happens |
-| `commit` | on a fresh runner that runs no upstream or npm code: `bin/t3blackout pin-check --candidate` re-derives every gate it can from git, npm and the advisory sources, then signs and pushes the pin | `contents: write`; the evaluator key, only in the final sign-and-push step | an evaluator-signed commit changing `pin.json` |
+| `evaluate` | `packages/t3/bin/t3blackout evaluate` on each new upstream nightly release, newest first: builds and smoke-tests them | read-only `contents`, plus `actions: read` for the last run's stage records; no secrets | a proposed `pin.json`, a report, resolved lockfiles and stage records, uploaded as an artifact whatever happens |
+| `commit` | on a fresh runner that runs no upstream or npm code: `packages/t3/bin/t3blackout pin-check --candidate` re-derives every gate it can from git, npm and the advisory sources, then signs and pushes the pin | `contents: write`; the evaluator key, only in the final sign-and-push step | an evaluator-signed commit changing `pin.json` |
 | `alerts` | advisories against the pin actually on `main` | `contents: read`, `issues: write` | GitHub issues |
 
 ## What holds a release back
@@ -30,7 +30,7 @@ it:
   [fast lane](fast-lane.md) waives the wait for vetted security fixes;
 - resolves a dependency from anywhere but the npm registry or upstream's own
   checkout, unless that exact entry and its integrity are listed in
-  `lib/known-resolutions.txt` (owner-signed; empty today). It's also held if it gives
+  `packages/t3/lib/known-resolutions.txt` (owner-signed; empty today). It's also held if it gives
   a version it already had a different tarball or integrity
   ([dependencies](../building/dependencies.md));
 - pins a device tool version that hasn't passed review ([device tools](../building/device-tools.md));
@@ -52,7 +52,7 @@ The `commit` job checks, before anything is signed:
 
 `evaluate --ref <tag>` evaluates one release by hand, for a hotfix worth taking now.
 Another track needs a first pin in a commit the owner signs
-(`bin/t3blackout evaluate --channel stable --baseline <tag> --write`, run locally).
+(`packages/t3/bin/t3blackout evaluate --channel stable --baseline <tag> --write`, run locally).
 Until then, every machine refuses it.
 
 ## Alerts
@@ -66,7 +66,7 @@ Chromium. It covers everything a build of that pin installs:
   stands in;
 - **each device tool's frozen closure** from `pin.json`;
 - **the staged production install,** from a stage record bound to the upstream
-  commit, this repository's build code (every file under `lib/` and `bin/`) and the
+  commit, this repository's build code (every file under `packages/t3/lib/` and `packages/t3/bin/`) and the
   platform. A record counts only if it stages exactly what upstream's packager stages
   at that commit. The next hourly run reuses the last record if it passes the same
   check, and otherwise builds the pinned release again.
@@ -118,11 +118,11 @@ naming it.
 - **`ci.yml`** (every push and pull request): the repo's tests; `bash -n`/`sh -n` and
   shellcheck on the scripts and on the SSH runner as the remote shell gets it;
   actionlint (downloaded and checked against a pinned SHA-256); every action pinned to
-  a full commit SHA; `pin.json` and `lib/overrides.json` valid; `pin-check`; and the
+  a full commit SHA; `pin.json` and `packages/t3/lib/overrides.json` valid; `pin-check`; and the
   strip rules applied to the pinned commit.
-- **`build.yml`** (changes under `bin/`, `lib/`, `test/stripped/` or to `pin.json`):
+- **`build.yml`** (changes under `packages/t3/bin/`, `packages/t3/lib/`, `packages/t3/test/stripped/` or to `pin.json`):
   builds each pinned channel the change affects with `check --build`, runs the tests
-  in `test/stripped/` inside the stripped checkout, and syntax-checks the SSH runner
+  in `packages/t3/test/stripped/` inside the stripped checkout, and syntax-checks the SSH runner
   as upstream renders it. Read-only token, no secrets. The evaluator's own pin commits
   don't start it, or `ci.yml`: they're pushed with the workflow's token, and GitHub
   starts no workflows for those pushes.

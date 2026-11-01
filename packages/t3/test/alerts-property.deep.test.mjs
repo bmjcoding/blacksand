@@ -1,4 +1,4 @@
-// node --test test/: the alert job's issues (.github/scripts/reconcile.mjs) over
+// node --test test/: the alert job's issues (ci/reconcile.mjs) over
 // random sequences of hourly runs, against an oracle that reads only the raw
 // per-source records (never lib/advisories.mjs's merge) and its own copy of the
 // owner's policy: high, critical and unrated ratings notify. Between and during
@@ -17,7 +17,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 
 import { mergeAdvisories } from "../lib/advisories.mjs";
-import { BOT, markerOf, readIssue, readMarker, reconcileAdvisories } from "../.github/scripts/reconcile.mjs";
+import { BOT, markerOf, readIssue, readMarker, reconcileAdvisories } from "../ci/reconcile.mjs";
 import { listedPackages, parse, problems, statedPairs } from "./alerts-markdown.mjs";
 
 const LIMIT = 65_536;
@@ -396,7 +396,7 @@ test("property: issues follow the raw records; nothing is on record unsaid, said
         }
       }
     } catch (error) {
-      throw new Error(`seed ${seed} (rerun it alone: T3B_PROPERTY_SEED=${seed} node --test test/alerts-property.test.mjs): ${error.message}`, { cause: error });
+      throw new Error(`seed ${seed} (rerun it alone: T3B_PROPERTY_SEED=${seed} node --test test/alerts-property.deep.test.mjs): ${error.message}`, { cause: error });
     }
   }
   assert.equal(seen.runs, seeds.length * 9);

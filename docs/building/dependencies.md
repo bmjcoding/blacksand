@@ -1,9 +1,9 @@
 # Dependency installs
 
-> **Applies to:** every build, macOS and Linux. Code: `lib/gates.mjs`,
-> `lib/lockfile.mjs`, `lib/stage-install.mjs`, `lib/resolution.mjs`. Tests:
-> `test/dependency-*.test.mjs`, `test/build-stage-install.test.mjs`,
-> `test/build-artifact.test.mjs`.
+> **Applies to:** every build, macOS and Linux. Code: `packages/t3/lib/gates.mjs`,
+> `packages/t3/lib/lockfile.mjs`, `packages/t3/lib/stage-install.mjs`, `packages/t3/lib/resolution.mjs`. Tests:
+> `packages/t3/test/dependency-*.test.mjs`, `packages/t3/test/build-stage-install.test.mjs`,
+> `packages/t3/test/build-artifact.test.mjs`.
 
 A dependency is its name and version, plus where it was fetched from and its integrity
 hash. So a swapped tarball is a substitution, and it fails.
@@ -17,7 +17,7 @@ hash. So a swapped tarball is a substitution, and it fails.
   can't turn it off.
 - A dependency must come from the npm registry or from upstream's own checkout. A
   tarball from anywhere else is refused unless that exact entry and its integrity are
-  listed in `lib/known-resolutions.txt`, which the owner signs (empty today).
+  listed in `packages/t3/lib/known-resolutions.txt`, which the owner signs (empty today).
 - A version upstream already had, given a different tarball or integrity, is refused.
 
 ## Install scripts

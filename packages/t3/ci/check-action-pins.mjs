@@ -3,12 +3,12 @@
 // each workflow as YAML (lib/yaml.mjs), so a `uses` key counts however it's
 // written: block or flow mapping, quoted or not. YAML the reader can't read
 // (anchors, say) fails the check rather than hiding a `uses` from it.
-// Usage: node .github/scripts/check-action-pins.mjs [workflow files...]
+// Usage: node packages/t3/ci/check-action-pins.mjs [workflow files...]
 
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { parseDocuments, toValue } from "../../lib/yaml.mjs";
+import { parseDocuments, toValue } from "../lib/yaml.mjs";
 import { isMain } from "./is-main.mjs";
 
 /** The value of each `uses` key, anywhere in a workflow's text: [{ line, value }]. Throws YamlError on YAML it can't read. */

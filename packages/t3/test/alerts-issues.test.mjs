@@ -1,4 +1,4 @@
-// node --test test/: the alert job's GitHub issues (.github/scripts/reconcile.mjs),
+// node --test test/: the alert job's GitHub issues (ci/reconcile.mjs),
 // through the real client (github.mjs) against GitHub's REST API in memory, with
 // its 65,536-character limit. What the owner is told, when, and that nothing they
 // were told is lost or repeated; owner notes; older issues; failures; inert text.
@@ -9,8 +9,8 @@ import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 
 import { mergeAdvisories } from "../lib/advisories.mjs";
-import { githubClient } from "../.github/scripts/github.mjs";
-import { BOT, code, codeBlock, markerOf, readIssue, readMarker, reconcileAdvisories, reconcileHeld } from "../.github/scripts/reconcile.mjs";
+import { githubClient } from "../ci/github.mjs";
+import { BOT, code, codeBlock, markerOf, readIssue, readMarker, reconcileAdvisories, reconcileHeld } from "../ci/reconcile.mjs";
 import { listedPackages, problems, statedPairs } from "./alerts-markdown.mjs";
 
 const A = "GHSA-2222-3333-4444";

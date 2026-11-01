@@ -1,8 +1,8 @@
 // The alert job's issues (.github/workflows/evaluate.yml; the logic is in
 // reconcile.mjs):
-//   node .github/scripts/security-issues.mjs advisories <advisories.json>
+//   node packages/t3/ci/security-issues.mjs advisories <advisories.json>
 //       (written by bin/t3blackout advisories, against the pin on main)
-//   node .github/scripts/security-issues.mjs held --channel C --exit N --published REF --pinned REF --newer FILE --report FILE
+//   node packages/t3/ci/security-issues.mjs held --channel C --exit N --published REF --pinned REF --newer FILE --report FILE
 //       (--published: the ref the commit job pushed, if any; --newer: bin/t3blackout releases --out)
 // GH_TOKEN and GH_REPO set; DRY_RUN=1 reads issues but only prints what it would change.
 

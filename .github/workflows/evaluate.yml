@@ -44,6 +44,11 @@ concurrency:
 env:
   CHANNEL: nightly
 
+# Paths in the steps are the t3 package's.
+defaults:
+  run:
+    working-directory: packages/t3
+
 jobs:
   evaluate:
     runs-on: ubuntu-24.04
@@ -54,10 +59,12 @@ jobs:
     outputs:
       exit: ${{ steps.evaluate.outputs.exit }}
     steps:
+      # Full history, without file contents (fetched when read).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           fetch-depth: 0
+          filter: blob:none
           persist-credentials: false
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -229,7 +236,7 @@ jobs:
           T3BLACKOUT_GITHUB_TOKEN: ${{ github.token }}
         run: |
           node bin/t3blackout advisories --channel "$CHANNEL" --resolved "$RUNNER_TEMP/evaluation/resolved" --out "$RUNNER_TEMP/advisories.json"
-          node .github/scripts/security-issues.mjs advisories "$RUNNER_TEMP/advisories.json"
+          node ci/security-issues.mjs advisories "$RUNNER_TEMP/advisories.json"
 
       # EXIT and the report come from the job that ran upstream code: they can
       # open the held issue, never close it. Closing takes PUBLISHED (what the
@@ -245,6 +252,6 @@ jobs:
           pinned=$(node -p "require('./pin.json').channels[process.env.CHANNEL]?.ref ?? ''")
           releases=0
           node bin/t3blackout releases --channel "$CHANNEL" --out "$RUNNER_TEMP/newer.json" || releases=$?
-          node .github/scripts/security-issues.mjs held --channel "$CHANNEL" --exit "$EXIT" --published "$PUBLISHED" \
+          node ci/security-issues.mjs held --channel "$CHANNEL" --exit "$EXIT" --published "$PUBLISHED" \
             --pinned "$pinned" --newer "$RUNNER_TEMP/newer.json" --report "$RUNNER_TEMP/evaluation/report.md"
           exit "$releases"

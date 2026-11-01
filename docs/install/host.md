@@ -67,7 +67,7 @@ addresses. Those scripts refuse to set them up while it's on.
 `~/Downloads`, then:
 
 ```sh
-./install.sh --role host
+packages/t3/install.sh --role host
 ```
 
 The host role needs an admin account, because the app goes in `/Applications`, where
@@ -84,7 +84,7 @@ agent accounts find it. It also needs the default locations: it stops if
 Check it:
 
 ```sh
-bin/t3blackout status
+packages/t3/bin/t3blackout status
 git --version
 ```
 

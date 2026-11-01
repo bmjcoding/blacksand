@@ -42,5 +42,5 @@ yours to keep current.
 
 - Your distribution's packages, with its own update tool. The git floor still applies.
 - Node: if `install.sh` installed it (`~/.local/share/t3blackout/node`), it replaces
-  it only when the Node on your `PATH` is below the floor. Rerun `./install.sh` after
+  it only when the Node on your `PATH` is below the floor. Rerun `packages/t3/install.sh` after
   a release of T3 Blackout raises the floor.

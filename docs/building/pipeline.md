@@ -1,15 +1,15 @@
 # The build pipeline
 
 > **Applies to:** every build, macOS and Linux, on each machine and in CI. Code:
-> `lib/build.mjs`, `lib/strip-engine.mjs`, `lib/smoke.mjs`, `lib/files/tripwire.cjs`.
-> Tests: `test/build-*.test.mjs`, `test/strip-rules.test.mjs`.
+> `packages/t3/lib/build.mjs`, `packages/t3/lib/strip-engine.mjs`, `packages/t3/lib/smoke.mjs`, `packages/t3/lib/files/tripwire.cjs`.
+> Tests: `packages/t3/test/build-*.test.mjs`, `packages/t3/test/strip-rules.test.mjs`.
 
 Each update builds the pinned upstream commit from source, as the
 [build account](build-account.md), in a private `TMPDIR`. A step that fails stops the
 update, and the installed build stays.
 
 1. **Host scan.** Before any rule runs, every host that upstream's app source writes
-   in a URL is checked against `lib/known-hosts.txt`. Hosts are read the way a URL
+   in a URL is checked against `packages/t3/lib/known-hosts.txt`. Hosts are read the way a URL
    parser reads them (lowercase, punycode, no userinfo or trailing dot), IP literals
    included. Names under the reserved `.invalid`, `.test`, `.localhost` and `.example`
    TLDs, and loopback addresses, are skipped. `example.com`, `example.net` and
@@ -35,12 +35,12 @@ update, and the installed build stays.
 9. **Sign and install** (signing on macOS only). The build account hands back an
    unsigned app; you scan it again, sign it and install it.
 
-`bin/t3blackout check --build` runs steps 1–7 without installing.
+`packages/t3/bin/t3blackout check --build` runs steps 1–7 without installing.
 
 ## The smoke test
 
 The newly built server boots with a network tripwire preloaded
-(`lib/files/tripwire.cjs`), an empty `HOME` (no harness credentials) and a minimal
+(`packages/t3/lib/files/tripwire.cjs`), an empty `HOME` (no harness credentials) and a minimal
 `PATH`.
 
 - **What it catches:** the tripwire blocks and records every non-loopback

@@ -1,9 +1,9 @@
 # The build account
 
 > **Applies to:** every role, macOS and Linux. Code: `install.sh` (`setup_builder`),
-> `lib/builder.mjs`, `lib/pnpm.mjs`, `lib/install-config.mjs`. Tests:
-> `test/install.test.mjs`, `test/build-builder.test.mjs`, `test/build-tools.test.mjs`,
-> `test/install-config.test.mjs`.
+> `packages/t3/lib/builder.mjs`, `packages/t3/lib/pnpm.mjs`, `packages/t3/lib/install-config.mjs`. Tests:
+> `packages/t3/test/install.deep.test.mjs`, `packages/t3/test/build-builder.test.mjs`, `packages/t3/test/build-tools.deep.test.mjs`,
+> `packages/t3/test/install-config.test.mjs`.
 
 Every build runs upstream's build scripts, and the install scripts of the
 dependencies the desktop build needs. That's code you haven't read, running
@@ -47,17 +47,17 @@ them.
 - An install that was killed part-way leaves its stage and the tools it moved aside.
   The next `install.sh` puts the old tools back or finishes, before anything else.
   Killed between its two renames, it leaves no tools in place. Builds (and the hourly
-  update) then fail saying to rerun `./install.sh`, which restores them.
+  update) then fail saying to rerun `packages/t3/install.sh`, which restores them.
 
 ## Required by default
 
 If sudo is missing or doesn't authorize you, `install.sh` stops before any upstream
-code runs. `./install.sh --unisolated-build` builds as you instead, and upstream's
+code runs. `packages/t3/install.sh --unisolated-build` builds as you instead, and upstream's
 scripts then run with your files and credentials. That choice is saved in
-`state/install.json`, and the `builds:` line in `bin/t3blackout status` shows it.
+`state/install.json`, and the `builds:` line in `packages/t3/bin/t3blackout status` shows it.
 
 An install saved without it never builds as you. If its build account goes missing,
-update, check, poll, smoke and evaluate refuse, and say to rerun `./install.sh`. A
+update, check, poll, smoke and evaluate refuse, and say to rerun `packages/t3/install.sh`. A
 checkout that isn't an install (CI, development) builds as you only with
 `T3BLACKOUT_UNISOLATED_BUILD=1`. A clone with installed builds but no
 `state/install.json` is refused even then.

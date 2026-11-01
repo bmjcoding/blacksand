@@ -1,0 +1,49 @@
+#!/bin/sh
+# Before a push: the fast tests, the type check, and shellcheck on the shell
+# scripts the push changes. A few seconds; CI runs the rest.
+# Turn it on once per clone: git config core.hooksPath .githooks
+# Skip it once: git push --no-verify
+set -eu
+cd "$(git rev-parse --show-toplevel)"
+
+zero=0000000000000000000000000000000000000000
+changed=$(mktemp)
+trap 'rm -f "$changed"' EXIT
+# stdin: <local ref> <local sha> <remote ref> <remote sha>, one line per ref pushed.
+# What's changed: files in the commits no remote has yet.
+while read -r _ local_sha _ _; do
+  [ "$local_sha" = "$zero" ] && continue # a deletion
+  git rev-list "$local_sha" --not --remotes | while read -r commit; do
+    git diff-tree --no-commit-id --name-only -r --diff-filter=ACMR "$commit"
+  done >>"$changed"
+done
+
+# A shell script: *.sh, or no extension and a sh or bash shebang.
+is_script() {
+  case "$1" in
+    *.sh) return 0 ;;
+    *.*) return 1 ;;
+  esac
+  head -n 1 "$1" | grep -Eq '^#!.*[/ ](ba)?sh( |$)'
+}
+scripts=$(sort -u "$changed" | while read -r file; do
+  if [ -f "$file" ] && is_script "$file"; then echo "$file"; fi
+done)
+
+if [ -n "$scripts" ]; then
+  if command -v shellcheck >/dev/null; then
+    # shellcheck disable=SC2086 # one word per path; the repo's paths have no spaces
+    shellcheck -S warning $scripts
+  else
+    echo "pre-push: shellcheck isn't installed, so these weren't checked (CI will): $scripts" >&2
+  fi
+fi
+
+# Git exports GIT_DIR and the like to hooks; tests that run git in their own
+# scratch repositories mustn't inherit them.
+for name in $(git rev-parse --local-env-vars); do unset "$name"; done
+
+[ -x node_modules/.bin/tsc ] || { echo "pre-push: run npm ci first (the type check needs TypeScript)" >&2; exit 1; }
+node_modules/.bin/tsc --noEmit
+node_modules/.bin/tsc --noEmit -p packages/t3
+node tools/test.ts fast
