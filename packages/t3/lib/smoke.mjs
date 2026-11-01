@@ -89,7 +89,14 @@ export async function observeServer({ args, env, port, out, cwd = os.tmpdir(), c
     check(html);
     await wait(observeMs, life.ended);
     if (life.exit) throw new Error(`server ${describeExit(life.exit)} after it answered; see state/smoke.log`);
-    if ((await answer(port)) === null) throw new Error("built server stopped answering GET / while it was watched; see state/smoke.log");
+    if ((await answer(port)) === null) {
+      // A server that's dying stops answering a moment before its exit is
+      // reported (a crash takes longer to finish on Linux): give it that moment,
+      // so the error names the signal or code rather than the silence.
+      await wait(2000, life.ended);
+      if (life.exit) throw new Error(`server ${describeExit(life.exit)} after it answered; see state/smoke.log`);
+      throw new Error("built server stopped answering GET / while it was watched; see state/smoke.log");
+    }
     if (life.exit) throw new Error(`server ${describeExit(life.exit)} after it answered; see state/smoke.log`);
     return html;
   } finally {
