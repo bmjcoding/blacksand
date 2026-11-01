@@ -9,7 +9,7 @@ import * as path from "node:path";
 
 import { EVALUATOR, evaluatorShape } from "./evaluator.ts";
 import { catBatch, objectIds, out, type Git } from "./git.ts";
-import { PACKAGE_DIR, layoutOf, pinPath } from "./layout.ts";
+import { LAYOUTS, ambiguous, layoutNames, layoutOf, pinPath, type Layout } from "./layout.ts";
 import { SIGNERS, signatureKind, type SignatureKind } from "./signers.ts";
 
 export interface TakenCommit {
@@ -78,8 +78,10 @@ function changedFiles(git: Git, shas: readonly string[]): Map<string, string[]> 
  * commit the owner signs changes who may sign the ones after it. An evaluator
  * commit must keep to its bounds (evaluatorShape) in its first parent's layout,
  * and leave that layout as it was: only a commit the owner signs moves the
- * package. A signature's kind is read from the raw commit first: only SSH
- * signatures go to git to be checked, so no OpenPGP or X.509 program runs.
+ * package. A commit, or a first parent, with more than one package folder has
+ * no layout (layout.ts), and is refused. A signature's kind is read from the
+ * raw commit first: only SSH signatures go to git to be checked, so no OpenPGP
+ * or X.509 program runs.
  * A commit without a parent is refused unless it's `root` (the clone's first
  * commit, judged by its own list, and not the evaluator's).
  */
@@ -96,7 +98,7 @@ export function takeHistory(git: Git, revs: readonly string[], { root = null }: 
   // What each commit is judged by: its first parent's list (the first commit's own), and the pins it moves between.
   const by = (c: { sha: string; parents: string[] }) => c.parents[0] ?? c.sha;
   const described = [...new Set(commits.flatMap((c) => [c.sha, ...c.parents.slice(0, 1)]))];
-  const names = [...new Set([...commits.map((c) => `${by(c)}:${SIGNERS}`), ...described.flatMap((rev) => [`${rev}:${PACKAGE_DIR}`, `${rev}:pin.json`, `${rev}:${PACKAGE_DIR}/pin.json`])])];
+  const names = [...new Set([...commits.map((c) => `${by(c)}:${SIGNERS}`), ...described.flatMap((rev) => [...layoutNames(rev), ...LAYOUTS.map((at) => `${rev}:${pinPath(at)}`)])])];
   const ids = objectIds(git, names);
   const raw = catBatch(git, commits.map((c) => c.sha));
   if (!ids || !raw) return UNREADABLE;
@@ -106,9 +108,16 @@ export function takeHistory(git: Git, revs: readonly string[], { root = null }: 
   };
   const modeOf = (name: string) => ids.get(name)?.mode ?? null;
   const kinds = new Map<string, SignatureKind | null>(commits.map((c) => [c.sha, raw.get(c.sha)?.type === "commit" ? signatureKind(raw.get(c.sha)?.bytes.toString("utf8") ?? "") : null]));
-  const layout = (rev: string) => layoutOf(ids.get(`${rev}:${PACKAGE_DIR}`)?.type ?? null);
-  const pinFileOf = (rev: string) => pinPath(layout(rev));
-  const pinBlob = (rev: string) => blob(`${rev}:${pinFileOf(rev)}`);
+  const layout = (rev: string) => layoutOf(rev, (name) => ids.get(name)?.type ?? null);
+  // A commit with no one layout has no pin file: it's refused below, before any pin is compared.
+  const pinFileOf = (rev: string) => {
+    const at = layout(rev);
+    return at && pinPath(at);
+  };
+  const pinBlob = (rev: string) => {
+    const pinFile = pinFileOf(rev);
+    return pinFile && blob(`${rev}:${pinFile}`);
+  };
 
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "blacksand-signers-"));
   try {
@@ -129,7 +138,7 @@ export function takeHistory(git: Git, revs: readonly string[], { root = null }: 
     if (!files) return UNREADABLE;
     const pinBlobs = bot.flatMap((c) => {
       const pinFile = pinFileOf(c.parents[0] ?? c.sha);
-      return [blob(`${c.sha}:${pinFile}`), blob(`${c.parents[0]}:${pinFile}`)];
+      return pinFile ? [blob(`${c.sha}:${pinFile}`), blob(`${c.parents[0]}:${pinFile}`)] : [];
     });
     const pins = catBatch(git, [...new Set(pinBlobs.filter((id) => id !== null))]);
     if (!pins) return UNREADABLE;
@@ -150,14 +159,19 @@ export function takeHistory(git: Git, revs: readonly string[], { root = null }: 
       if (kind !== "ssh") return { problem: `${label} ${kind ? `is signed with ${kind === "unknown" ? "an unrecognized signature" : kind}, not an SSH key in ${SIGNERS}` : "isn't signed"}` };
       const { status, principal } = signed.get(c.sha) ?? { status: "E", principal: "" };
       if (status !== "G") return { problem: `${label} isn't signed by a key in ${SIGNERS} (${status})` };
+      // The first parent's layout says where this commit's pin is; a taken parent was checked before it, the trusted start wasn't.
+      const before: Layout | null = layout(by(c));
+      if (before === null) return { problem: ambiguous(parent === undefined ? label : `commit ${short(parent)}, which ${short(c.sha)} follows,`) };
       if (principal === EVALUATOR) {
         if (parent === undefined) return { problem: `${label} is the evaluator's; it needs one you sign` };
-        const pinFile = pinFileOf(parent);
+        const pinFile = pinPath(before);
         const why = evaluatorShape({ parents: c.parents.length, files: files.get(c.sha) ?? [], pinFile, after: pinText(c.sha, pinFile), before: pinText(parent, pinFile), afterMode: modeOf(`${c.sha}:${pinFile}`), beforeMode: modeOf(`${parent}:${pinFile}`) });
         if (why) return { problem: `evaluator commit ${short(c.sha)} ${why}` };
-        // An empty packages/t3 tree changes no file, but would move where the pin is read.
-        if (layout(c.sha) !== layout(parent)) return { problem: `evaluator commit ${short(c.sha)} changes the layout from ${layout(parent)} to ${layout(c.sha)}; only a commit you sign may` };
       }
+      const after = layout(c.sha);
+      if (after === null) return { problem: ambiguous(label) };
+      // An empty package tree changes no file, but would move where the pin is read.
+      if (principal === EVALUATOR && after !== before) return { problem: `evaluator commit ${short(c.sha)} changes the layout from ${before} to ${after}; only a commit you sign may` };
       taken.push({ sha: c.sha, parents: c.parents, principal, pinChanged: parent !== undefined && pinBlob(c.sha) !== pinBlob(parent) });
     }
     return { commits: taken };

@@ -9,7 +9,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { REGULAR, localGit, objectIds, out, type Git } from "./git.ts";
-import { PACKAGE_DIR, layoutOf, packagePath, pinPath } from "./layout.ts";
+import { layoutNames, layoutOf, packagePath, pinPath } from "./layout.ts";
 import { pinBasis, short, takeHistory, type TakenCommit } from "./history.ts";
 import { addedApprovals, validatePin, type Pin } from "./pin.ts";
 import { compareWorktree, type WorkingTree } from "./worktree.ts";
@@ -48,15 +48,17 @@ export interface PinGates {
 
 const FULL_CLONE = "make a full clone (git fetch --unshallow)";
 
-/** The layout of `rev` (any revision git takes, such as sha^). */
+/** The layout of `rev` (any revision git takes, such as sha^), or null when it has none (layout.ts). */
 function layoutAt(git: Git, rev: string) {
-  const name = `${rev}:${PACKAGE_DIR}`;
-  return layoutOf(objectIds(git, [name])?.get(name)?.type ?? null);
+  const ids = objectIds(git, layoutNames(rev));
+  return layoutOf(rev, (name) => ids?.get(name)?.type ?? null);
 }
 
-/** The valid pin at `rev`, in its own layout, or null (a symlink, or any file but a regular one, isn't one). */
+/** The valid pin at `rev`, in its own layout, or null (a symlink, or any file but a regular one, isn't one; a commit with no layout has none). */
 function pinAt(git: Git, rev: string): Pin | null {
-  const name = `${rev}:${pinPath(layoutAt(git, rev))}`;
+  const layout = layoutAt(git, rev);
+  if (layout === null) return null;
+  const name = `${rev}:${pinPath(layout)}`;
   if (objectIds(git, [name])?.get(name)?.mode !== REGULAR) return null;
   const text = out(git, ["show", name]);
   if (text === null) return null;
@@ -108,11 +110,12 @@ export async function checkTip(git: Git, { tip, start, gates }: { tip: string; s
   const { trusted, bot } = taken;
   const last = bot.at(-1);
   if (last !== undefined) {
-    const tipLayout = layoutAt(git, tip);
-    const read = (file: string) => out(git, ["show", `${tip}:${packagePath(tipLayout, file)}`]);
-    // takeHistory took only evaluator commits that follow and leave valid pins, in an unchanged layout; a history
-    // where that doesn't hold here is refused, not a crash.
+    // takeHistory took only evaluator commits that follow and leave valid pins, in an unchanged layout, and only
+    // commits with one layout; a history where that doesn't hold here is refused, not a crash.
     const unreadable = (sha: string): Unverified => ({ result: "refused", message: `evaluator commit ${short(sha)} moves between pins that can't be read` });
+    const tipLayout = layoutAt(git, tip);
+    if (tipLayout === null) return unreadable(last);
+    const read = (file: string) => out(git, ["show", `${tip}:${packagePath(tipLayout, file)}`]);
     let aged = false;
     for (const sha of bot) {
       const [before, after] = [pinAt(git, `${sha}^`), pinAt(git, sha)];

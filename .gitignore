@@ -1,6 +1,6 @@
-/packages/t3/upstream/
-/packages/t3/build/
-/packages/t3/state/
+/tooling/t3code/upstream/
+/tooling/t3code/build/
+/tooling/t3code/state/
 node_modules/
 *.log
 .DS_Store

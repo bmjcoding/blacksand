@@ -30,7 +30,7 @@ async function cliOn(machine: FakeMachine, ...argv: string[]) {
     clock: fakeClock(),
     run: (command, args) => (ran.push([command, ...args]), { status: 7, signal: null }),
     host: fakeHost(machine),
-    // verify's real check walks this clone's signed history: packages/t3/test/trust-port.deep.test.mjs runs that.
+    // verify's real check walks this clone's signed history: tooling/t3code/test/trust-port.deep.test.mjs runs that.
     headCheck: () => ({ head: null, history: { result: "refused", message: "this clone has no commit" }, tree: { refused: "there's no commit to compare the working tree with", differs: [], outside: [] } }),
   });
   const exit = await runCli(argv, context);

@@ -22,7 +22,7 @@ done
 is_script() {
   case "$1" in
     # A template, not a script: CI renders it, then checks what /bin/sh runs (ci.yml, "SSH runner").
-    packages/t3/lib/files/ssh-runner-*.sh) return 1 ;;
+    tooling/t3code/lib/files/ssh-runner-*.sh) return 1 ;;
     *.sh) return 0 ;;
     *.*) return 1 ;;
   esac
@@ -47,5 +47,5 @@ for name in $(git rev-parse --local-env-vars); do unset "$name"; done
 
 [ -x node_modules/.bin/tsc ] || { echo "pre-push: run npm ci first (the type check needs TypeScript)" >&2; exit 1; }
 node_modules/.bin/tsc --noEmit
-node_modules/.bin/tsc --noEmit -p packages/t3
-node tools/test.ts fast
+node_modules/.bin/tsc --noEmit -p tooling/t3code
+node scripts/test.ts fast

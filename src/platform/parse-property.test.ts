@@ -1,4 +1,4 @@
-// Property tests (fast tier, a fixed seed: tools/fuzz.ts) of what discovery
+// Property tests (fast tier, a fixed seed: scripts/fuzz.ts) of what discovery
 // reads: dscl's records, sshd -G's dump, and the machine config. Each
 // reader must read back what was written, and refuse anything else with its
 // own error, never another exception.
@@ -8,7 +8,7 @@ import { test } from "node:test";
 
 import fc from "fast-check";
 
-import { check } from "../../tools/fuzz.ts";
+import { check } from "../../scripts/fuzz.ts";
 import { ConfigError, SSHD_KEYWORDS, parseMachineConfig } from "../core/machine.ts";
 import { ParseError, parseDscl, parseLaunchd, parseSshdDump } from "./parse.ts";
 

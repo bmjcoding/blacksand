@@ -1,5 +1,5 @@
 // Entry point: ./blacksand runs this with Node, which strips the types, and a
-// single binary (tools/build-sea.ts) starts here too.
+// single binary (scripts/build-sea.ts) starts here too.
 //
 // Root is refused before any command's module loads: until apply installs a
 // root-owned blacksand, root must never run code its user can replace. The

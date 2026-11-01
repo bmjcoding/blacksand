@@ -6,7 +6,7 @@
 
 import { createHash } from "node:crypto";
 
-import { satisfies } from "../../packages/t3/lib/semver.mjs";
+import { satisfies } from "../../tooling/t3code/lib/semver.mjs";
 import type { Warning } from "./envelope.ts";
 import type { MachineConfig } from "./machine.ts";
 import type { Json, Plan, Step } from "./plan.ts";

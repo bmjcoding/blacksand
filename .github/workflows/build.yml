@@ -17,26 +17,26 @@ on:
   push:
     branches: [main]
     paths:
-      - "packages/t3/bin/**"
-      - "packages/t3/lib/**"
-      - "packages/t3/pin.json"
-      - "packages/t3/test/stripped/**"
+      - "tooling/t3code/bin/**"
+      - "tooling/t3code/lib/**"
+      - "tooling/t3code/pin.json"
+      - "tooling/t3code/test/stripped/**"
       - ".github/workflows/build.yml"
-      - "packages/t3/ci/build-channels.mjs"
-      - "packages/t3/ci/is-main.mjs"
-      - "packages/t3/ci/render-runner.mjs"
-      - "packages/t3/ci/stripped-tests.mjs"
+      - "tooling/t3code/ci/build-channels.mjs"
+      - "tooling/t3code/ci/is-main.mjs"
+      - "tooling/t3code/ci/render-runner.mjs"
+      - "tooling/t3code/ci/stripped-tests.mjs"
   pull_request:
     paths:
-      - "packages/t3/bin/**"
-      - "packages/t3/lib/**"
-      - "packages/t3/pin.json"
-      - "packages/t3/test/stripped/**"
+      - "tooling/t3code/bin/**"
+      - "tooling/t3code/lib/**"
+      - "tooling/t3code/pin.json"
+      - "tooling/t3code/test/stripped/**"
       - ".github/workflows/build.yml"
-      - "packages/t3/ci/build-channels.mjs"
-      - "packages/t3/ci/is-main.mjs"
-      - "packages/t3/ci/render-runner.mjs"
-      - "packages/t3/ci/stripped-tests.mjs"
+      - "tooling/t3code/ci/build-channels.mjs"
+      - "tooling/t3code/ci/is-main.mjs"
+      - "tooling/t3code/ci/render-runner.mjs"
+      - "tooling/t3code/ci/stripped-tests.mjs"
   workflow_dispatch:
 
 permissions:
@@ -49,7 +49,7 @@ concurrency:
 # Paths in the steps are the t3 package's.
 defaults:
   run:
-    working-directory: packages/t3
+    working-directory: tooling/t3code
 
 jobs:
   channels:
@@ -135,10 +135,10 @@ jobs:
       # The *.browser.test.tsx ones run in upstream's Playwright project (headless
       # Chromium, the version upstream's lockfile pins).
       - name: Chromium for the browser tests
-        working-directory: packages/t3/build/work/apps/web
+        working-directory: tooling/t3code/build/work/apps/web
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Tests in the stripped checkout (packages/t3/test/stripped)
+      - name: Tests in the stripped checkout (tooling/t3code/test/stripped)
         run: node ci/stripped-tests.mjs build/work
 
       - name: The SSH runner as tunnel.ts renders it

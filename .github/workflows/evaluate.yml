@@ -47,7 +47,7 @@ env:
 # Paths in the steps are the t3 package's.
 defaults:
   run:
-    working-directory: packages/t3
+    working-directory: tooling/t3code
 
 jobs:
   evaluate:

@@ -8,7 +8,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { aclProblem } from "../../packages/t3/lib/pnpm.mjs";
+import { aclProblem } from "../../tooling/t3code/lib/pnpm.mjs";
 import type { PlatformId } from "../core/envelope.ts";
 import { platformId } from "./index.ts";
 
@@ -53,7 +53,7 @@ const DEADLINE_MS = 5_000;
 const cleanRun = (file: string, args: readonly string[], options: { encoding: "utf8" }) =>
   spawnSync(file, args, { ...options, env: EXEC_ENV, cwd: "/", stdio: ["ignore", "pipe", "pipe"], timeout: DEADLINE_MS, killSignal: "SIGKILL" });
 
-/** Why `at`'s access control list could let someone other than root change it (packages/t3/lib/pnpm.mjs, Apple's ls), or null. */
+/** Why `at`'s access control list could let someone other than root change it (tooling/t3code/lib/pnpm.mjs, Apple's ls), or null. */
 const cleanAcl = (at: string) => aclProblem(at, { run: cleanRun });
 
 export interface RootChecks {

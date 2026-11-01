@@ -1,6 +1,6 @@
 // Every command, in the order help lists them. Imported statically: nothing is loaded by name.
 
-import { k8s } from "../../packages/substrate-k8s/src/command.ts";
+import { k8s } from "../../substrates/kubernetes/src/command.ts";
 import type { Command } from "../core/command.ts";
 import { plan } from "./plan.ts";
 import { status } from "./status.ts";

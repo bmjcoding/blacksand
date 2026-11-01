@@ -7,11 +7,11 @@
     "node": ">=24"
   },
   "scripts": {
-    "test": "node tools/test.ts fast",
-    "test:fast": "node tools/test.ts fast",
-    "test:deep": "node tools/test.ts deep",
-    "test:all": "node tools/test.ts all",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p packages/t3"
+    "test": "node scripts/test.ts fast",
+    "test:fast": "node scripts/test.ts fast",
+    "test:deep": "node scripts/test.ts deep",
+    "test:all": "node scripts/test.ts all",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tooling/t3code"
   },
   "devDependencies": {
     "@types/node": "24.19.2",

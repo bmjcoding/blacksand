@@ -1,14 +1,14 @@
 # Documentation
 
-Each package keeps its own guides. Start with a package's README, which links to the
-rest of its docs.
+Each component keeps its own guides beside its code. Start with a component's README,
+which links to the rest of its docs.
 
-## Packages
+## Components
 
-- [t3](../packages/t3/README.md) builds T3 Code from upstream source with its
+- [Blacksand T3](../tooling/t3code/README.md) builds T3 Code from upstream source with its
   telemetry and other calls home removed. Its guides are in
-  [`packages/t3/docs/`](../packages/t3/docs/README.md).
-- [substrate-k8s](../packages/substrate-k8s/README.md) runs a coding agent on one task
+  [`tooling/t3code/docs/`](../tooling/t3code/docs/README.md).
+- [The Kubernetes sandbox](../substrates/kubernetes/README.md) runs a coding agent on one task
   in a new Kubernetes sandbox, then tears the sandbox down.
 
 ## The repository

@@ -8,7 +8,7 @@
 // needs a receipt, which nothing writes before apply exists, so it still
 // refuses.
 //
-// A single binary (tools/build-sea.ts) refuses before reading anything: it has
+// A single binary (scripts/build-sea.ts) refuses before reading anything: it has
 // no clone, and no record of the owner's key and first commit to check one
 // against, so any history it found would vouch for itself.
 

@@ -21,7 +21,7 @@
 // encryption, Tailscale and tools are checked, not set: a difference is a
 // warning for the owner, not a step.
 
-import { parseRange } from "../../packages/t3/lib/semver.mjs";
+import { parseRange } from "../../tooling/t3code/lib/semver.mjs";
 import type { Role } from "./plan.ts";
 
 export const MACHINE_SCHEMA = "blacksand.machine/1";
