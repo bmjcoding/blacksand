@@ -14,7 +14,7 @@ describe("blacksand update track", () => {
     await using _screen = await render(<UpdateTrackSwitchDialog channel="latest" onClose={() => {}} />);
     await expect.element(page.getByRole("alertdialog")).toBeVisible();
     await expect.element(page.getByText(/pin\.json pins for each track/)).toBeVisible();
-    await expect.element(page.getByText(/blacksand update --channel stable/)).toBeVisible();
+    await expect.element(page.getByText(/blacksand t3 update --channel stable/)).toBeVisible();
     expect(page.getByText(/npm\. Try again later/).query()).toBeNull();
     expect(fetches.mock.calls.filter(([url]) => String(url).includes("npmjs"))).toEqual([]);
   });
