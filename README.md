@@ -1,93 +1,78 @@
-# Blacksand T3
+# Blacksand
 
-Blacksand T3 builds [T3 Code](https://github.com/pingdotgg/t3code) from upstream
-source with its telemetry, stock auto-updater and other calls home removed. Each
-machine rebuilds the release this repository pins, after checking that release
-itself. Optionally, coding agents run in separate macOS accounts on an always-on
-host, which the desktop app reaches over SSH.
+Blacksand is a hardened, self-updating home for coding agents. One repository and
+one command, `blacksand`, describe what each machine runs: the desktop app you work
+in, the accounts and sandboxes agents run in, and what those are allowed to reach.
+A machine takes a change only when the owner's SSH key signed it, and checks that
+for itself before acting.
 
-## What it protects against
+It's pre-release. What works today and what's still being built are listed under
+[Status](#status).
 
-It stops T3 Code from sending usage data or contacting T3's services. It holds back
-new third-party dependency versions for 3 days, unless a version is a vetted security
-fix. A machine takes repository changes only when the owner's SSH key
-signed them. The CI evaluator's key may sign pin moves, but only forward ones to
-real upstream releases, and every machine checks those again. Upstream's build
-scripts run in an unprivileged account. On a host, agents run in standard
-accounts that log in over SSH with one key only. It doesn't limit what the agents
-reach on the network, audit upstream's code, or protect a machine whose admin
-account is compromised. The full picture is in the
-[threat model](docs/security/threat-model.md).
+## Packages
 
-## What it removes, and what still connects out
+| Package | What it is |
+|---|---|
+| [`packages/t3`](packages/t3#readme) | **Blacksand T3**: [T3 Code](https://github.com/pingdotgg/t3code) built from upstream source with its telemetry, stock auto-updater and other calls home removed. Each machine rebuilds the release this repository pins, after checking that release itself. |
+| [`packages/substrate-k8s`](packages/substrate-k8s#readme) | **Coding agents in per-run Kubernetes sandboxes**: Claude Code or Codex runs one task in a fresh gVisor sandbox with no provider key and no direct network. Its only way out is a per-run proxy that holds the key, allows only the run's granted model operation and models, and records every connection. You get the patch and a sealed run record. |
 
-Removed from every build:
+## The `blacksand` command
 
-- PostHog analytics and OpenTelemetry export
-- T3 Connect, its Clerk sign-in and its relay
-- the model-manifest and LiteLLM pricing fetches
-- checks for new `t3` releases on npm, Google favicon lookups, and the GitHub star check
-- the Electron auto-updater and downloads of upstream's prebuilt app and server
-  (each update is a local rebuild instead)
-- upstream's background service (`t3 up`), and text that sends you to stock T3
+```sh
+./blacksand status     # what this machine runs, and what discovery sees on it
+./blacksand plan       # the steps that would bring this machine to its config (applies nothing)
+./blacksand verify     # this clone's signed history and files, and the machine against what was applied
+./blacksand t3 …       # the T3 package: update, check, drift, preview, rollback, evaluate
+./blacksand k8s …      # coding-agent runs in Kubernetes sandboxes
+```
 
-What still connects out:
+`blacksand help <command>` gives each command's usage. Exit codes: 0 passed,
+1 drift, 2 usage, 3 held, 4 refused.
 
-- the agent CLIs, to their own providers
-- automatic provider CLI version checks, which go to the npm registry (Muse uses
-  Meta's release channel). They're on by default; turn them off in **Settings →
-  Maintenance → Provider update checks**.
-- the server, when it fetches GitHub images for a chat
-- updates: GitHub, the npm registry, Electron's prebuilt runtime, and the advisory
-  and release-list services the checks read
-- device tools, when you turn device support on; EAS Simulator video (Expo's cloud),
-  if you use it; and the pages you open in the preview browser
+## How changes are trusted
 
-How each of these is enforced and checked, and how to check it yourself:
-[privacy](docs/security/privacy.md).
+- **Signed history.** Every commit is signed with SSH. `.allowed_signers` lists the
+  keys, and each commit is judged by the list in its first parent, so adding a
+  signer takes a commit an existing signer made.
+- **Bounded automation.** The CI evaluator has its own key. A commit it signs may
+  only move `pin.json` forward to a real upstream release, and every machine checks
+  that again before taking it.
+- **Checked before acting.** `blacksand verify` walks the history itself and
+  compares the working tree with the commit it verified. It refuses anything else
+  rather than guessing.
+- **Simple over clever.** It has zero runtime dependencies: Node runs the
+  TypeScript directly, and development tools are pinned with their integrity hashes.
 
-## Platforms and roles
+More in [SECURITY.md](SECURITY.md) and the [threat model](docs/security/threat-model.md).
 
-| Role | `install.sh` | macOS | Linux |
-|---|---|---|---|
-| Desktop: the app you work in | `--role ui` (default) | Yes | Yes (x64 and arm64; Arch/Omarchy, Ubuntu/Debian, Fedora/RHEL) |
-| Always-on host: agent accounts reached over SSH | `--role host` | Yes | Not yet |
-| Desktop with a standby agent account | `--role both` | Yes | Not yet |
+## Status
 
-[Roles and platforms](docs/getting-started/roles.md) explains each role, and lists
-what Linux would need for the others.
+| Area | Today | Planned |
+|---|---|---|
+| Blacksand T3 desktop app, macOS and Linux | installs with `packages/t3/install.sh`; updates through `blacksand t3` | installed by `blacksand apply` |
+| Always-on agent host | macOS, with setup scripts | `blacksand apply` replaces the scripts; Linux hosts |
+| `status`, `plan`, `verify` | read-only, on macOS and Linux | `apply`, with a journal and receipts |
+| Kubernetes sandboxes | k3s on one node | EKS |
 
-## Quick start
+## Getting started
 
-Check the [prerequisites](docs/getting-started/prerequisites.md) first. Git must be
-2.55.0 or later before you clone. Then:
+Check the [prerequisites](docs/getting-started/prerequisites.md), then clone and put
+the clone at the commit you trust ([how](docs/install/clone.md#put-it-at-the-commit-you-trust)):
 
 ```sh
 git clone https://github.com/bmjcoding/blacksand.git
 cd blacksand
 ```
 
-Before running any script, [put the clone at the full commit SHA you trust](docs/install/clone.md#put-it-at-the-commit-you-trust).
-Then run `packages/t3/install.sh`. For a desktop plus an always-on host, follow
-[the worked example](docs/getting-started/example-desktop-and-host.md).
+- **The desktop app:** [Blacksand T3](packages/t3#readme). The [documentation map](docs/README.md)
+  covers installing it, hosts, remote access and updates.
+- **Sandboxed agent runs:** [substrate-k8s](packages/substrate-k8s#readme).
 
-## If the app won't start
+## Contributing and security
 
-The app's startup error links here.
-
-- **Go back one build:** `blacksand t3 rollback`.
-- **Rebuild the release you're on:** quit the app, then run
-  `blacksand t3 update --force`.
-- The last update's log is `packages/t3/state/blacksand-t3.log` in your clone.
-
-More in [troubleshooting](docs/troubleshooting.md).
-
-## Documentation
-
-Start with the [documentation map](docs/README.md). To report a vulnerability, see
-[SECURITY.md](SECURITY.md). To contribute, see [CONTRIBUTING.md](CONTRIBUTING.md).
+To report a vulnerability, see [SECURITY.md](SECURITY.md). To contribute, see
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-MIT ([LICENSE](LICENSE)). T3 Code is MIT-licensed by T3 Tools Inc.
-([NOTICE](NOTICE)).
+MIT ([LICENSE](LICENSE)). T3 Code is MIT-licensed by T3 Tools Inc. ([NOTICE](NOTICE)).

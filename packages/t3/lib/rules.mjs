@@ -145,7 +145,7 @@ export const STOCK_GUIDANCE = [
 ];
 
 // Blacksand T3's own ways to install, update and roll back, which replace them.
-const BLACKSAND_README = "https://github.com/bmjcoding/blacksand#readme";
+const T3_README = "https://github.com/bmjcoding/blacksand/tree/main/packages/t3#readme";
 const BLACKSAND_UPDATE = "~/.blacksand/t3/bin/t3 update";
 const BLACKSAND_ROLLBACK = "~/.blacksand/t3/bin/t3 rollback";
 
@@ -2273,7 +2273,7 @@ export const makeRules = ({ updater, build }) => [
     file: "apps/web/src/lib/bootError.ts",
     edits: [
       { find: 'const FALLBACK_TRIAGE_COMMAND = "npx t3 triage";\n', replace: 'const FALLBACK_TRIAGE_COMMAND = "t3 triage";\n' },
-      { find: 'const DOWNLOAD_URL = "https://t3.codes/download";\n', replace: `const DOWNLOAD_URL = "${BLACKSAND_README}";\n` },
+      { find: 'const DOWNLOAD_URL = "https://t3.codes/download";\n', replace: `const DOWNLOAD_URL = "${T3_README}";\n` },
       {
         find:
           "          link(\n" +
@@ -2293,7 +2293,7 @@ export const makeRules = ({ updater, build }) => [
     edits: [
       {
         find: 'export const DESKTOP_DOWNLOAD_URL = "https://t3.codes/download";\n',
-        replace: `export const DESKTOP_DOWNLOAD_URL = "${BLACKSAND_README}";\n`,
+        replace: `export const DESKTOP_DOWNLOAD_URL = "${T3_README}";\n`,
       },
     ],
   },
@@ -2317,7 +2317,7 @@ export const makeRules = ({ updater, build }) => [
     why: "When the app can't start, it offers stock T3 from pingdotgg's GitHub releases; offer blacksand t3 rollback and update instead",
     file: "apps/desktop/src/app/DesktopStartupRecovery.ts",
     edits: [
-      { find: 'const RELEASES_URL = "https://github.com/pingdotgg/t3code/releases";\n', replace: `const RELEASES_URL = "${BLACKSAND_README}";\n` },
+      { find: 'const RELEASES_URL = "https://github.com/pingdotgg/t3code/releases";\n', replace: `const RELEASES_URL = "${T3_README}";\n` },
       {
         find:
           "        text: `Version ${offer.version} started correctly on this computer. Download it and install it to go back.`,\n" +
@@ -2784,7 +2784,7 @@ export const makeRules = ({ updater, build }) => [
           "launched).\n",
         replace:
           "If the user is behind and the fix likely shipped, say so plainly: Blacksand T3\n" +
-          `updates with \\\`${BLACKSAND_UPDATE}\\\` (its README, ${BLACKSAND_README},\n` +
+          `updates with \\\`${BLACKSAND_UPDATE}\\\` (its README, ${T3_README},\n` +
           "has the rest), never from upstream's releases or npm.\n",
       },
     ],
