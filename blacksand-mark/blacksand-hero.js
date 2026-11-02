@@ -409,7 +409,10 @@ void main() {
     base(c, L.x0, L.y0);
     c.beginPath(); c.moveTo(...T[0]); c.lineTo(...T[1]); c.lineTo(...T[2]); c.closePath(); c.clip();
     if (st.core && st.core.y1 > st.core.y0) {
-      const { y0, y1, density, endFade } = st.core;
+      const { y0, y1, density } = st.core;
+      // the static logo (stream in front) is one unbroken line: no end fade there
+      const endFade = streamLayer === 'front' ? 0 : st.core.endFade;
+      const fadeAt = st.core.fadeAt ?? y1;
       const yA = G.apex[1];
       const half = (y) => 1.3 * Math.min(1, Math.sqrt(Math.max(0, y - yA) / 46));
       c.beginPath();
@@ -419,12 +422,16 @@ void main() {
       c.closePath();
       // the core's density follows the grains' (the emission when that sand left the apex);
       // above a wall contact its last units fade out
-      const gr = c.createLinearGradient(0, y0, 0, y1), K = 24;
-      for (let i = 0; i <= K; i++) {
-        const y = y0 + (y1 - y0) * i / K;
-        const e = endFade > 0 ? Math.min(1, (y1 - y) / endFade) : 1;
-        gr.addColorStop(i / K, `rgba(118,118,118,${(0.24 * (density ? density(y) : 1) * e).toFixed(4)})`);
-      }
+      // stops at fixed heights (every 16 units from the apex), so moving the end never
+      // re-interpolates the rest of the line; plus the fade stops at the end
+      const gr = c.createLinearGradient(0, y0, 0, y1), hgt = y1 - y0;
+      const alpha = (y) => { const e = endFade > 0 ? Math.max(0, Math.min(1, (fadeAt - y) / endFade)) : 1; return 0.24 * (density ? density(y) : 1) * e; };
+      const ys = [];
+      for (let y = y0; y < y1; y += 16) ys.push(y);
+      if (endFade > 0) for (let i = 0; i <= 4; i++) ys.push(fadeAt - endFade * (1 - i / 4));
+      ys.push(y1);
+      ys.filter((y) => y >= y0 && y <= y1).sort((a, b) => a - b)
+        .forEach((y) => gr.addColorStop((y - y0) / hgt, `rgba(118,118,118,${alpha(y).toFixed(4)})`));
       c.fillStyle = gr; c.fill();
     }
     strokeGrains(c, st.grains);

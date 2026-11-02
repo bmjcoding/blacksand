@@ -445,9 +445,12 @@ export function createSim(G, C, seed = 7) {
     if (gy <= 0 || gx * gx + gy * gy > G.Rin * G.Rin) return false;      // strictly inside
     return gy >= (gx - G.nk) * G.slope + G.wallV && gy >= (-G.nk - gx) * G.slope + G.wallV;
   };
-  function sandEdge(rot) {
+  // which: 'bot' (full before the wrap) or 'top' (the same sand, after the wrap)
+  function sandEdge(rot, which) {
     const c = Math.cos(rot), s = Math.sin(rot);
-    const inside = (y) => { const d = y - G.iy; return inBot(d * s, d * c); };   // glass = R(-rot)(0, d)
+    const inside = which === 'bot'
+      ? (y) => { const d = y - G.iy; return inBot(d * s, d * c); }               // glass = R(-rot)(0, d)
+      : (y) => { const d = y - G.iy; return inBot(-d * s, -d * c); };            // point reflection: top
     let prev = G.iy - G.Rin;
     for (let y = prev; y <= G.iy; y += 1.5) {
       if (inside(y)) {
@@ -459,13 +462,19 @@ export function createSim(G, C, seed = 7) {
     }
     return Infinity;
   }
+  // A sand contact is a plain occlusion (sharp, exactly where the sand mask hides the stream),
+  // not a landing: the stream does not fade before it. It holds on both sides of the wrap.
   const contactAt = (tt) => {
     const ph = phaseOf(tt), rot = rotAt(ph);
     const w = wallContact(G, polys, rot, G.ix, yA);
-    if (ph >= TIMING.flow) {
-      const ys = sandEdge(rot);
-      if (ys < w.y) return { y: ys, hit: true, face: false, sand: true };
+    let ys = Infinity;
+    if (ph >= TIMING.flow) ys = sandEdge(rot, 'bot');
+    else if (ph < TIMING.landEnd) {
+      const e = sandEdge(rot, 'top');
+      // the full chamber is draining: its level surface is the sand's upper edge
+      if (e < Infinity) ys = Math.max(e, C.crater(C.craterFor(levels(ph).fTop, craterKAt(ph)), G.ix, craterKAt(ph)));
     }
+    if (ys < w.y) return { y: ys, hit: true, face: false, sand: true };
     return w;
   };
   const apexY = (gr, tt) => yA + dist(tt - gr.born, v0);
@@ -655,7 +664,7 @@ export function createSim(G, C, seed = 7) {
       const x = apexX(gr, y, age);
       // above a wall contact the stream's last units fade instead of ending in a hard cut
       let fade = 1;
-      if (cc.hit && y > yGate) { if (y >= cc.y) continue; fade = Math.min(1, (cc.y - y) / STREAM.endFade); }
+      if (cc.hit && y > yGate) { if (y >= cc.y) continue; if (!cc.sand) fade = Math.min(1, (cc.y - y) / STREAM.endFade); }
       if (y > front) front = y;
       const sh = Math.min(sh0, age), y0 = y - vy * sh + 0.5 * g * sh * sh;
       grains.push({ x0: apexX(gr, y0, age - sh), y0, x, y, r: gr.r, shade: gr.shade, fade });
@@ -692,7 +701,16 @@ export function createSim(G, C, seed = 7) {
     // swept across the stream, the sand below it is gone and the cut head falls from there.
     const density = (y) => emissionAt(phaseOf(tt - fall(Math.max(0, y - yA), v0)));
     const coreEnd = Math.min(cc.y, front);
-    const core = { y0: yA, y1: coreEnd, hit: cc.hit, endFade: cc.hit || coreEnd < yN ? STREAM.endFade : 0, density };
+    // fade the end where it lands on a wall or is the falling head of a cut stream; where it
+    // meets sand it is simply hidden (sharp, like the sand mask)
+    // The fade is anchored at the nearer of the live head and whatever hides the stream (a wall
+    // it lands on, the sand edge, the top pile's surface in the pour, the neck). Landing on a
+    // wall: full fade. A falling head: its fade shrinks to nothing as it reaches sand or the
+    // neck. Anchored the same way in every phase, so it is continuous across every boundary.
+    const occl = cc.hit ? cc.y : (fTop > 0 && fTop < 1 ? Math.min(yN, C.crater(cr, G.ix, craterK)) : yN);
+    const fadeAt = Math.min(front, occl);
+    const endFade = cc.hit && !cc.sand ? STREAM.endFade : Math.min(STREAM.endFade, Math.max(0, occl - front));
+    const core = { y0: yA, y1: coreEnd, hit: cc.hit, fadeAt, endFade, density };
     // the neck column: sand leaving the neck. While the top still has sand its top tucks just
     // above the neck line, under the pile; after the top runs dry the tail falls away. Its
     // leading head, while falling free, fades in rather than ending in a flat cap.
