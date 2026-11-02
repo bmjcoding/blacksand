@@ -380,6 +380,7 @@ const STREAM = {
   slideLife: 0.15,  // seconds; they fade out linearly
   slideMinAngle: 40, // only on faces at least this far from vertical (degrees)
   slideLift: 0.8,   // sliding grains ride this far clear of the face (units)
+  slideEndFade: 10, // and fade out over their last units before the corner
   endFade: 6,       // the stream's last units above a wall contact fade out
 };
 
@@ -454,7 +455,36 @@ function createSim(G, C, seed = 7) {
   // the stream lands where its centreline meets a wall: every grain stops at that one height
   // (a grain off the centreline that overlaps the wall there is under the wall), so the end of
   // the stream is clean instead of fraying along a steep face
-  const contactAt = (tt) => wallContact(G, polys, rotAt(phaseOf(tt)), G.ix, yA);
+  // During the flip the full chamber swings up into the stream's path: sand stops it too
+  // (the nearer of the wall and the sand edge). Point of the centreline first inside the
+  // chamber that is full while the glass turns (the bottom one, in glass space, before the wrap).
+  const inBot = (gx, gy) => {
+    if (gy <= 0 || gx * gx + gy * gy > G.Rin * G.Rin) return false;      // strictly inside
+    return gy >= (gx - G.nk) * G.slope + G.wallV && gy >= (-G.nk - gx) * G.slope + G.wallV;
+  };
+  function sandEdge(rot) {
+    const c = Math.cos(rot), s = Math.sin(rot);
+    const inside = (y) => { const d = y - G.iy; return inBot(d * s, d * c); };   // glass = R(-rot)(0, d)
+    let prev = G.iy - G.Rin;
+    for (let y = prev; y <= G.iy; y += 1.5) {
+      if (inside(y)) {
+        let lo = prev, hi = y;
+        for (let k = 0; k < 12; k++) { const m = (lo + hi) / 2; if (inside(m)) hi = m; else lo = m; }
+        return hi;
+      }
+      prev = y;
+    }
+    return Infinity;
+  }
+  const contactAt = (tt) => {
+    const ph = phaseOf(tt), rot = rotAt(ph);
+    const w = wallContact(G, polys, rot, G.ix, yA);
+    if (ph >= TIMING.flow) {
+      const ys = sandEdge(rot);
+      if (ys < w.y) return { y: ys, hit: true, face: false, sand: true };
+    }
+    return w;
+  };
   const apexY = (gr, tt) => yA + dist(tt - gr.born, v0);
   // a grain that lands on a wall face: SLIDE share of them slide downhill along the face (in
   // glass space, so they ride the turning glass), leave it at the end of the face and fall
@@ -492,14 +522,13 @@ function createSim(G, C, seed = 7) {
     const s = (u) => S.s0 * u + 0.5 * acc * u * u;
     const glassToWorld = (p, at) => { const w = rotG(p, rotUnwrapped(at)); return [G.ix + w[0], G.iy + w[1]]; };
     // time it reaches the end of the face
-    const tc = acc > 1e-6 ? (-S.s0 + Math.sqrt(S.s0 * S.s0 + 2 * acc * S.L)) / acc : S.L / S.s0;
-    if (tau <= tc) { const d = s(tau); return glassToWorld([S.P[0] + S.T[0] * d, S.P[1] + S.T[1] * d], tt); }
-    // off the end: free fall from the corner with its velocity there
-    const d = S.L, at = S.h + tc;
-    const C = glassToWorld([S.P[0] + S.T[0] * d, S.P[1] + S.T[1] * d], at);
-    const sp = S.s0 + acc * tc, Tw = rotG(S.T, rotUnwrapped(at));
-    const u = tau - tc;
-    return [C[0] + Tw[0] * sp * u, C[1] + Tw[1] * sp * u + 0.5 * g * u * u];
+    const d = s(tau);
+    // it settles into the corner where the face ends: gone by then (no orphan grains falling
+    // free through the empty wedge, which read as specks of dirt)
+    if (d >= S.L) return null;
+    const p = glassToWorld([S.P[0] + S.T[0] * d, S.P[1] + S.T[1] * d], tt);
+    p.fade = Math.min(1, (S.L - d) / STREAM.slideEndFade);
+    return p;
   }
   function spawnNeck(born) {
     // what happens when it lands is drawn now, so the outcome never depends on the order in
@@ -633,7 +662,7 @@ function createSim(G, C, seed = 7) {
         const p = slidePos(gr, tt);
         if (p) {
           const q = slidePos(gr, Math.max(gr.slide.h, tt - sh0)) || p;
-          spray.push({ x0: q[0], y0: q[1], x: p[0], y: p[1], r: gr.r, shade: gr.shade, a: 1 - (tt - gr.slide.h) / STREAM.slideLife });
+          spray.push({ x0: q[0], y0: q[1], x: p[0], y: p[1], r: gr.r, shade: gr.shade, a: (1 - (tt - gr.slide.h) / STREAM.slideLife) * p.fade });
         }
         continue;
       }
@@ -679,7 +708,7 @@ function createSim(G, C, seed = 7) {
     // there left the apex. While the glass turns it ends with the live stream: where a wall
     // swept across the stream, the sand below it is gone and the cut head falls from there.
     const density = (y) => emissionAt(phaseOf(tt - fall(Math.max(0, y - yA), v0)));
-    const coreEnd = turning ? Math.min(cc.y, front) : yN;
+    const coreEnd = Math.min(cc.y, front);
     const core = { y0: yA, y1: coreEnd, hit: cc.hit, endFade: cc.hit || coreEnd < yN ? STREAM.endFade : 0, density };
     // the neck column: sand leaving the neck. While the top still has sand its top tucks just
     // above the neck line, under the pile; after the top runs dry the tail falls away. Its
