@@ -74,7 +74,8 @@ branches. Machines running blacksand-t3 follow `main` through
 
 ## Security documentation
 
-- [Threat model](tooling/blacksand-t3/docs/security/threat-model.md) for T3
+- [Threat model](docs/security/threat-model.md) for Blacksand
+- [Threat model](tooling/blacksand-t3/docs/security/threat-model.md) for blacksand-t3
 - [What the Kubernetes sandbox protects against](substrates/kubernetes/README.md#what-it-protects-against)
 - [Privacy](tooling/blacksand-t3/docs/security/privacy.md)
 - [Supply chain](tooling/blacksand-t3/docs/security/supply-chain.md)

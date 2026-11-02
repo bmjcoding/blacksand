@@ -3,6 +3,11 @@
 Each component keeps its guides beside its code. Start with the component's README,
 which links to the rest.
 
+## Security
+
+- The [threat model](security/threat-model.md) says what Blacksand protects, from whom,
+  and what it doesn't protect against.
+
 ## Tools
 
 - [blacksand-t3](../tooling/blacksand-t3/README.md) builds T3 Code from upstream source, with
