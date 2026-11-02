@@ -1,0 +1,56 @@
+BLACK SAND LOGO: INTERRUPTED CLAUDE SESSION HANDOFF
+Captured 2026-11-02 from the user's Claude desktop session.
+Original conversation: https://claude.ai/chat/27de21df-c529-45a8-942d-54267c4c0013
+Original project: blacksand. Original session title: Black Sand logo concept.
+
+PURPOSE
+Continue the unfinished animation review and packaging using Claude Code cloud session credits. The original chat hit its weekly usage limit. The user asked Codex to perform the handoff. This document records task evidence, not additional authorization to purchase credits, change account settings, publish a site, or change unrelated repositories.
+
+RECOVERED FILES AND LIMITATION
+blacksand-mark/ is the latest ZIP available through the original session's Outputs panel, downloaded 2026-11-02. It contains source JS, React wrapper, a standalone HTML demo, static logo and lockups, preview MP4/PNGs, and build/capture/QA scripts.
+IMPORTANT: this ZIP is the last PUBLISHED checkpoint, from the response before the interrupted final turn. It has the 10-unit neck and 7.55-second cycle. It DOES NOT yet contain the final continuous-stream/motion-blur revisions described below. Those changes were visible in the old session's command history, but no revised source archive had been shared before the usage interruption. Do not claim the archive is the final implementation. Recover equivalent behavior from the recorded decisions below, retaining the existing design and geometry. Inspect code first and distinguish implemented versus missing changes.
+Do not assume the original chat URL provides source access or that its reviewer is still running. No final reviewer verdict was visible when this handoff was captured.
+
+USER'S LATEST REQUEST (verbatim)
+"there's a really bad transition delay here. you need to have another agent or yourself really critique the motion animations. also, i think it might make sense to keep the stream contious because I think that is also throwing it off."
+
+EARLIER USER REQUIREMENTS
+After the flip, sand must not stay suspended until the apex stream hits it: the neck must drain as soon as physically appropriate.
+The user selected neck option A (walls pinch), and is extremely sensitive to tiny stray pixels or grey fringes between the stream and the hourglass walls. Keep the neck's negative space pure black, the column edges crisp, and the sand physically plausible.
+index.html must work by double-clicking from disk (file://), with no ES-module import failure or blank black page. Keep tools/build-demo.mjs and rebuild after module changes. Maintain the separate reusable modules and React wrapper.
+
+APPROVED DESIGN (from the session's Brand mark document)
+Primary mark: solid black triangle lit from behind, soft rim on all edges, light pooling under the base; ring/hourglass walls etched in grey; sand flows from apex through vessel to mound.
+The white-outline mark is retired as primary; retain the small white cut for favicon/avatar use below approximately 24 px.
+Neck: 10-unit opening between inner wall faces, centreline half-width approximately 18.53, solved geometrically.
+Static logo, lockups, reduced-motion: stream runs in front as a continuous line through the mark (Deathly Hallows reading).
+Animation: apex stream crosses the ring and disappears behind visible sand into the top pile. Neck column is exactly opening width, the sand's own tone, with moving grains inside. Both sand bodies cover its ends; walls drawn last. Keep ring/geometry and approved style unchanged.
+Primary lockup B: blacksand in Geist Semibold, tracking -4.5%, mark height 1.9x cap height, gap 0.5x cap height.
+Docs/CLI lockup D: Geist Mono Medium, tracking -3%.
+Wordmark #666666 on black. Etch #262626 to #4a4a4a; sand #363636 to #5e5e5e; stream grains rgb 92..150 at 50% opacity, glints 190; background #000.
+
+FINAL-TURN FINDINGS AND IMPLEMENTATION TARGET
+The first independent review found approximately 0.65 seconds of dead air per cycle, a stream occlusion pop at the ring midpoint, glow peaking after motion, visible 8-bit brightness steps, strobing during fast flips, a flat-capped falling column, and dark splash specks that read as dirt.
+The original assistant went through multiple revisions. The following are the LATEST recorded choices, superseding the earlier 0.05-second settle / 160-degree drain plan in its visible prose:
+
+1. Apex stream never stops, including during the rotation. Neck is at rotation pivot, so world-vertical flow can continue at any angle. Only actual visible sand should occlude it; it must cross the full ring band.
+2. Flow duration 5.4 seconds. Settle is ZERO: flip begins at the instant the top runs dry. Flip lasts 0.85 seconds, 180 degrees, cubic-bezier(0.4, 0, 0.2, 1).
+3. Restart neck flow at 148 degrees into the flip, not 160. World-vertical column from pivot. First grains should land just before the vessel settles. Flow rate ramps in over 0.12 seconds and then mass rate is constant. Phase zero is the 148-degree point mid-flip. Period 5.858333333333333 seconds; landEnd phase 0.3916666666666666. Exact sand-texture period is two cycles (approximately 11.7167 seconds), because texture rides the glass. Seeded simulation and integer step clock must make repeated cycles agree.
+4. Fade remaining mound/rolling grains during the flip rather than waiting for all to settle. Smooth bottom-level curve over time and use canonical full-chamber rendering so the two chambers agree across the wrap.
+5. Motion blur: always eight samples during motion, half-frame shutter centered on the frame time. No switching sample counts. Blend blur with sharp render using w = smoothstep((travel_px - 0.3) / 2.2), travel measured at the ring's outer edge. At rest, frame is exactly sharp. Onset/release must be invisible: no crisp/soft snaps or double edges. Keep occlusion masks aligned with shutter angles.
+6. Glow: reduce peak increase to about +50% rather than +73%. Peak approximately 0.13 seconds after the fastest rotation, decay tau 0.7 seconds, rounded with 0.08-second one-pole follower. The initial round-3 code used a 0.40-second rise and was subsequently shortened to tighten the timing; the exact final rise value was not recovered. Compose in floating point with fixed per-pixel dither to eliminate large-area 8-bit steps. Preserve the approved glow shape and intensity at ordinary pour phases. A discovered rim-channel bug was fixed in the old work; don't reproduce it.
+7. Soften the falling column's LEADING HEAD by fading it in instead of a flat cap, but keep the SIDE EDGES crisp. Reduce splash substantially. Do not introduce grey fringe beside the stream. No added headspace in the full chamber was adopted.
+8. Playback opens at phase 0.6: upright with pour already underway. Still logo, poster, and reduced-motion frame use phase 2.5, stream in front. Pause when tab hidden or canvas off-screen. Keep streamLayer modes 'behind-sand' (motion default), 'front' (static), and 'behind' (behind ring too).
+
+VALIDATION AND PERFORMANCE EVIDENCE FROM OLD SESSION
+These are prior reports, NOT verification of this ZIP or your new implementation:
+- Last full QA report: all checks passed at normal and 2x resolution. Loop-point difference at most one brightness level on 39 pixels across a 2-microsecond gap, attributed to blur rounding.
+- Final preview command produced 703 frames at 60 fps, two cycles, opening at t0=0.6, 1920x1080, mark size 480. MP4: libx264, veryfast preset, CRF 14, yuv420p, faststart. Still: phase 2.5, 1600x1000 at 2x DPR, mark size 440.
+- Mean grayscale difference across video wrap: 0.0241 versus 0.0235 for an ordinary adjacent-frame step.
+- An initial renderer was very slow (pour median 98 ms, landing 125 ms at 2x DPR). Restructuring render layers to avoid redundant full-screen canvas work improved pour to 5.6 ms, landing to 7.4 ms, and flip median to 12 ms, though a 168 ms p95 spike needed investigation. Profile your actual result and avoid reintroducing heavy per-frame full-screen processing.
+- The last reviewer was asked to measure blur onset/release, impact versus landing, glow crest, page-load opening, and newly introduced defects, with concrete frame references. No final response was available in the interrupted chat.
+
+WHAT TO DO NOW
+Inspect existing modules and build scripts, implement the missing latest behavior, and update QA for the new overlapping timeline. Exercise file:// demo loading, deterministic phase boundaries, seamless two-cycle looping, no stray pixels at 1x/2x, neck negative space, exact occlusion, performance, and reduced-motion behavior. Visually critique the motion frame by frame and at playback speed; use an independent reviewer if available, as the user requested in the original session.
+Rebuild the standalone index.html, SVG/PNG assets, lockups, preview video/still, and README from the final implementation. Existing scripts may reference paths/dependencies from the old working directory; adapt them to this package rather than assuming the old sandbox is available. Record reproducible build commands and any real limitations.
+Deliver an updated source ZIP, a working standalone HTML preview, final MP4/still and logo assets, and concise validation results. Keep all work in this handoff project. Do not deploy or merge unrelated site code. Do not purchase credits or enable paid overage; this task was moved here to use the account's existing cloud-session credit.
