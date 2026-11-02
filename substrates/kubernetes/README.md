@@ -120,8 +120,9 @@ The script:
 - labels the node with the floor's digest.
 
 **Single-node only for now.** The label is ordinary node metadata, so anyone who
-administers the cluster can set it, not only root on the node. Several nodes, or EKS,
-need a protected `node-restriction.kubernetes.io/` label.
+administers the cluster can set it, not only root on the node. The floor also uses
+node-local networking and k3s-specific configuration. Several nodes, or EKS, need more
+than a protected `node-restriction.kubernetes.io/` label, so they aren't supported yet.
 
 Then, once per cluster, as an admin:
 
@@ -280,8 +281,9 @@ record's `source.base` says which commit ran.
   before it reads the key. The body may carry only local tools, wherever the request
   offers them: functions, custom tools, namespaces of those, and client-run tool search.
   The proxy refuses web search, file search, MCP servers, remote files or URLs, other
-  responses or conversations, background work and retention. It also refuses any beta
-  feature Claude Code doesn't use.
+  responses or conversations, background work, and OpenAI response storage
+  (`store: true`). It also refuses any beta feature Claude Code doesn't use. Prompt
+  caching is allowed, and the provider's own retention policy still applies.
 - **Network access beyond the allowlist.** This covers DNS, IPv4 and IPv6, the node, and
   other Pods and Services, from a Pod's first instruction. Three layers enforce it: the
   node floor, then NetworkPolicy, then the run token at the proxy.
