@@ -333,6 +333,12 @@ describe("responsive version stamp", () => {
       await expect.element(page.getByRole("heading", { name: /^Blacksand/ })).toBeVisible();
       const card = document.querySelector(".t3b-version-card")!;
       await vi.waitFor(() => expect(getComputedStyle(card.closest(".t3b-version-notes")!).opacity).toBe("1"));
+      const positioner = card.closest('[data-slot="popover-positioner"]')!;
+      await vi.waitFor(() => {
+        expect(positioner.getAttribute("data-side")).toBe("top");
+        const stamp = document.querySelector(".t3b-version-stamp")!;
+        expect(Math.abs(rect(positioner).bottom - rect(stamp).top + 4)).toBeLessThan(2);
+      });
       inViewport(rect(card));
       expect(rect(card).height).toBeLessThanOrEqual(window.innerHeight * 0.6 + 1);
       expect(card.scrollHeight).toBeGreaterThan(card.clientHeight);

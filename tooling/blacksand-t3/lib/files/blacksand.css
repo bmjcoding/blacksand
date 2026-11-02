@@ -149,6 +149,8 @@ html[data-theme-id] .t3b-version-stamp { --t3b-version-surface: var(--app-theme-
 .t3b-version-notes {
   width: 340px;
   max-width: calc(100vw - 16px);
+  max-height: min(420px, 60vh);
+  overflow: hidden;
 }
 
 .t3b-version-card {
