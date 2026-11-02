@@ -3,7 +3,7 @@
 // closure (pin.json deviceToolLocks) and the staged production install (stage
 // records the evaluate job keeps, bound to commit, overrides and platform); what
 // it can't cover is a gap that keeps issues open. Also the device tool lockfiles
-// the evaluator proposes and the commit job checks. (Stage records' binding to
+// the evaluator proposes and the check job checks. (Stage records' binding to
 // the build code and their checks: test/pipeline-stage-records.test.mjs.)
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -244,9 +244,9 @@ test("the evaluator keeps a lockfile for each tool it clears, and proposes one f
   assert.match(heldResult.report, /no dependency lockfile to keep for it: npm has no publish time/);
 });
 
-// -------------------------------------------------------- the commit job ----
+// --------------------------------------------------------- the check job ----
 
-test("the commit job checks the kept lockfiles: only for tools the release pins, verified, and none missing", async () => {
+test("the check job checks the kept lockfiles: only for tools the release pins, verified, and none missing", async () => {
   const candidate = (locks) => ({ ...PIN, channels: { nightly: { ref: NEWEST, sha: sha("a"), evaluatedAt: "2026-10-31T01:00:00.000Z", leftOut: [] } }, deviceToolLocks: locks });
   const calls = [];
   const io = {

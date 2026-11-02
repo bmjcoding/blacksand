@@ -10,16 +10,64 @@
 Every CI result is advisory. Each machine checks and builds a pin itself before it
 installs that pin ([self-update](self-update.md)).
 
-## The three jobs (`evaluate.yml`, hourly)
+## The four jobs (`evaluate.yml`, hourly)
 
 The workflow splits the work so that the signing key never shares a runner with
-upstream code.
+upstream code or mutable repository scripts.
 
 | Job | What it runs | Token and secrets | Output |
 |---|---|---|---|
 | `evaluate` | `blacksand t3 evaluate` on each new upstream nightly release, newest first. It builds and smoke-tests each one. | Read-only `contents`, and `actions: read` to fetch the last run's stage records. No secrets. | A proposed `pin.json`, a report, resolved lockfiles and stage records. The job uploads them as an artifact on every run, pass or fail. |
-| `commit` | It starts on a fresh runner that runs no upstream or npm code. `blacksand t3 pin-check --candidate` re-derives every gate it can from git, npm and the advisory sources. The job then signs and pushes the pin. | `contents: write`. The evaluator key is available only in the final sign-and-push step. | An evaluator-signed commit that changes `pin.json`. |
+| `check` | A fresh runner runs `blacksand t3 pin-check --candidate`, re-deriving every gate it can without executing upstream or npm code. | `contents: read`, no secrets or environment. | A checked pin and the exact main SHA, uploaded as a separate immutable artifact. |
+| `commit` | A fresh runner uses only inline workflow shell and pinned GitHub-owned actions. It checks the exact main SHA, builds a pin-only tree without filters or hooks, then signs and pushes fast-forward only. | Read-only workflow token; the main-only `evaluator` environment supplies the signing key and repository-scoped Contents-write App credential. | An evaluator-signed commit changing `tooling/blacksand-t3/pin.json` alone. Requires explicit publication opt-in. |
 | `alerts` | It checks advisories against the pin that is on `main`. | `contents: read` and `issues: write`. | GitHub issues. |
+
+## Evaluation before publication is configured
+
+Publication is disabled unless the **repository variable**
+`BLACKSAND_EVALUATOR_PUBLISH` is literal `true` on exact branch `main`.
+Keep the variable absent or literal `false` for evaluation-only runs. GitHub's
+case-insensitive condition can start `commit` for values such as `TRUE`, but an
+inline case-sensitive guard fails before the App-token and signing steps.
+Evaluation, independent checking and alerts still run. A green
+workflow may report a held release; inspect the evaluation exit/report and the
+check verdict. An expired age hold alone does not prove a current candidate passes.
+
+After the owner lands the workflow on trusted `main`, enable and dispatch
+`evaluate.yml` on `main`. Keep publication disabled until its credential setup and
+branch authorization have been approved. Retain the run URL, main SHA, evaluation
+artifact ID, checked `pin` artifact ID and reports. Both data handoffs use immutable
+artifact IDs; the credential job rejects a changed main SHA, extra staged paths,
+symlinked pin/SHA files, multiple JSON documents and an unsafe release-ref string.
+It executes no repository or upstream script, package manager, local action or
+cache restore. Pin semantics and gates remain the independent check's job and are
+also enforced by each installed machine.
+
+The `evaluator` environment must admit exactly branch `main`, with no tag policy.
+It holds `BLACKSAND_EVALUATOR_APP_CLIENT_ID` as a variable and
+`BLACKSAND_EVALUATOR_APP_PRIVATE_KEY` and `BLACKSAND_EVALUATOR_SIGNING_KEY` as
+secrets. The App is installed on this repository alone with Contents write and
+implicit Metadata read, without Workflows or administration permission. Its
+installation token is requested for this repository and Contents write alone.
+Read back environment branch policies, secret **names**, App installation scope,
+permissions and applicable rules before opting in. No unattended publisher may
+reuse the owner's GitHub token. Keys, App approval and rule authorization are
+owner provisioning, separate from running evaluation. Preserve the history rule's
+no-force/no-delete policy and client signature checks.
+
+While publisher approval is pending, the owner can publish a freshly built and
+independently checked pin manually. Download the `pin` artifact by its exact ID
+from the completed successful check job of the selected main run; retain the
+matching `evaluation` report/resolved artifacts. In a clean, trusted checkout on
+`main`, require the artifact's entire `main-sha` file to equal `git rev-parse HEAD`
+plus one newline. Review the candidate's complete diff against that baseline. In
+the final fail-fast signing block, run `pin-check --candidate` with the matching
+resolved directory against that unchanged baseline, require `changed`, repeat the
+static validators and require that the only changed/staged path is
+`tooling/blacksand-t3/pin.json`, then owner-sign that file and push normally. If main
+moves or any validator fails, stop and evaluate/check again; never transplant an
+old pin onto unchecked history or force-push. Do not run an upstream build in the
+credential-bearing owner account to obtain the candidate.
 
 ## What holds a release back
 
@@ -44,7 +92,7 @@ release that does any of the following:
   forbidden endpoint, or makes any network call in the offline smoke test
   ([build pipeline](../building/pipeline.md)).
 
-Before it signs anything, the `commit` job checks the following:
+The secret-free `check` job independently checks the following:
 
 - The pin is valid. It moves only the evaluated channel, and only forward.
 - Each tag points at its pinned commit upstream. The job asks with `git ls-remote`.
@@ -69,7 +117,7 @@ After the `commit` job, the `alerts` job checks the pin on `main` against the
 [advisory sources](fast-lane.md#advisory-sources). It also checks Electron's embedded
 Node and Chromium. The check covers everything a build of that pin installs:
 
-- The lockfile the evaluate job resolved, checked the way the commit job checks it. If
+- The lockfile the evaluate job resolved, checked the way the check job checks it. If
   that lockfile is missing or fails the check, the job uses upstream's lockfile with
   the overrides applied instead.
 - Each device tool's frozen closure from `pin.json`.
@@ -115,7 +163,7 @@ labeled `security`. GitHub sends it as an email and a push notification.
 - The issue `Upstream <channel> releases held` says why every newer release is held.
   It closes only when the pin the `commit` job pushed is on `main`, or when upstream
   has nothing newer. The evaluate job's exit code can open this issue but never close
-  it, because that job ran upstream code.
+  it, because that job ran upstream code or mutable repository scripts.
 
 The automation changes only the issues its bot opened with its hidden marker. It keeps
 any notes you add above or below its text, whole. If your notes leave no room within
@@ -141,9 +189,8 @@ The run still fails and names that issue.
   `tooling/blacksand-t3/test/stripped/` inside the stripped checkout, and syntax-checks the
   SSH runner as upstream renders it. It has a read-only token and no secrets.
 
-The evaluator's own pin commits start neither `build.yml` nor `ci.yml`. The workflow
-pushes them with its own token, and GitHub starts no workflows for pushes made with
-that token.
+The evaluator App's pin pushes start `build.yml` and `ci.yml`. Those jobs have no
+evaluator environment or keys. The schedule/dispatch-only evaluator does not recurse.
 
 The jobs that build install `libsecret-1-dev` and `imagemagick` with apt, because
 upstream's Linux packager checks for them. They get pnpm through `install.sh`'s

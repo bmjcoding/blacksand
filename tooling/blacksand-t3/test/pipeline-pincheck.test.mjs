@@ -1,4 +1,4 @@
-// node --test test/*.test.mjs: the commit job's re-derivation (lib/pincheck.mjs).
+// node --test test/*.test.mjs: the check job's re-derivation (lib/pincheck.mjs).
 // The evaluate job's pin.json is only a proposal: each case is a proposal a
 // compromised evaluate job could make, refused here from git, npm and OSV alone.
 import { test } from "node:test";

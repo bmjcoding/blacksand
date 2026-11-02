@@ -248,7 +248,7 @@ export async function addedPackageProblems({ resolvedLock, added, overrides = re
 export const toolClosurePackages = (tool, pinJson) => [...closurePackages(approvedToolLock(tool, pinJson)).keys()].sort();
 
 /**
- * WORK's resolved lockfile checked as the commit job checks it: against
+ * WORK's resolved lockfile checked as the check job checks it: against
  * upstream's lockfile (checkResolvedLock), then what the overrides brought in
  * against npm (addedPackageProblems; npm unreachable is a problem too).
  * Returns { packages, problems }.

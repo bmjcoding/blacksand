@@ -4,6 +4,8 @@
 // does every lazy blob fetch one of those repositories makes later (`git show`
 // in a blobless clone), because the options below travel to the git processes
 // it starts.
+// Self-update alone chooses an explicit path-scoped gh helper for its canonical
+// HTTPS origin (self-fetch-auth.mjs); public upstream/build callers never do.
 //
 // A machine's own git configuration must not decide how these run. A
 // `url.ssh://git@github.com/.insteadOf=https://github.com/` rule in ~/.gitconfig

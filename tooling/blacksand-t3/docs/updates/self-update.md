@@ -149,7 +149,11 @@ HEAD with the same code and the same rule as self-update.
 
 - origin must be one github.com repository URL, in the form `https://github.com/…`,
   `git@github.com:…` or `ssh://git@github.com/…`. Whatever its form, self-update
-  fetches it over HTTPS without credentials, so it never waits on an SSH-agent prompt.
+  fetches it over HTTPS, so it never waits on an SSH-agent prompt. Only an exact
+  canonical `https://github.com/<owner>/<repo>.git` origin may use the owner's
+  existing GitHub CLI login through the fixed self-fetch credential helper. Other
+  origin forms and explicit test remote overrides stay anonymous. Public upstream
+  calls never use this helper.
   Any other origin, including an SSH host alias, makes self-update skip every run.
 - Self-update reads the URL as the clone's own `.git/config` writes it. So no
   `insteadOf` rule, whether global, local or in the environment, can change which
@@ -161,14 +165,22 @@ HEAD with the same code and the same rule as self-update.
   - git ignores the machine's global and system configuration, including rewrites,
     credential helpers, `core.sshCommand`, proxies and `includeIf`. `git.mjs` also
     drops every `GIT_*` variable.
-  - Nothing can prompt.
+  - Nothing can prompt. Private self-fetch disables redirects and proxy/environment
+    overrides, scopes the helper to the exact host/path, and rechecks that scope
+    inside the helper before asking `gh auth git-credential get`. It ignores token
+    environment variables and never invokes `gh auth token`. Credentials travel
+    only through helper pipes, never URLs, arguments, exported tokens or git
+    configuration. No credential is saved by the helper or passed to a build.
+    Authenticated fetch diagnostics are fixed messages, since remote/helper error
+    text could contain credentials. A failure requires checking the HTTPS origin,
+    transport policy or the owner's existing `gh` login.
   - Each call has a deadline: 1 minute for listing, 5 for reading the mirror, 15 for
     fetching and 30 for cloning.
 - `git.mjs` can't switch off the clone's own `.git/config` the same way, so
   self-update checks that file before each fetch. The file must not set URL rewrites,
   `http.*`, `credential.*`, proxies, transport programs (`core.sshCommand`,
   `remote.*.uploadpack` and the like), `protocol.*.allow` or a partial clone. If it
-  does, self-update skips every run, and the log names the key
+  does, self-update skips every run (private fetch logs use a fixed policy message)
   ([troubleshooting](../troubleshooting.md#self-update)).
 - The upstream mirror belongs to the build account. Only that account fetches into the
   mirror or reads file contents from it. Every other read of the mirror, such as tags,

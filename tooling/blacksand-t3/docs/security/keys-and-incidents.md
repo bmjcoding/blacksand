@@ -8,7 +8,8 @@
 | Secret | What it can do | Where it lives | Rotation |
 |---|---|---|---|
 | Owner SSH signing key | sign any commit every machine takes. It is the root of trust | your SSH agent or hardware key; its public half in `.allowed_signers` | add the new key in a commit the old key signs; sign the next commit with the new key, removing the old one ([below](#rotating-the-owner-key)) |
-| Evaluator key (`blacksand-evaluator`) | sign `pin.json`-only, forward moves to real upstream releases, which machines re-check | the `T3BLACKOUT_EVALUATOR_SIGNING_KEY` repository Actions secret; its public half in `.allowed_signers` | new key pair; replace the secret; replace its line in `.allowed_signers` in an owner-signed commit |
+| Evaluator key (`blacksand-evaluator`) | sign `pin.json`-only, forward moves to real upstream releases, which machines re-check | the `BLACKSAND_EVALUATOR_SIGNING_KEY` secret in the main-only `evaluator` environment; its public half in `.allowed_signers` | new key pair; replace the secret; replace its line in `.allowed_signers` in an owner-signed commit |
+| Evaluator App private key | mint short-lived Contents-write installation tokens for the selected repository; cannot alter workflows or rules | `BLACKSAND_EVALUATOR_APP_PRIVATE_KEY` in the main-only `evaluator` environment | revoke at the App, replace the environment secret; keep publication disabled until readback passes |
 | SSH key agent accounts accept | log in to every agent account | your SSH agent; its public half in root's `/etc/ssh/blacksand/authorized_keys/<account>` on each machine | rerun `sudo tooling/blacksand-t3/scripts/add-agent-account.sh <account> --key <new.pub>` for every account; the file is rewritten |
 | Claude Code token (`claude setup-token`) | use your Claude subscription from that agent account | `~/.blacksand/t3/server.env` in the agent account (owner only) | yearly: `claude setup-token`, then `/usr/local/libexec/blacksand/set-claude-token`; switch the environment off and on; revoke the old token |
 | Codex login | use your OpenAI account from that agent account | `~/.codex/auth.json` in the agent account | `codex logout`, `codex login` |
@@ -68,8 +69,8 @@ have aged or pass the machines' own fast lane. Every machine still checks the ta
 against upstream, re-derives the gates, and builds, scans and smoke-tests the release.
 
 1. Generate a new key pair (`ssh-keygen -t ed25519 -C blacksand-evaluator -f
-   <scratch path>`), and replace the `T3BLACKOUT_EVALUATOR_SIGNING_KEY` secret
-   (**Settings → Secrets and variables → Actions**). Delete the private key file.
+   <scratch path>`), and replace the `BLACKSAND_EVALUATOR_SIGNING_KEY` secret
+   (**Settings → Environments → evaluator**). Delete the private key file.
 2. In an owner-signed commit, replace the `blacksand-evaluator` line in
    `.allowed_signers` with the new public key. From the next commit on, the old key
    signs nothing machines take.
@@ -166,3 +167,16 @@ Reports come through GitHub's private vulnerability reporting
    builds. Publish the advisory once the fix is on `main`, and credit the reporter if
    they want that.
 5. If it's upstream's bug, not blacksand-t3's, help the reporter take it to upstream.
+
+### The evaluator App key leaked
+
+Disable the evaluator, cancel unfinished runs and retain the environment and branch
+protections. Revoke the App key and outstanding installation tokens. Review changes
+to main: Contents write can alter repository scripts as well as pins; the installed
+verifier still refuses unsigned/untrusted history and non-pin evaluator commits.
+The credential job runs no repository script, so App-written scripts have no route
+to its signing key through the reviewed four-job flow. Assess both automation keys
+for a shared compromise before resuming. Restore trusted contents and provisioning,
+then opt in again; never restore repository-wide signing secrets or remove the
+writer/history protections as rollback. The owner can publish independently checked
+pins manually while the evaluator is stopped.

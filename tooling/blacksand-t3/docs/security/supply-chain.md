@@ -28,8 +28,9 @@ machine re-checks what CI proposes.
 
 - CI's `evaluate` job builds candidates with a read-only token and no secrets. Its
   output is only a proposal.
-- The `commit` job re-derives the gates on a fresh runner that runs no upstream or npm
-  code, before the key is in reach ([evaluator](../updates/evaluator.md)).
+- The secret-free `check` job re-derives the gates on a fresh runner that runs no
+  upstream or npm code. A separate credential job executes only inline workflow
+  shell and pinned GitHub-owned actions ([evaluator](../updates/evaluator.md)).
 - **Each machine is the authority.** It re-derives the gates from upstream's git, npm,
   the advisory sources and this repository, then strips, typechecks, scans and
   smoke-tests the release itself. At worst, a forged CI result or a stolen evaluator
@@ -86,11 +87,13 @@ machine re-checks what CI proposes.
 - **Least privilege.** The default workflow token is read-only, and workflows can't
   approve pull requests. `evaluate.yml` starts from `permissions: {}`, and each job
   asks only for what it needs
-  ([evaluator](../updates/evaluator.md#the-three-jobs-evaluateyml-hourly)).
-  `actions/checkout` runs with `persist-credentials: false`. The evaluator key is a
-  repository Actions secret, and only the final sign-and-push step reads it. That step
-  writes the key to a mode-600 file and deletes the file after signing.
-- **Anyone who can push a workflow can read the evaluator's key.** For that reason,
+  ([evaluator](../updates/evaluator.md#the-four-jobs-evaluateyml-hourly)).
+  `actions/checkout` runs with `persist-credentials: false`. Publication requires
+  explicit repository opt-in and owner provisioning. Only the `commit` job names
+  the main-only `evaluator` environment. Its signing key goes to a mode-600 file
+  deleted after signing; the App token is scoped to this repository's Contents
+  write permission. No repository script shares that runner with either key.
+- **Anyone who can change a workflow on main can read its environment keys.** For that reason,
   agent accounts hold no token with `workflow` scope
   ([keys and incidents](keys-and-incidents.md)).
 
@@ -111,11 +114,12 @@ never notifies ([alerts](../updates/evaluator.md#alerts)).
   records.
 - The fast lane reads npm provenance but never verifies it. Provenance can take a
   version out of the fast lane, never put one in.
-- The evaluator key isn't in a GitHub environment with required reviewers. It's a
-  repository secret, so a workflow pushed to the repository could read it. Machines
-  would refuse that unsigned commit, but the key would be exposed. The damage is then
-  limited to what the evaluator key may sign, and you rotate the key
-  ([keys and incidents](keys-and-incidents.md#the-evaluator-key-leaked)). Pull
-  requests from forks don't get secrets.
+- The `evaluator` environment has no required reviewers. Its branch policy must
+  admit only `main`, and publisher provisioning must preserve the main writer,
+  signature and history protections. Contents write is not a pin-only permission:
+  an App can change scripts that the secret-free jobs run. The credential job's
+  data-only handoff and inline implementation protect its keys from those scripts;
+  installed machines still verify history and gates independently
+  ([keys and incidents](keys-and-incidents.md#the-evaluator-app-key-leaked)).
 
 The residual risks are listed in the [threat model](threat-model.md#residual-risks).

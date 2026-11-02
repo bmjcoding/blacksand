@@ -363,7 +363,7 @@ test("a rewrite in the clone's own configuration that hides github.com stops sel
   assert.equal(await f.update({ remote: null }), "skipped");
   assert.equal(planted.ran(), false);
   assert.equal(f.head(), before);
-  assert.match(f.logs.at(-1), /self-update skipped: couldn't fetch \(refusing to reach https:\/\/github\.com\/bmjcoding\/blacksand\.git from .*sets url\.ext::.*\.insteadof/);
+  assert.match(f.logs.at(-1), /self-update skipped: couldn't fetch \(private self-fetch refused by origin\/transport policy/);
 });
 
 test("a global rewrite that hides github.com (ext:: or an SSH host alias) can't steer self-update's fetch, which goes to GitHub over HTTPS", async () => {
@@ -383,6 +383,9 @@ test("a global rewrite that hides github.com (ext:: or an SSH host alias) can't 
       assert.notEqual(plainGit(f.clone, ["fetch", "--quiet", "origin", "main"]).status, 0);
       assert.equal(planted.ran(), true, `positive control (${kind}): plain git runs the planted transport`);
       planted.reset();
+      // Noncanonical origins remain anonymous. Keep this older public-fetch
+      // proxy probe offline; private HTTPS auth has its own loopback fixtures.
+      run(f.clone, ["remote", "set-url", "origin", "git@github.com:bmjcoding/blacksand.git"]);
       assert.equal(await f.update({ remote: null }), "skipped");
     });
     assert.equal(planted.ran(), false, kind);

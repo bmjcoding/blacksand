@@ -363,7 +363,7 @@ export async function latestReviewed(name, reviewed) {
  * lane (toolFastLane, against that version and its kept lock; `advisories`
  * reads the advisory sources, `toolOverrides` are the owner's device tool
  * overrides, this clone's unless given) takes it. Returns [{ tool, ok, reasons, notes,
- * lock }]. The evaluator's commit job and every machine's self-update run it on
+ * lock }]. The evaluator's check job and every machine's self-update run it on
  * a bot-signed pin, so the evaluator's key alone can't approve a tool.
  *
  * `locks` / `previousLocks`: the pins' deviceToolLocks ({ "name@version":

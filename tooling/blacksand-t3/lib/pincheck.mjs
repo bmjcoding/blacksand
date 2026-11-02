@@ -1,12 +1,12 @@
-// The evaluator's commit job (bin/t3 pin-check, .github/workflows/
-// evaluate.yml): the only place the evaluator's signing key is used, on a fresh
-// runner that runs no upstream or npm code. The evaluate job built upstream, so
+// The evaluator's check job (bin/t3 pin-check, .github/workflows/
+// evaluate.yml): a fresh runner with no signing key, upstream or npm execution.
+// Only the separate inline commit job receives keys. The evaluate job built upstream, so
 // its pin.json and resolved lockfiles are only a proposal: everything that can be
 // decided from git, npm and the advisory sources (OSV, GitHub's) without running
 // upstream code is decided again here before the pin is signed.
 //
 // This job is advisory too. It can't know that the evaluate job's build really
-// compiled, scanned clean and passed the smoke test, and its key could be stolen.
+// compiled, scanned clean and passed the smoke test; an evaluator key could also be stolen.
 // Each Mac is the authority: it re-derives the gates a pin's commit claims to
 // pass before taking it (lib/selfupdate.mjs: tags, device tools, dependency age
 // against the pin it already trusts) and builds, scans and smoke-tests the

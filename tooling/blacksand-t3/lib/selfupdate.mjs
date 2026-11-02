@@ -14,6 +14,7 @@ import { registryTime } from "./gates.mjs";
 import { DEADLINES, UPSTREAM_URL, gitEnv, ownConfig, publicGit } from "./git.mjs";
 import { ROOT, log } from "./util.mjs";
 import { t3Gates } from "./trust-gates.mjs";
+import { canonicalSelfOrigin, selfFetchConfig, selfFetchEnv } from "./self-fetch-auth.mjs";
 export const BOT_PRINCIPAL = EVALUATOR;
 // Historical callers ask about a root-layout pin; production uses evaluatorShape
 // with the first parent's layout via src/trust/history.ts.
@@ -68,19 +69,26 @@ export function githubOrigin(repo) {
  * Fetches main without prompting, only through lib/git.mjs (HTTPS only, none of
  * this machine's git configuration, the clone's own checked first): from
  * `remote` when the caller names one (a local path, for tests), else from this
- * clone's GitHub origin over HTTPS, which a public repository needs no login
- * for. Nothing else is fetched: an SSH key behind an agent like 1Password would
+ * clone's GitHub origin over HTTPS. Only a canonical HTTPS origin may use the
+ * owner's existing gh login; explicit remote overrides remain anonymous.
+ * Nothing else is fetched: an SSH key behind an agent like 1Password would
  * wait for an approval nobody gives at 04:00, and a git configuration's rewrite
  * could send the fetch anywhere.
  */
 function fetchMain(repo, remote) {
   const url = remote ?? githubOrigin(repo);
   if (!url) return { status: 1, stderr: "origin isn't a github.com repository URL, and self-update fetches only from GitHub" };
+  const authenticated = remote === null && canonicalSelfOrigin(url) && ownConfig(repo, "remote.origin.url")[0] === url;
   try {
-    return publicGit(["fetch", "--quiet", url, "main"], { url, repo, timeout: DEADLINES.fetch });
+    const result = publicGit(["fetch", "--quiet", url, "main"], {
+      url, repo, timeout: DEADLINES.fetch,
+      ...(authenticated ? { config: selfFetchConfig(url), env: selfFetchEnv() } : {}),
+    });
+    if (authenticated && (result.error || result.signal || result.status !== 0)) return { status: 1, stderr: "private self-fetch failed (HTTPS/gh login, origin policy or deadline); no remote diagnostics retained" };
+    return authenticated ? { status: 0, stderr: "" } : result;
   } catch (error) {
     // The clone's own git configuration would send the fetch elsewhere (lib/git.mjs checkRepoTransport).
-    return { status: 1, stderr: error.message };
+    return { status: 1, stderr: authenticated ? "private self-fetch refused by origin/transport policy" : error.message };
   }
 }
 
@@ -113,7 +121,7 @@ export async function selfUpdate({ repo = ROOT, remote = null, upstream = UPSTRE
     return "skipped";
   }
   const fetched = fetchMain(repo, remote);
-  if (fetched.status !== 0) {
+  if (fetched.error || fetched.signal || fetched.status !== 0) {
     report(`self-update skipped: couldn't fetch (${(fetched.stderr || fetched.error?.message || "timed out").trim().split("\n")[0]})`);
     return "skipped";
   }

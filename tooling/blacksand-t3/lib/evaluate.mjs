@@ -19,7 +19,7 @@
 //
 // Everything outside this module comes in through `io`, so the evaluation can run
 // against fakes (test/pipeline-*.test.mjs). The evaluate job is untrusted: what it
-// writes is only a proposal, which the commit job re-derives (lib/pincheck.mjs).
+// writes is only a proposal, which the check job re-derives (lib/pincheck.mjs).
 
 import { completeAdvisories, isAlerting, scanAdvisories } from "./advisories.mjs";
 import { makeFastLane, runtimeAdvisories } from "./fastlane.mjs";

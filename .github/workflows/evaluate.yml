@@ -3,15 +3,18 @@
 # against the pin on main into issues. Hourly, so a security fix upstream ships
 # lands within the hour (the fast lane, lib/fastlane.mjs).
 #
-# Three jobs, because the evaluate job builds and runs untrusted upstream code
+# Four jobs, because the evaluate job builds and runs untrusted upstream code
 # and its dependencies (Oct 2026: SubQuery's payload read CI runner memory):
 #   evaluate  read-only token, no secrets; its pin.json, report, resolved
 #             lockfiles and stage records (the staged production install of
 #             each release it built, lib/inventory.mjs) are artifacts, and only
 #             ever a proposal
-#   commit    fresh runner that runs no upstream or npm code: re-derives every gate
+#   check     fresh runner, no secrets: re-derives every gate
 #             it can from git, npm and the advisory sources (OSV, GitHub's;
-#             bin/t3 pin-check, lib/pincheck.mjs), then signs and pushes the pin
+#             bin/t3 pin-check, lib/pincheck.mjs), uploads the pin and main SHA
+#   commit    fresh runner, main-only evaluator environment, pinned GitHub-owned
+#             actions and inline shell only; exact-SHA, pin-only, ff-only publish
+#             requires repository variable BLACKSAND_EVALUATOR_PUBLISH=true
 #   alerts    after commit: advisories against the pin actually on main
 #             (bin/t3 advisories), then issues only. It runs when the
 #             evaluate job failed or timed out too: what that job didn't leave is
@@ -58,6 +61,7 @@ jobs:
       actions: read # the last evaluation's artifact
     outputs:
       exit: ${{ steps.evaluate.outputs.exit }}
+      artifact: ${{ steps.evaluation.outputs.artifact-id }}
     steps:
       # Full history, without file contents (fetched when read).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -135,25 +139,27 @@ jobs:
           echo "exit=$?" >> "$GITHUB_OUTPUT"
           cp pin.json "$RUNNER_TEMP/out/pin.json" 2>/dev/null || true
 
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      - id: evaluation
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: evaluation
           path: ${{ runner.temp }}/out
           retention-days: 7
 
-  commit:
+  check:
     needs: evaluate
     if: needs.evaluate.outputs.exit == '0'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
-      contents: write
+      contents: read
     outputs:
-      # The ref it signed and pushed; empty when it pushed nothing.
-      published: ${{ steps.push.outputs.published }}
+      verdict: ${{ steps.check.outputs.verdict }}
+      # The commit job downloads this artifact by ID, so no other job's upload
+      # can stand in for it.
+      pin: ${{ steps.upload.outputs.artifact-id }}
     steps:
-      # No credentials in .git/config: the push below passes the token itself.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
@@ -165,14 +171,14 @@ jobs:
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: evaluation
+          artifact-ids: ${{ needs.evaluate.outputs.artifact }}
           path: ${{ runner.temp }}/evaluation
 
-      # No upstream or npm code runs here, and the signing key isn't in reach:
-      # pin-check reads upstream with git, npm and the advisory sources (OSV,
-      # GitHub's) over HTTPS and applies the strip rules to upstream's source as
-      # text. It writes pin.json when it passes. The job's token goes to GitHub's
-      # advisory API alone (lib/advisories.mjs), for its rate limit.
+      # No upstream or npm code runs here, and no key is in reach: pin-check
+      # reads upstream with git, npm and the advisory sources (OSV, GitHub's)
+      # over HTTPS and applies the strip rules to upstream's source as text. It
+      # writes pin.json when it passes. The job's token goes to GitHub's advisory
+      # API alone (lib/advisories.mjs), for its rate limit.
       - name: Re-derive the gates
         id: check
         env:
@@ -181,26 +187,119 @@ jobs:
           node bin/t3 pin-check --channel "$CHANNEL" --candidate "$RUNNER_TEMP/evaluation/pin.json" \
             --resolved "$RUNNER_TEMP/evaluation/resolved" --result "$RUNNER_TEMP/verdict"
           echo "verdict=$(cat "$RUNNER_TEMP/verdict")" >> "$GITHUB_OUTPUT"
+          mkdir "$RUNNER_TEMP/pin"
+          cp pin.json "$RUNNER_TEMP/pin/pin.json"
+          git rev-parse HEAD > "$RUNNER_TEMP/pin/main-sha"
+
+      # Data only: the pin.json pin-check wrote and the main commit it checked.
+      - name: Hand the pin to the commit job
+        id: upload
+        if: steps.check.outputs.verdict == 'changed'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pin
+          path: ${{ runner.temp }}/pin
+          if-no-files-found: error
+          retention-days: 7
+
+  # The keys never share a runner with code the App can write. Every step here is
+  # this file's shell or a GitHub-owned action pinned by SHA: no node, no npm, no
+  # script from the checkout, which is only git objects to build one commit on.
+  # Each job gets a fresh runner, and GITHUB_ENV and GITHUB_PATH reach only later
+  # steps of the same job, so nothing the check job ran can follow it here.
+  commit:
+    needs: check
+    if: needs.check.outputs.verdict == 'changed' && vars.BLACKSAND_EVALUATOR_PUBLISH == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: evaluator
+    defaults:
+      run:
+        working-directory: .
+    permissions:
+      contents: read
+    outputs:
+      # The ref it signed and pushed; empty when it pushed nothing.
+      published: ${{ steps.push.outputs.published }}
+    steps:
+      # No credentials in .git/config: the push below passes the token itself.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.check.outputs.pin }}
+          path: ${{ runner.temp }}/pin
+
+      # The proposal is data. Git plumbing builds the tree: it reads no
+      # working-tree file, runs no hook and applies no .gitattributes filter
+      # (hash-object --no-filters). It refuses anything but a pin.json change on
+      # the main commit the check job saw.
+      - name: Check the proposal
+        id: proposal
+        env:
+          PUBLISH: ${{ vars.BLACKSAND_EVALUATOR_PUBLISH }}
+        run: |
+          set -euo pipefail
+          # Actions string equality ignores case; enforce owner intent here.
+          [[ "$PUBLISH" == true && "$GITHUB_REF" == refs/heads/main ]] || {
+            echo 'Publication requires literal true on main'
+            exit 1
+          }
+          git config core.hooksPath /dev/null
+          pin="$RUNNER_TEMP/pin/pin.json"
+          [ -f "$pin" ] && [ ! -L "$pin" ] || { echo "no pin.json in the check job's artifact"; exit 1; }
+          sha="$RUNNER_TEMP/pin/main-sha"
+          [ -f "$sha" ] && [ ! -L "$sha" ] || { echo "no checked main SHA"; exit 1; }
+          head=$(git rev-parse HEAD)
+          [[ "$head" =~ ^[0-9a-f]{40}$ ]]
+          printf '%s\n' "$head" | cmp -s - "$sha" || { echo "main differs from the check job's exact SHA: not signing"; exit 1; }
+          git update-index --cacheinfo "100644,$(git hash-object -w --no-filters "$pin"),tooling/blacksand-t3/pin.json"
+          tree=$(git write-tree)
+          changed=$(git diff-tree -r --name-only HEAD "$tree")
+          [ "$changed" = tooling/blacksand-t3/pin.json ] || { echo "refusing: the change isn't pin.json alone: ${changed:-nothing}"; exit 1; }
+          [ "$(jq -s length "$pin")" = 1 ] || { echo "not one pin document"; exit 1; }
+          ref=$(jq -er --arg channel "$CHANNEL" '.channels[$channel].ref | select(type == "string") | select(test("\\Av[0-9A-Za-z.+-]+\\z"))' "$pin")
+          [[ "$ref" =~ ^v[0-9A-Za-z.+-]+$ ]] || { echo "refusing: not a release tag: $ref"; exit 1; }
+          echo "tree=$tree" >> "$GITHUB_OUTPUT"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      # A token for this repository alone, contents write only, that expires within
+      # the hour; the action tries to revoke it when the job ends.
+      - name: The evaluator App's token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.BLACKSAND_EVALUATOR_APP_CLIENT_ID }}
+          private-key: ${{ secrets.BLACKSAND_EVALUATOR_APP_PRIVATE_KEY }}
+          permission-contents: write
 
       - name: Sign and push the pin
         id: push
-        if: steps.check.outputs.verdict == 'changed'
         env:
-          SIGNING_KEY: ${{ secrets.T3BLACKOUT_EVALUATOR_SIGNING_KEY }}
-          GH_TOKEN: ${{ github.token }}
+          SIGNING_KEY: ${{ secrets.BLACKSAND_EVALUATOR_SIGNING_KEY }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TREE: ${{ steps.proposal.outputs.tree }}
+          REF: ${{ steps.proposal.outputs.ref }}
         run: |
-          key="$RUNNER_TEMP/evaluator_key"
-          (umask 077 && printf '%s\n' "$SIGNING_KEY" > "$key")
-          ref=$(node -p "require('./pin.json').channels[process.env.CHANNEL].ref")
-          git -c core.hooksPath=/dev/null -c gpg.format=ssh -c gpg.ssh.program=ssh-keygen -c user.signingkey="$key" \
+          set -euo pipefail
+          [[ "$TREE" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$REF" =~ ^v[0-9A-Za-z.+-]+$ ]]
+          key=$(mktemp) # mode 600
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$SIGNING_KEY" > "$key"
+          commit=$(git -c gpg.format=ssh -c gpg.ssh.program=ssh-keygen -c user.signingkey="$key" \
             -c user.name="blacksand evaluator" -c user.email="blacksand-evaluator@users.noreply.github.com" \
-            commit -S -m "Pin $CHANNEL to $ref" -- pin.json
+            commit-tree -S -p HEAD -m "Pin $CHANNEL to $REF" "$TREE")
           rm -f "$key"
           # The token goes to git through its environment, not its command line.
+          # A plain push: if main moved since, it isn't a fast-forward and fails.
           GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.https://github.com/.extraheader \
             GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" \
-            git -c core.hooksPath=/dev/null push origin HEAD:main
-          echo "published=$ref" >> "$GITHUB_OUTPUT"
+            git -c core.hooksPath=/dev/null push origin "$commit:refs/heads/main"
+          echo "published=$REF" >> "$GITHUB_OUTPUT"
 
   alerts:
     needs: [evaluate, commit]

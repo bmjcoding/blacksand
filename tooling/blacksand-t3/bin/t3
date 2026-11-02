@@ -934,7 +934,7 @@ const saveEvaluationIn = (dir) => {
  * on a channel that passes every gate (lib/evaluate.mjs). --write updates
  * pin.json; --report writes a Markdown summary either way; --resolved DIR gets
  * the lockfiles it resolved and the stage records of what it built, as it goes
- * (saveEvaluationIn), for the commit and alert jobs. --stage-from DIR: the last
+ * (saveEvaluationIn), for the check and alert jobs. --stage-from DIR: the last
  * evaluation's --resolved, whose stage record of the pinned release is reused
  * when it still checks out, instead of building that release again.
  * Exit 0: pinned or already current. Exit 3: every candidate was held.
@@ -964,7 +964,7 @@ async function cmdEvaluate(opts) {
 }
 
 /**
- * CI. With --candidate, the commit job: re-derives every gate it can without
+ * CI. With --candidate, the check job: re-derives every gate it can without
  * running upstream code before the evaluator's pin is signed (lib/pincheck.mjs),
  * writes the candidate over pin.json when it changed, and "changed" or
  * "unchanged" to --result. Alone: checks that every tag pin.json names still
@@ -981,7 +981,7 @@ async function cmdPinCheck(opts) {
   }
   if (!opts.channel) throw new Error("pass --channel <the channel the evaluate job evaluated>");
   fetchUpstreamHere();
-  // The job holding the signing key runs no upstream code: no pnpm (or its pnpmfile), no build.
+  // The independent check job holds no signing key and runs no upstream code: no pnpm (or its pnpmfile), no build.
   const { resolveLock, build, ...checks } = evaluatorIo();
   const io = {
     ...checks,
