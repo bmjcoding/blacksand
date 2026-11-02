@@ -12,7 +12,7 @@ test("a Mac's users, groups, jobs, sshd, firewall, FileVault and tools, each as 
   const m = observe(fakeHost(MAC));
   assert.deepEqual(m.users.state === "present" && m.users.value.map((u) => [u.name, u.uid, u.hidden]), [["nobody", -2, false], ["owner", 501, false], ["_t3blackout", 299, true], ["root", 0, false]]);
   assert.deepEqual(m.groups.state === "present" && m.groups.value.find((g) => g.name === "com.apple.access_ssh"), { name: "com.apple.access_ssh", gid: 399, members: ["owner"] });
-  assert.deepEqual(m.jobs.state === "present" && m.jobs.value.map((j) => j.label), ["com.apple.AppleVirtualPlatform.SystemService", "com.apple.example", "com.openssh.sshd", "dev.blacksand.updater", "dev.t3blackout.update"], "every loaded job, not just the ones status shows");
+  assert.deepEqual(m.jobs.state === "present" && m.jobs.value.map((j) => j.label), ["com.apple.AppleVirtualPlatform.SystemService", "com.apple.example", "com.openssh.sshd", "dev.t3blackout.update", "run.blacksand.updater"], "every loaded job, not just the ones status shows");
   assert.equal(m.sshd.state === "present" && m.sshd.value.enabled, true);
   assert.deepEqual(m.sshd.state === "present" && m.sshd.value.settings.passwordauthentication, ["no"]);
   assert.deepEqual(m.sshd.state === "present" && m.sshd.value.settings.allowusers, []);

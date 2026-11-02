@@ -47,7 +47,7 @@ const LAUNCHD = `system = {
 \t}
 \tservices = {
 \t\t       0      - \tcom.openssh.sshd
-\t\t     812      - \tdev.blacksand.updater
+\t\t     812      - \trun.blacksand.updater
 \t\t       0      1 \tdev.t3blackout.update
 \t\t   66516      - \tcom.apple.AppleVirtualPlatform.SystemService
 \t\t       0  (jt) \tcom.apple.example

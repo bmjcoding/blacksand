@@ -21,7 +21,7 @@
 #     tailnet address and holds an authorized key isn't stopped (pf could tie
 #     SSH to Tailscale's interface, but a pf mistake can lock a remote host out
 #     of SSH for good). --allow-from narrows it to your desktop Mac's addresses.
-#   - With --loopback-only, a separate sshd (launchd job dev.blacksand.sshd)
+#   - With --loopback-only, a separate sshd (launchd job run.blacksand.sshd)
 #     listens on 127.0.0.1 and ::1 port 2222 only, for this Mac's own desktop;
 #     Remote Login stays off (its launchd socket can't be bound to loopback).
 # The app comes from /Applications (install.sh). Provider logins happen inside
@@ -59,7 +59,7 @@ SSH_DIR=/etc/ssh/blacksand
 KEYS_DIR=$SSH_DIR/authorized_keys
 # Before macOS's 100-macos.conf: sshd keeps the first value it reads.
 DROPIN=/etc/ssh/sshd_config.d/010-blacksand.conf
-LOOPBACK_LABEL=dev.blacksand.sshd
+LOOPBACK_LABEL=run.blacksand.sshd
 LOOPBACK_PORT=2222
 LOOPBACK_CONFIG=$SSH_DIR/sshd_config
 LOOPBACK_HOSTKEY=$SSH_DIR/ssh_host_ed25519_key

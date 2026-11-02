@@ -79,7 +79,7 @@ agent accounts find it. It also needs the default locations, and it stops if
 what [the desktop install](desktop.md#what-it-does) does, it:
 
 - Installs the app to `/Applications/T3 Code (blacksand).app`, without opening it.
-- Installs the updater as the LaunchDaemon `dev.blacksand.update`. The updater runs
+- Installs the updater as the LaunchDaemon `run.blacksand.update`. The updater runs
   as you, even with nobody logged in. It runs hourly, and whenever a server on this
   host asks for an update through `/Users/Shared/blacksand/update-requests`
   ([host updates](../updates/how-updates-arrive.md#hosts)).

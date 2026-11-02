@@ -353,7 +353,7 @@ test("--on turns Screen Sharing back on through a check", mac, () => {
 
 test("--uninstall removes the forward first, read back, while every holder keeps its port; then the jobs and the files, leaving nothing", mac, async () => {
   const h = host({ own_loaded: "", check_loaded: "", ts_listen: "" });
-  fs.writeFileSync(path.join(h.s, "LaunchDaemons", "dev.blacksand.screen-sharing-check.plist"), "plist");
+  fs.writeFileSync(path.join(h.s, "LaunchDaemons", "run.blacksand.screen-sharing-check.plist"), "plist");
   const out = h.run("uninstall_all");
   assert.equal(out.status, 0, out.stdout + out.stderr);
   assert.match(out.stdout, /Done\. Screen Sharing's switch stays off/);
@@ -397,21 +397,21 @@ test("an uninstall that stops (tailscaled away, Serve mentioning either port, a 
     assert.equal(out.status, 1, `${label}\n${out.stdout}${out.stderr}`);
     assert.match(out.stderr, /uninstall stopped: Tailscale Serve( still mentions TCP 15900 or 15901|'s TCP 5900 is tcp localhost:15901)/, label);
     assert.ok(h.has("park_loaded") && h.has("hold_loaded"), `${label}: both holders kept`);
-    assert.ok(h.has("LaunchDaemons/dev.blacksand.screensharing-park.plist") && h.has("LaunchDaemons/dev.blacksand.screensharing-hold.plist"), label);
+    assert.ok(h.has("LaunchDaemons/run.blacksand.screensharing-park.plist") && h.has("LaunchDaemons/run.blacksand.screensharing-hold.plist"), label);
     assert.equal(api.posts.length, 0, label);
     // The owner removes it; the rerun finishes.
     const { out: rerun } = await withRealServe(h, {}, "uninstall_all");
     assert.equal(rerun.status, 0, `${label} rerun: ${rerun.stdout}${rerun.stderr}`);
   }
   // A job that won't unload: stopped there, with the forward already gone; the files that set it up stay.
-  for (const job of ["dev.blacksand.screen-sharing-check", "dev.blacksand.screensharing-hold"]) {
+  for (const job of ["run.blacksand.screen-sharing-check", "run.blacksand.screensharing-hold"]) {
     const h = host({ check_loaded: "", bootout_fail: job });
-    fs.writeFileSync(path.join(h.s, "LaunchDaemons", "dev.blacksand.screen-sharing-check.plist"), "plist");
+    fs.writeFileSync(path.join(h.s, "LaunchDaemons", "run.blacksand.screen-sharing-check.plist"), "plist");
     const out = h.run("uninstall_all");
     assert.equal(out.status, 1, job);
     assert.match(out.stderr, new RegExp(`uninstall stopped: launchd still has ${job.replace(/\./g, "\\.")} 10 s after bootout.*; rerun --uninstall`));
     assert.equal(h.read("mapping"), "free\n", `${job}: the forward went first`);
-    assert.ok(h.has("LaunchDaemons/dev.blacksand.screensharing-hold.plist") && h.has("user"), `${job}: the files stay`);
+    assert.ok(h.has("LaunchDaemons/run.blacksand.screensharing-hold.plist") && h.has("user"), `${job}: the files stay`);
     h.drop("bootout_fail");
     const rerun = h.run("uninstall_all");
     assert.equal(rerun.status, 0, `${job} rerun: ${rerun.stdout}${rerun.stderr}`);
@@ -419,7 +419,7 @@ test("an uninstall that stops (tailscaled away, Serve mentioning either port, a 
   }
   // Whatever an earlier uninstall left (here: the holders and their plists gone already, the rest not): a rerun finishes.
   const partial = host({ serve: null, hold_loaded: null, park_loaded: null, mapping: null });
-  for (const job of ["hold", "park"]) partial.drop(`LaunchDaemons/dev.blacksand.screensharing-${job}.plist`);
+  for (const job of ["hold", "park"]) partial.drop(`LaunchDaemons/run.blacksand.screensharing-${job}.plist`);
   fs.mkdirSync(path.join(partial.s, "support"));
   partial.put("support/com.apple.screensharing.plist", "plist");
   const done = partial.run("uninstall_all");

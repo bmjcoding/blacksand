@@ -8,7 +8,7 @@ export const CONFIG = {
   machine: { id: "agent-host", role: "host" },
   users: { "_blacksand-egress": { shell: "/usr/bin/false", hidden: true } },
   groups: { "com.apple.access_ssh": { members: ["owner"] } },
-  jobs: { "dev.blacksand.updater": {}, "com.openssh.sshd": { running: false } },
+  jobs: { "run.blacksand.updater": {}, "com.openssh.sshd": { running: false } },
   sshd: { enabled: true, settings: { PasswordAuthentication: "no", PermitRootLogin: "prohibit-password", AllowUsers: ["owner", "agent-*@100.64.0.0/10"], Port: ["22"] } },
   firewall: { enabled: true, stealth: true },
   disk_encryption: true,

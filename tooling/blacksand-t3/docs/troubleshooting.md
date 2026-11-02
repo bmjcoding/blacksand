@@ -137,7 +137,7 @@ These messages appear in the log. Only "refused" also sends a notification.
   `tooling/blacksand-t3/install.sh --role host` on that host. The app must be in
   `/Applications`.
 - **The host doesn't update.** Check `blacksand t3 status` (the schedule line),
-  `sudo launchctl print system/dev.blacksand.update`, and the two logs. The daemon
+  `sudo launchctl print system/run.blacksand.update`, and the two logs. The daemon
   can't reach a clone inside `~/Documents`, `~/Desktop` or `~/Downloads`. Move the
   clone and rerun `tooling/blacksand-t3/install.sh --role host`.
 - **You see "This host has no blacksand-t3 update agent".** The host's request folder
@@ -179,7 +179,7 @@ These messages appear in the log. Only "refused" also sends a notification.
 - **The host dropped off after weeks.** Its key expired. Disable key expiry and
   re-authenticate it
   ([Tailscale](networking/tailscale.md#the-host-tailscaled-as-a-system-daemon)).
-- **The standby sshd isn't listening.** Read `/var/log/dev.blacksand.sshd.log`, and
+- **The standby sshd isn't listening.** Read `/var/log/run.blacksand.sshd.log`, and
   rerun its account script.
 
 ## Agent accounts and providers

@@ -114,7 +114,7 @@ test("the preview start waits for its window", () => {
 test("the app is called T3 Code (blacksand) everywhere it shows its name, with no stage label", () => {
   const replaces = (id) => byId.get(id).edits.map((edit) => edit.replace).join("\n");
   assert.match(replaces("desktop/identity-app-id"), /if \(version\) return "T3 Code \(blacksand\)";/, "the .app, Dock and Finder name");
-  assert.match(replaces("desktop/identity-app-id"), /"dev\.blacksand\.t3"/, "the bundle ID stays");
+  assert.match(replaces("desktop/identity-app-id"), /"run\.blacksand\.t3"/, "the bundle ID stays");
   assert.match(replaces("desktop/identity-runtime-name"), /const APP_BASE_NAME = "T3 Code \(blacksand\)";/);
   assert.match(replaces("desktop/identity-runtime-name"), /displayName: APP_BASE_NAME,/, "menu bar, About, window title, Linux launcher");
   assert.match(replaces("desktop/identity-package-name"), /name: "blacksand-t3",/, "the Electron name and Keychain item stay");

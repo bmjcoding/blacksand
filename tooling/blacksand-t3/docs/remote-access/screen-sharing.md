@@ -41,7 +41,7 @@ yet, Screen Sharing works on loopback, and the forward is set up once tailscaled
 
 ## The check
 
-A root check (`dev.blacksand.screen-sharing-check`) runs at boot and every minute.
+A root check (`run.blacksand.screen-sharing-check`) runs at boot and every minute.
 Within about a minute, it undoes or stops what's wrong:
 
 - If Apple's version is loaded or its switch is on, which System Settings can do, the

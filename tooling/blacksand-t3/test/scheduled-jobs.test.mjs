@@ -14,7 +14,7 @@ const isMac = process.platform === "darwin";
 
 const job = (extra = {}) =>
   launchdUpdateJob({
-    label: "dev.blacksand.update",
+    label: "run.blacksand.update",
     node: "/opt/R&D <tools>/bin/node",
     launcher: "/Users/me/R&D's \"clone\"/bin/t3",
     pathEnv: "/opt/R&D <tools>/bin:/usr/bin:/bin",

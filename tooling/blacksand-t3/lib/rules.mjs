@@ -2114,7 +2114,7 @@ export const makeRules = ({ updater, build }) => [
     edits: [
       {
         find: 'const DESKTOP_APP_ID = "com.t3tools.t3code";',
-        replace: 'const DESKTOP_APP_ID = "dev.blacksand.t3";',
+        replace: 'const DESKTOP_APP_ID = "run.blacksand.t3";',
       },
       {
         find: /(export function resolveDesktopProductName\(version: string\): string \{\n)/,

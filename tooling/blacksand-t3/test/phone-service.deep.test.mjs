@@ -40,7 +40,7 @@ render_plist`);
   fs.writeFileSync(file, out.stdout);
   assert.equal(spawnSync("plutil", ["-lint", "-s", file]).status, 0);
   const job = JSON.parse(spawnSync("plutil", ["-convert", "json", "-o", "-", file], { encoding: "utf8" }).stdout);
-  assert.equal(job.Label, "dev.blacksand.phone.agent-claude");
+  assert.equal(job.Label, "run.blacksand.phone.agent-claude");
   assert.deepEqual(job.ProgramArguments, ["/bin/sh", "/usr/local/libexec/blacksand/phone-server", "4773"]);
   assert.equal(job.UserName, "agent-claude");
   assert.equal(job.EnvironmentVariables.HOME, "/Users/agent-claude");
@@ -169,18 +169,18 @@ launchctl() {
 }
 sleep() { :; }
 : >"$S/up"
-if out="$(job_unload dev.blacksand.phone.agent-a)"; then echo UNLOADED; else echo "UNLOAD-FAILED $out"; fi
+if out="$(job_unload run.blacksand.phone.agent-a)"; then echo UNLOADED; else echo "UNLOAD-FAILED $out"; fi
 rm -f "$S/up"
-if out="$(job_load dev.blacksand.phone.agent-a /tmp/x.plist)"; then echo LOADED; else echo "LOAD-FAILED $out"; fi`);
+if out="$(job_load run.blacksand.phone.agent-a /tmp/x.plist)"; then echo LOADED; else echo "LOAD-FAILED $out"; fi`);
     return { ...out, calls: fs.readFileSync(path.join(scratch, "calls"), "utf8") };
   };
   const transient = run(2, { lingering: 3 });
   assert.equal(transient.status, 0, transient.stderr);
   assert.match(transient.stdout, /UNLOADED\nLOADED/);
   assert.equal(transient.calls.match(/^bootstrap /gm).length, 3, "two I/O errors, then it loads");
-  assert.ok(transient.calls.indexOf("bootout") < transient.calls.lastIndexOf("print system/dev.blacksand.phone.agent-a"), "it polled launchd after the bootout");
+  assert.ok(transient.calls.indexOf("bootout") < transient.calls.lastIndexOf("print system/run.blacksand.phone.agent-a"), "it polled launchd after the bootout");
   const stuck = run(9);
-  assert.match(stuck.stdout, /LOAD-FAILED launchctl bootstrap \/tmp\/x\.plist failed 5 times: Bootstrap failed: 5: Input\/output error; see: sudo launchctl print system\/dev\.blacksand\.phone\.agent-a/);
+  assert.match(stuck.stdout, /LOAD-FAILED launchctl bootstrap \/tmp\/x\.plist failed 5 times: Bootstrap failed: 5: Input\/output error; see: sudo launchctl print system\/run\.blacksand\.phone\.agent-a/);
 });
 
 test("the phone's HTTPS mapping goes through the atomic helper, and a rerun keeps the HTTPS port the account already has", { skip: !isMac && "osascript" }, async () => {
@@ -228,7 +228,7 @@ echo "PORT=$PORT"`);
   const taken = choose("agent-a", "4773\n4774\n");
   assert.match(taken.stdout, /PORT=4775/, "busy ports are skipped");
   // agent-a's job already has 4773: agent-b gets the next.
-  const plist = path.join(dir, "dev.blacksand.phone.agent-a.plist");
+  const plist = path.join(dir, "run.blacksand.phone.agent-a.plist");
   fs.writeFileSync(plist, `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict><key>ProgramArguments</key><array><string>/bin/sh</string><string>/usr/local/libexec/blacksand/phone-server</string><string>4773</string></array></dict></plist>`);
@@ -331,7 +331,7 @@ test("--remove takes the Serve mapping off first, read back; a failure on the wa
     fs.mkdirSync(path.join(s, "plists"));
     fs.writeFileSync(path.join(s, "phone-server"), "wrapper");
     fs.writeFileSync(path.join(s, "loaded"), "");
-    const plist = path.join(s, "plists", "dev.blacksand.phone.agent-a.plist");
+    const plist = path.join(s, "plists", "run.blacksand.phone.agent-a.plist");
     fs.writeFileSync(plist, `<?xml version="1.0"?><plist version="1.0"><dict><key>ProgramArguments</key><array><string>/bin/sh</string><string>${s}/phone-server</string><string>4773</string></array></dict></plist>`);
     const api = await localApi(mapped, { status: { Self: { DNSName: `${DNS}.`, CapMap: { https: [] } } } });
     const run = (body) =>
@@ -404,7 +404,7 @@ test("--remove frees the server's port only once nothing in Serve mentions it, r
     fs.mkdirSync(path.join(s, "plists"));
     fs.writeFileSync(path.join(s, "phone-server"), "wrapper");
     fs.writeFileSync(path.join(s, "loaded"), "");
-    const plist = path.join(s, "plists", "dev.blacksand.phone.agent-a.plist");
+    const plist = path.join(s, "plists", "run.blacksand.phone.agent-a.plist");
     fs.writeFileSync(plist, `<?xml version="1.0"?><plist version="1.0"><dict><key>ProgramArguments</key><array><string>/bin/sh</string><string>${s}/phone-server</string><string>4773</string></array></dict></plist>`);
     let putBack = name === "put back after the write";
     const api = await localApi(c.config, { status: c.signedOut ? null : { Self: { DNSName: `${DNS}.`, CapMap: { https: [] } } }, afterPost: (config) => (putBack ? mapping() : config) });
@@ -494,7 +494,7 @@ ${body}`], { env: { ...process.env, ...api.env } });
         child.stderr.on("data", (d) => (stderr += d));
         child.on("close", (status) => resolve({ status, stdout, stderr }));
       });
-    const plist = path.join(s, "plists", "dev.blacksand.phone.agent-a.plist");
+    const plist = path.join(s, "plists", "run.blacksand.phone.agent-a.plist");
     const portOf = () => spawnSync("/usr/libexec/PlistBuddy", ["-c", "Print :ProgramArguments:2", plist], { encoding: "utf8" }).stdout.trim();
     const install = "choose_port\ninstall_job\nverify_listener\nconfigure_serve";
     try {

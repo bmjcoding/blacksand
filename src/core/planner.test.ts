@@ -38,7 +38,7 @@ test("what's missing is created, what differs is updated, and each says whether 
     config({
       users: { "_blacksand-egress": { shell: "/usr/bin/false", hidden: true }, _t3blackout: { shell: "/bin/zsh" } },
       groups: { "com.apple.access_ssh": { members: ["owner", "_t3blackout"] } },
-      jobs: { "dev.blacksand.vm": {}, "dev.blacksand.updater": { running: false }, "com.apple.example": {} },
+      jobs: { "run.blacksand.vm": {}, "run.blacksand.updater": { running: false }, "com.apple.example": {} },
       sshd: { settings: { PasswordAuthentication: "no", PermitRootLogin: "no", X11Forwarding: "yes", MaxAuthTries: "3", DenyUsers: ["root", "agent"] } },
       firewall: { stealth: false },
     }),
@@ -49,8 +49,8 @@ test("what's missing is created, what differs is updated, and each says whether 
     [
       ["firewall/system", "update", true],
       ["group/com.apple.access_ssh", "update", true],
-      ["job/dev.blacksand.updater", "update", false],
-      ["job/dev.blacksand.vm", "create", false],
+      ["job/run.blacksand.updater", "update", false],
+      ["job/run.blacksand.vm", "create", false],
       ["sshd/denyusers", "update", true],
       ["sshd/maxauthtries", "update", false],
       ["sshd/permitrootlogin", "update", false],

@@ -41,7 +41,7 @@ fi
 
 # Before the log is open, problems go to the system log (log show --predicate 'senderImagePath ENDSWITH "logger"').
 early() {
-  logger -t dev.blacksand.phone "$(id -un): $*" 2>/dev/null || true
+  logger -t run.blacksand.phone "$(id -un): $*" 2>/dev/null || true
   echo "phone-server: $*" >&2
   # A setup problem doesn't fix itself: once a minute, not every 10 s.
   sleep 60

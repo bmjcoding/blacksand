@@ -12,7 +12,7 @@ import { observe } from "../platform/index.ts";
 const ACCESS_GROUPS = new Set(["admin", "wheel", "sudo", "com.apple.access_ssh", "com.apple.access_ssh-disabled", "com.apple.access_screensharing"]);
 const OURS = /blacksand|t3blackout/;
 /** The launchd jobs status lists: blacksand's, today's product's, Apple's sshd and Screen Sharing, and Tailscale's. */
-const JOB_PREFIXES = ["dev.blacksand.", "dev.t3blackout.", "com.t3blackout.", "com.openssh.sshd", "com.apple.screensharing", "com.tailscale.", "homebrew.mxcl.tailscale"];
+const JOB_PREFIXES = ["run.blacksand.", "dev.t3blackout.", "com.t3blackout.", "com.openssh.sshd", "com.apple.screensharing", "com.tailscale.", "homebrew.mxcl.tailscale"];
 /** sshd settings the text output shows (--json has every one). */
 const SSHD_SHOWN = ["passwordauthentication", "kbdinteractiveauthentication", "permitrootlogin", "allowusers", "allowgroups"];
 

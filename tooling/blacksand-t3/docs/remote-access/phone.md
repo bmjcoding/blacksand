@@ -8,7 +8,7 @@ phone reaches one agent account's server directly over Tailscale. Tailscale Serv
 publishes HTTPS on the host's MagicDNS name, and the policy allows `tcp:443` from the
 phone's tag only. Serve forwards it to that account's server on the host's loopback.
 
-- A launchd job (`dev.blacksand.phone.<account>`) starts the server at boot, as the
+- A launchd job (`run.blacksand.phone.<account>`) starts the server at boot, as the
   agent account, whether or not anyone is logged in. The server listens on
   `127.0.0.1` only.
 - The desktop's SSH connection to the same account shares that server, so the phone

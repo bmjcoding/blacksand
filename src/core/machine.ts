@@ -8,7 +8,7 @@
 //     "machine": { "id": "agent-host", "role": "host" },
 //     "users":  { "_blacksand-egress": { "shell": "/usr/bin/false", "hidden": true } },
 //     "groups": { "com.apple.access_ssh": { "members": ["admin"] } },
-//     "jobs":   { "dev.blacksand.updater": { "running": false } },
+//     "jobs":   { "run.blacksand.updater": { "running": false } },
 //     "sshd":   { "enabled": true, "settings": { "PasswordAuthentication": "no", "AllowUsers": ["owner"] } },
 //     "firewall": { "enabled": true, "stealth": true },
 //     "disk_encryption": true,

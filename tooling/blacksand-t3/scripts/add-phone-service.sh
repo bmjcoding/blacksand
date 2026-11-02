@@ -9,7 +9,7 @@
 #   scripts/add-phone-service.sh --print-policy [--https-port 443]  # the Tailscale grant (no sudo)
 #
 # What it sets up:
-#   - A launchd job, dev.blacksand.phone.<account>, that runs the account's
+#   - A launchd job, run.blacksand.phone.<account>, that runs the account's
 #     server at boot, logged in or not, as that account, on 127.0.0.1:<port>
 #     only (scripts/phone-server.sh, installed root-owned). The desktop's SSH
 #     connection to the account finds that server and shares it: the same threads
@@ -45,7 +45,7 @@ SERVER="$ASAR/apps/server/dist/bin.mjs"
 AGENT_GROUP=blacksand-agents
 HELPER_DIR=/usr/local/libexec/blacksand
 WRAPPER=$HELPER_DIR/phone-server
-LABEL_PREFIX=dev.blacksand.phone
+LABEL_PREFIX=run.blacksand.phone
 PLIST_DIR=/Library/LaunchDaemons
 FIRST_PORT=4773
 # Where the desktop's SSH connections pick a port (upstream's DEFAULT_REMOTE_PORT

@@ -74,17 +74,17 @@ test("a changed Apple plist still gives a loopback-only socket; one that can't b
 
 test("the hold and parking jobs only hold a port, from boot; the check runs the root-owned copy at boot and every minute", mac, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "t3b-ss-jobs-"));
-  for (const [label, port] of [["dev.blacksand.screensharing-hold", "15900"], ["dev.blacksand.screensharing-park", "15901"]]) {
+  for (const [label, port] of [["run.blacksand.screensharing-hold", "15900"], ["run.blacksand.screensharing-park", "15901"]]) {
     const file = path.join(dir, `${label}.plist`);
     fs.writeFileSync(file, sourced(`render_hold_plist ${label} ${port}`).stdout);
     assert.equal(spawnSync("plutil", ["-lint", "-s", file]).status, 0);
     assert.deepEqual(toJson(file), { Label: label, Program: "/usr/bin/true", UserName: "nobody", inetdCompatibility: { Wait: false }, Sockets: { Listener: { SockNodeName: "localhost", SockServiceName: port } } });
   }
-  assert.equal(sourced('echo "$HOLD_PLIST $PARK_PLIST"').stdout.trim(), "/Library/LaunchDaemons/dev.blacksand.screensharing-hold.plist /Library/LaunchDaemons/dev.blacksand.screensharing-park.plist");
+  assert.equal(sourced('echo "$HOLD_PLIST $PARK_PLIST"').stdout.trim(), "/Library/LaunchDaemons/run.blacksand.screensharing-hold.plist /Library/LaunchDaemons/run.blacksand.screensharing-park.plist");
   const file = path.join(dir, "check.plist");
   fs.writeFileSync(file, sourced("render_check_plist").stdout);
   const job = toJson(file);
-  assert.equal(job.Label, "dev.blacksand.screen-sharing-check");
+  assert.equal(job.Label, "run.blacksand.screen-sharing-check");
   assert.deepEqual(job.ProgramArguments, ["/bin/bash", "/usr/local/libexec/blacksand/screen-sharing-check", "check"]);
   assert.equal(job.RunAtLoad, true);
   assert.equal(job.StartInterval, 60);
@@ -330,7 +330,7 @@ test("off, then someone takes Screen Sharing's port: the forward stays parked, a
     h.drop("hold_loaded");
     h.put("squat4");
     h.put("squat6");
-    assert.match(h.run().stdout, /dev\.blacksand\.screensharing-hold is loaded, but TCP 15900 is held on 127\.0\.0\.1:15900 by screensharingd \(pid 4242, uid 501\)/, how);
+    assert.match(h.run().stdout, /run\.blacksand\.screensharing-hold is loaded, but TCP 15900 is held on 127\.0\.0\.1:15900 by screensharingd \(pid 4242, uid 501\)/, how);
     assert.equal(h.run("reaches").stdout.trim(), "15901 park", how);
   }
 });
@@ -390,7 +390,7 @@ test("another Serve handler mentioning either port is never moved past; a parkin
   const park = host({ own_loaded: "", ts_listen: "", squat_park: "" });
   const parked = park.run();
   assert.ok(parked.failed);
-  assert.match(parked.stdout, /dev\.blacksand\.screensharing-park is loaded, but TCP 15901 is held on 127\.0\.0\.1:15901 by nc \(pid 4243, uid 501\)/);
+  assert.match(parked.stdout, /run\.blacksand\.screensharing-park is loaded, but TCP 15901 is held on 127\.0\.0\.1:15901 by nc \(pid 4243, uid 501\)/);
   assert.equal(park.read("mapping"), "free\n");
   assert.equal(park.has("own_loaded"), false);
   park.neverForeign();
@@ -486,7 +486,7 @@ test("with the real Serve parser: only this setup's own live forward is parked, 
     assert.match(refused.stdout, /STATUS=1/, label);
     assert.match(refused.stdout, /Tailscale Serve isn't parked: .*left as it is \(tailscale serve status\), so no port changes hands/, `${label}\n${refused.stdout}`);
     assert.ok(h.has("hold_loaded"), `${label}: the hold job kept`);
-    assert.doesNotMatch(h.read("calls"), /bootout system\/dev\.blacksand\.screensharing-hold/, label);
+    assert.doesNotMatch(h.read("calls"), /bootout system\/run\.blacksand\.screensharing-hold/, label);
     assert.equal(untouched.posts.length, 0, `${label}: nothing written`);
   }
 });
@@ -498,13 +498,13 @@ ${WRAP_LAUNCHCTL}
 launchctl() {
   local rc=0
   model_launchctl "$@" || rc=$?
-  if [[ $1 == bootout && $2 == system/dev.blacksand.screensharing-hold ]]; then rm -f "$S/ts_absent"; trace; fi
+  if [[ $1 == bootout && $2 == system/run.blacksand.screensharing-hold ]]; then rm -f "$S/ts_absent"; trace; fi
   return "$rc"
 }
 run_check periodic || echo STATUS=$?`);
   assert.match(out.stdout, /STATUS=1/);
   assert.match(out.stdout, /tailscaled isn't running, so the forward it keeps \(and restores when it starts\) can't be checked/);
-  assert.doesNotMatch(h.read("calls"), /bootout system\/dev\.blacksand\.screensharing-hold/, "the hold job never let go");
+  assert.doesNotMatch(h.read("calls"), /bootout system\/run\.blacksand\.screensharing-hold/, "the hold job never let go");
   assert.equal(api.posts.length, 0);
   for (const fault of [
     `jxa() { if [[ $1 == inventory ]]; then /usr/bin/osascript -l JavaScript - "$@" <<<"$JXA_SERVE" & local parser=$!; kill -KILL "$parser" 2>/dev/null || true; wait "$parser"; return; fi; /usr/bin/osascript -l JavaScript - "$@" <<<"$JXA_SERVE"; }`,

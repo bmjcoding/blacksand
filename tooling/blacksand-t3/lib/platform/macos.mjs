@@ -48,7 +48,7 @@ const APP_STAGED = path.join(APPS, ".T3 Code (blacksand).new.app");
 const APP_PENDING = path.join(APPS, ".T3 Code (blacksand).pending.app");
 const APP_PREVIOUS = path.join(APPS, ".T3 Code (blacksand).previous.app");
 const APP_OUTGOING = path.join(APPS, ".T3 Code (blacksand).outgoing.app");
-const UPDATE_LABEL = "dev.blacksand.update";
+const UPDATE_LABEL = "run.blacksand.update";
 // The host role's updater: a LaunchDaemon running as you, so it keeps running
 // with nobody logged in (agent accounts' sessions don't keep yours alive).
 const DAEMON_PLIST = `/Library/LaunchDaemons/${UPDATE_LABEL}.plist`;

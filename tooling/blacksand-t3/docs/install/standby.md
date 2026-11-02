@@ -20,7 +20,7 @@ macOS asks you to choose the account's password. The script does everything
 [agent accounts](../accounts/agent-accounts.md#create-an-agent-account) describes.
 `--loopback-only` also makes it:
 
-- Install the LaunchDaemon `dev.blacksand.sshd`, which runs Apple's
+- Install the LaunchDaemon `run.blacksand.sshd`, which runs Apple's
   `sshd -D -f /etc/ssh/blacksand/sshd_config`. That sshd listens only on port 2222
   of `127.0.0.1` and `::1`. It admits only members of `blacksand-agents`, accepts
   only keys, and has its own host key.
@@ -61,5 +61,5 @@ with host `127.0.0.1`, user `agent-standby` and port `2222`.
   clones, logins and threads, and nothing copies between them automatically.
 - The standby lane runs the desktop's app. It moves to a new build once the app has
   restarted into that build and you switch the standby environment off and on.
-- If the standby sshd isn't listening, read `/var/log/dev.blacksand.sshd.log` and
+- If the standby sshd isn't listening, read `/var/log/run.blacksand.sshd.log` and
   rerun the account script.

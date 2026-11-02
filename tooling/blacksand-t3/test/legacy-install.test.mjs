@@ -34,7 +34,7 @@ function machine(legacy) {
   const dir = tmp();
   const jobs = path.join(dir, "LaunchDaemons");
   fs.mkdirSync(jobs);
-  fs.writeFileSync(path.join(jobs, "dev.blacksand.update.plist"), "");
+  fs.writeFileSync(path.join(jobs, "run.blacksand.update.plist"), "");
   const marker = path.join(dir, "t3blackout-build", ".t3blackout-builder");
   if (legacy === "marker") {
     fs.mkdirSync(path.dirname(marker));
