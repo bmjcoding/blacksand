@@ -562,14 +562,16 @@ export function createSim(G, C, seed = 7) {
         if (gr.dead !== undefined || gr.born > tn || tn - gr.born >= apexLife) continue;
         const yEnd = apexY(gr, tn);
         if (yEnd < yGate) continue;
-        const cEnd = contactAt(tn);
+        // only walls stop grains; sand just hides them (the renderer clips them at its edge)
+        const wallAt = (tt) => wallContact(G, polys, rotAt(phaseOf(tt)), G.ix, yA);
+        const cEnd = wallAt(tn);
         if (!cEnd.hit || yEnd < cEnd.y) continue;
-        const gap = (tt) => apexY(gr, tt) - contactAt(tt).y;
+        const gap = (tt) => apexY(gr, tt) - wallAt(tt).y;
         const lo0 = Math.max(t, gr.born);
         if (gap(lo0) >= 0) { gr.dead = lo0; continue; }      // the wall swept onto it: it just stops
         let lo = lo0, hi = tn;
         for (let k = 0; k < 16; k++) { const m = (lo + hi) / 2; if (gap(m) >= 0) hi = m; else lo = m; }
-        const c = contactAt(hi);
+        const c = wallAt(hi);
         if (c.hit) landOnWall(gr, hi, c); else gr.dead = hi;
       }
     }
@@ -664,10 +666,19 @@ export function createSim(G, C, seed = 7) {
       const x = apexX(gr, y, age);
       // above a wall contact the stream's last units fade instead of ending in a hard cut
       let fade = 1;
-      if (cc.hit && y > yGate) { if (y >= cc.y) continue; if (!cc.sand) fade = Math.min(1, (cc.y - y) / STREAM.endFade); }
-      if (y > front) front = y;
       const sh = Math.min(sh0, age), y0 = y - vy * sh + 0.5 * g * sh * sh;
-      grains.push({ x0: apexX(gr, y0, age - sh), y0, x, y, r: gr.r, shade: gr.shade, fade });
+      const x0 = apexX(gr, y0, age - sh);
+      if (cc.hit && cc.sand && y > cc.y) {
+        // behind sand: clip the streak at the sand's edge (what the sand mask does, sharp)
+        if (y0 >= cc.y) continue;
+        const u = (cc.y - y0) / (y - y0);
+        grains.push({ x0, y0, x: x0 + (x - x0) * u, y: cc.y, r: gr.r, shade: gr.shade, fade });
+        if (cc.y > front) front = cc.y;
+        continue;
+      }
+      if (cc.hit && !cc.sand && y > yGate) { if (y >= cc.y) continue; fade = Math.min(1, (cc.y - y) / STREAM.endFade); }
+      if (y > front) front = y;
+      grains.push({ x0, y0, x, y, r: gr.r, shade: gr.shade, fade });
     }
     const neckGrains = [];
     for (const gr of neck) {
@@ -710,7 +721,10 @@ export function createSim(G, C, seed = 7) {
     const occl = cc.hit ? cc.y : (fTop > 0 && fTop < 1 ? Math.min(yN, C.crater(cr, G.ix, craterK)) : yN);
     const fadeAt = Math.min(front, occl);
     const endFade = cc.hit && !cc.sand ? STREAM.endFade : Math.min(STREAM.endFade, Math.max(0, occl - front));
-    const core = { y0: yA, y1: coreEnd, hit: cc.hit, fadeAt, endFade, density };
+    // y1: the full line (the static logo draws it in front of everything); yHidden: where it
+    // disappears behind sand or a wall, continuous through every phase (a gradient is
+    // resampled over its whole length when its end moves, so the end must never jump)
+    const core = { y0: yA, y1: coreEnd, yHidden: Math.min(coreEnd, occl), hit: cc.hit, fadeAt, endFade, density };
     // the neck column: sand leaving the neck. While the top still has sand its top tucks just
     // above the neck line, under the pile; after the top runs dry the tail falls away. Its
     // leading head, while falling free, fades in rather than ending in a flat cap.

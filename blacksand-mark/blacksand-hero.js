@@ -365,7 +365,10 @@ void main() {
       b.push(gr);
     }
     c.lineCap = 'round';
-    for (const [key, list] of buckets) {
+    // fixed order: translucent strokes composite order-dependently, so the order must not
+    // depend on which grains happen to be visible
+    for (const key of [...buckets.keys()].sort((p, q) => p - q)) {
+      const list = buckets.get(key);
       const sb = key % SB, tb = Math.floor(key / SB) % (BINS + 1), fb = Math.floor(key / SB / (BINS + 1));
       const k = tb === BINS ? PALETTE.glint : Math.round(PALETTE.stream[0] + (PALETTE.stream[1] - PALETTE.stream[0]) * ((tb + 0.5) / BINS));
       c.strokeStyle = `rgba(${k},${k},${k},${PALETTE.grainAlpha * fb / FADES})`;
@@ -408,10 +411,12 @@ void main() {
     c.save();
     base(c, L.x0, L.y0);
     c.beginPath(); c.moveTo(...T[0]); c.lineTo(...T[1]); c.lineTo(...T[2]); c.closePath(); c.clip();
-    if (st.core && st.core.y1 > st.core.y0) {
-      const { y0, y1, density } = st.core;
+    const front = streamLayer === 'front';
+    if (st.core && (front ? st.core.y1 : st.core.yHidden ?? st.core.y1) > st.core.y0) {
+      const { y0, density } = st.core;
       // the static logo (stream in front) is one unbroken line: no end fade there
-      const endFade = streamLayer === 'front' ? 0 : st.core.endFade;
+      const y1 = front ? st.core.y1 : st.core.yHidden ?? st.core.y1;
+      const endFade = front ? 0 : st.core.endFade;
       const fadeAt = st.core.fadeAt ?? y1;
       const yA = G.apex[1];
       const half = (y) => 1.3 * Math.min(1, Math.sqrt(Math.max(0, y - yA) / 46));
