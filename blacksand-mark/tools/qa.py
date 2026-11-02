@@ -95,6 +95,10 @@ def glass(u, v, rot):
     return x, y, b, t, wd
 
 def smoothabs(dx): return np.sqrt(dx * dx + 49) - 7
+# crater profile with the eased centre (engine: shapeTop, CRATER_W = 0.25 Rin)
+def crater_shape(dx, k):
+    w = 0.25 * Rin; sw = smoothabs(w); d = np.abs(dx)
+    return np.where(d < w, k * smoothabs(d), k * sw + (smoothabs(d) - sw))
 
 def passA(dirn, meta):
     s, u, v = grid()
@@ -125,7 +129,7 @@ def passA(dirn, meta):
             x, y, b, t, wd = glass_c(0)
             dx = x - ix
             mound = m['peak'] + G['KB'] * smoothabs(dx)
-            crater = m['crater'] - G['KT'] * smoothabs(dx)
+            crater = m['crater'] - G['KT'] * crater_shape(dx, m['craterK'])
             empB = b & (y < mound - 30) & (wd > L / 2 + tol) & inner & ~band    # splash allowance (ballistic grains)
             empT = t & (y < crater - tol) & (wd > L / 2 + tol) & inner & ~band
         if len(cache) > 64: cache.clear()
@@ -217,18 +221,22 @@ def main():
     tol = 1.6 / s
     rb = ringbox(); u, v = u[rb], v[rb]
     r = np.hypot(u - ix, v - iy)
-    leaks = []; band_ok = 0; band_n = 0
+    leaks = []; band_ok = 0; band_n = 0; band_cut = 0
     inner_band = (r > Rin + tol) & (r < R + H / 2 - tol) & (np.abs(u - ix) < 3) & (v < iy)   # ring band on the stream line, top
     x, y, bm, tm, wd = glass(u, v, 0)
     for i, m in enumerate(mE):
         a = load(dE1, i)[rb].astype(int); b = load(dE2, i)[rb].astype(int)
-        # PASS G: grains visible over the full ring band in every frame (any difference in the band)
-        band_n += 1
-        if (a[inner_band] != b[inner_band]).sum() > 0: band_ok += 1
+        # PASS G: grains visible over the full ring band in every frame whose stream reaches
+        # below the band. While the glass turns, a wall's end sweeping under the ring is the
+        # stream's first contact (the agreed first-hit rule), so there it may end in the band.
+        if m['coreEnd'] > iy - Rin + 2:
+            band_n += 1
+            if (a[inner_band] != b[inner_band]).sum() > 0: band_ok += 1
+        else: band_cut += 1
         if m['rot'] != 0: continue
         dx = x - ix
         inside = (r < Rin - tol) & (wd > L / 2 + tol)
-        sandT = tm & (y > m['crater'] - G['KT'] * smoothabs(dx) + 3 * tol) & inside & (m['fTop'] < 1)
+        sandT = tm & (y > m['crater'] - G['KT'] * crater_shape(dx, m['craterK']) + 3 * tol) & inside & (m['fTop'] < 1)
         surfB = np.maximum(m['peak'] + G['KB'] * smoothabs(dx), iy)          # a pile at the neck is flush with it
         sandB = bm & (y > surfB + 3 * tol) & inside & (m['fBot'] > 0)
         for nm, mask in (('top sand', sandT), ('bottom sand', sandB)):
@@ -236,7 +244,7 @@ def main():
             if n: leaks.append((i, round(m['t'], 3), nm, n, int(np.abs(a[mask] - b[mask]).max())))
     report(not leaks, f'E stream hidden inside sand: {len(leaks)} frames with leaks over {len(mE)} frames')
     for x in leaks[:15]: print('   ', x)
-    report(band_ok == band_n, f'G stream crosses the ring band: visible in {band_ok}/{band_n} frames')
+    report(band_ok == band_n, f'G stream crosses the ring band: visible in {band_ok}/{band_n} frames ({band_cut} frames end at a wall under the ring)')
 
     # PASS F: the neck. Beside the column, between the walls' inner faces, below the pinch:
     # pure black on every upright frame (glow off). No grain fragments, no fringes.

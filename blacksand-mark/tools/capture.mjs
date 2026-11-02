@@ -35,8 +35,9 @@ export async function capture({ out, times, w, h, dpr, mark, debug = '', layer =
       const ms = performance.now() - t0;
       const s = hero.state(t);
       return [document.getElementById('blacksand').toDataURL('image/png'),
-        { t: s.t, ph: s.ph, rot: s.rot, omega: s.omega, fTop: s.fTop, fBot: s.fBot, peak: s.peak, crater: s.crater, pulse: s.pulse,
-          g: s.grains.length, n: s.neckGrains.length, sp: s.splash.length, ro: s.rollers.length, col: s.column, ms: timing ? ms : undefined }];
+        { t: s.t, ph: s.ph, rot: s.rot, omega: s.omega, fTop: s.fTop, fBot: s.fBot, peak: s.peak, crater: s.crater, craterK: s.craterK, pulse: s.pulse,
+          g: s.grains.length, n: s.neckGrains.length, sp: s.splash.length, ro: s.rollers.length, spray: s.spray.length,
+          coreEnd: s.core.y1, contact: s.core.hit, col: s.column, ms: timing ? ms : undefined }];
     }), [chunk, timing]);
     res.forEach(([png, m], j) => {
       fs.writeFileSync(path.join(out, `f${String(i + j).padStart(5, '0')}.png`), Buffer.from(png.split(',')[1], 'base64'));

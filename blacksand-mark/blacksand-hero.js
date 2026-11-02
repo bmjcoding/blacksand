@@ -24,8 +24,6 @@ export const GLOW = { rim: 0.35, rimPeak: 0.50, spillPeak: 0.34 };
 // with the sharp render by w = smoothstep((travel_px - onset) / width), travel measured at
 // the ring's outer edge. At rest the frame is exactly the sharp render.
 export const BLUR = { samples: 8, shutter: 1 / 120, onset: 0.3, width: 2.2 };
-// above the pivot the stream is drawn over the walls, except within this distance of it
-export const PINCH = 20;
 
 const rgb = (c, a = 1) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 const mkCanvas = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
@@ -69,10 +67,11 @@ export function mountBlacksand(canvas, opts = {}) {
       const x1 = Math.ceil(ox + 968 * s) + 4, y1 = Math.ceil(oy + 878 * s) + 4;
       mbox = { x: Math.max(0, x0), y: Math.max(0, y0), w: Math.min(W, x1) - Math.max(0, x0), h: Math.min(Hh, y1) - Math.max(0, y0) };
     }
-    // stream layer: a strip from the apex to the neck, as wide as the stream can wander
+    // stream layer: from the apex down through the ring, as wide as the ring (grains that land
+    // on a wall mid-flip slide along it toward the side wedge's corner)
     {
-      const x0 = Math.floor(ox + (ix - 10) * s) - 2, y0 = Math.floor(oy + 138 * s) - 2;
-      const x1 = Math.ceil(ox + (ix + 10) * s) + 2, y1 = Math.ceil(oy + (iy + 4) * s) + 2;
+      const x0 = Math.floor(ox + (ix - R - H / 2) * s) - 2, y0 = Math.floor(oy + 138 * s) - 2;
+      const x1 = Math.ceil(ox + (ix + R + H / 2) * s) + 2, y1 = Math.ceil(oy + (iy + R + H / 2) * s) + 2;
       mark = { x0, y0, w: x1 - x0, h: y1 - y0, c: mkCanvas(x1 - x0, y1 - y0) };
     }
     // blur layers: the ring's box (rotation never leaves it)
@@ -265,18 +264,20 @@ void main() {
   }
   // a sand body, or (for a full chamber) the whole chamber: the two chambers then draw the
   // identical region, so the wrap of the cycle, where their roles swap, is seamless
-  const topSurface = (st) => (st.fTop <= 0 ? null : (x) => C.crater(st.crater, x));
+  const topSurface = (st) => (st.fTop <= 0 ? null : (x) => C.crater(st.crater, x, st.craterK));
   const botSurface = (st) => (st.fBot >= 1 ? null : (x) => C.mound(st.peak, x));
 
   // --------------------------------------------------------- layer draws ---
   // L = { c, x0, y0 } is a layer; the main canvas is { c: ctx, x0: 0, y0: 0 }
   const MAIN = { get c() { return ctx; }, x0: 0, y0: 0 };
 
+  // A sand surface is level under gravity, so it is drawn in world space; only the chamber
+  // (the glass) turns. Upright, the two are the same thing.
   function drawSandBody(L, which, surfaceFn, rot, texRot, edge) {
     const c = L.c;
     c.save();
     rotate(rot, c, L.x0, L.y0); chamberPath(which, c); c.clip();
-    if (surfaceFn) { rotate(rot, c, L.x0, L.y0); surfacePath(surfaceFn, true, c); c.clip(); }
+    if (surfaceFn) { base(c, L.x0, L.y0); surfacePath(surfaceFn, true, c); c.clip(); }
     base(c, L.x0, L.y0); c.fillStyle = sandGradient(c); c.fillRect(ix - R - 40, iy - R - 40, 2 * R + 80, 2 * R + 80);
     rotate(texRot, c, L.x0, L.y0);
     c.drawImage(tex, ix - R - 1 / s, iy - R - 1 / s, tex.width / s, tex.height / s);
@@ -285,8 +286,8 @@ void main() {
     // lit surface edge
     c.save();
     rotate(rot, c, L.x0, L.y0); chamberPath(which, c); c.clip();
-    rotate(rot, c, L.x0, L.y0); surfacePath(surfaceFn, false, c);
-    base(c, L.x0, L.y0); c.globalAlpha = edge; c.strokeStyle = PALETTE.surface; c.lineWidth = 1.6; c.lineJoin = 'round'; c.stroke();
+    base(c, L.x0, L.y0); surfacePath(surfaceFn, false, c);
+    c.globalAlpha = edge; c.strokeStyle = PALETTE.surface; c.lineWidth = 1.6; c.lineJoin = 'round'; c.stroke();
     c.restore();
   }
 
@@ -326,7 +327,7 @@ void main() {
       c.save();
       base(c, L.x0, L.y0); c.beginPath(); c.arc(ix, iy, Rin, 0, Math.PI * 2); c.clip();
       rotate(rot, c, L.x0, L.y0); chamberPath(which, c); c.clip();
-      if (fn) { rotate(rot, c, L.x0, L.y0); surfacePath(fn, true, c); c.clip(); }
+      if (fn) { base(c, L.x0, L.y0); surfacePath(fn, true, c); c.clip(); }
       base(c, L.x0, L.y0); c.fillStyle = '#000'; c.fillRect(ix - R - 40, iy - R - 40, 2 * R + 80, 2 * R + 80);
       c.restore();
     }
@@ -348,27 +349,30 @@ void main() {
     ctx.beginPath(); ctx.arc(ix, iy, R, 0, Math.PI * 2); ctx.stroke();
   }
 
-  // grains batched by tone and size, as streaks
-  function strokeGrains(c, list) {
+  // grains batched by tone, size and fade (gr.fade, 0..1, quantised to FADES levels), as streaks
+  const FADES = 6;
+  function strokeGrains(c, list, fadeKey = 'fade') {
     const BINS = 6, SB = 3, { rMin, rMax } = STREAM;
-    const buckets = Array.from({ length: (BINS + 1) * SB }, () => []);
+    const buckets = new Map();
     for (const gr of list) {
+      const f = gr[fadeKey] ?? 1;
+      if (f <= 0) continue;
+      const fb = Math.max(1, Math.min(FADES, Math.ceil(f * FADES)));
       const tb = gr.shade > 1 ? BINS : Math.min(BINS - 1, Math.floor(gr.shade * BINS));
       const sb = Math.min(SB - 1, Math.floor(((gr.r - rMin) / (rMax - rMin)) * SB));
-      buckets[tb * SB + sb].push(gr);
+      const key = (fb * (BINS + 1) + tb) * SB + sb;
+      let b = buckets.get(key); if (!b) buckets.set(key, (b = []));
+      b.push(gr);
     }
     c.lineCap = 'round';
-    for (let tb = 0; tb <= BINS; tb++) {
+    for (const [key, list] of buckets) {
+      const sb = key % SB, tb = Math.floor(key / SB) % (BINS + 1), fb = Math.floor(key / SB / (BINS + 1));
       const k = tb === BINS ? PALETTE.glint : Math.round(PALETTE.stream[0] + (PALETTE.stream[1] - PALETTE.stream[0]) * ((tb + 0.5) / BINS));
-      c.strokeStyle = `rgba(${k},${k},${k},${PALETTE.grainAlpha})`;
-      for (let sb = 0; sb < SB; sb++) {
-        const list = buckets[tb * SB + sb];
-        if (!list.length) continue;
-        c.lineWidth = 2 * (rMin + (rMax - rMin) * ((sb + 0.5) / SB));
-        c.beginPath();
-        for (const gr of list) { c.moveTo(gr.x0, gr.y0); c.lineTo(gr.x, gr.y); }
-        c.stroke();
-      }
+      c.strokeStyle = `rgba(${k},${k},${k},${PALETTE.grainAlpha * fb / FADES})`;
+      c.lineWidth = 2 * (rMin + (rMax - rMin) * ((sb + 0.5) / SB));
+      c.beginPath();
+      for (const gr of list) { c.moveTo(gr.x0, gr.y0); c.lineTo(gr.x, gr.y); }
+      c.stroke();
     }
   }
 
@@ -404,8 +408,8 @@ void main() {
     c.save();
     base(c, L.x0, L.y0);
     c.beginPath(); c.moveTo(...T[0]); c.lineTo(...T[1]); c.lineTo(...T[2]); c.closePath(); c.clip();
-    if (st.core) {
-      const { y0, y1 } = st.core;
+    if (st.core && st.core.y1 > st.core.y0) {
+      const { y0, y1, density, endFade } = st.core;
       const yA = G.apex[1];
       const half = (y) => 1.3 * Math.min(1, Math.sqrt(Math.max(0, y - yA) / 46));
       c.beginPath();
@@ -413,9 +417,19 @@ void main() {
       for (let i = 0; i <= N; i++) { const y = y0 + (y1 - y0) * i / N; i ? c.lineTo(ix + half(y), y) : c.moveTo(ix + half(y), y); }
       for (let i = N; i >= 0; i--) { const y = y0 + (y1 - y0) * i / N; c.lineTo(ix - half(y), y); }
       c.closePath();
-      c.fillStyle = 'rgba(118,118,118,0.24)'; c.fill();
+      // the core's density follows the grains' (the emission when that sand left the apex);
+      // above a wall contact its last units fade out
+      const gr = c.createLinearGradient(0, y0, 0, y1), K = 24;
+      for (let i = 0; i <= K; i++) {
+        const y = y0 + (y1 - y0) * i / K;
+        const e = endFade > 0 ? Math.min(1, (y1 - y) / endFade) : 1;
+        gr.addColorStop(i / K, `rgba(118,118,118,${(0.24 * (density ? density(y) : 1) * e).toFixed(4)})`);
+      }
+      c.fillStyle = gr; c.fill();
     }
     strokeGrains(c, st.grains);
+    // grains that landed on a wall, sliding off it (they fade out)
+    if (st.spray && st.spray.length) strokeGrains(c, st.spray, 'a');
     c.restore();
   }
 
@@ -522,11 +536,9 @@ void main() {
     drawRing();
     tick('ring');
 
-    // the stream, from the apex: over the ring, behind the visible sand. Only sand hides it,
-    // so it also passes over a wall that sweeps across it mid-flip; the exception is the
-    // pinch zone just above the pivot, where the walls stay on top (they cover the junction).
-    // The zone is a pixel-aligned horizontal cut of the strip, so nothing is drawn twice.
-    let strip = null;
+    // the stream, from the apex: over the ring, behind the visible sand and under the walls.
+    // While the glass turns it ends where it first meets a wall (the engine's first-hit
+    // contact), so a wall never hides part of it: it lands on the wall instead.
     if (showStream && streamLayer !== 'behind') {
       if (streamLayer === 'front') drawStream(MAIN, st);
       else {
@@ -542,10 +554,8 @@ void main() {
           mc.drawImage(M, box.x0 - mark.x0, box.y0 - mark.y0);
         }
         mc.globalCompositeOperation = 'source-over';
-        const hTop = Math.min(mark.h, Math.max(0, Math.round(oy + (iy - PINCH) * s) - mark.y0));
-        strip = { hTop };
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        if (mark.h > hTop) ctx.drawImage(mark.c, 0, hTop, mark.w, mark.h - hTop, mark.x0, mark.y0 + hTop, mark.w, mark.h - hTop);
+        ctx.drawImage(mark.c, mark.x0, mark.y0);
       }
     }
     tick('stream');
@@ -558,7 +568,6 @@ void main() {
       ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(X, box.x0, box.y0);
     }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    if (strip && strip.hTop > 0) ctx.drawImage(mark.c, 0, 0, mark.w, strip.hTop, mark.x0, mark.y0, mark.w, strip.hTop);
     tick('walls');
   }
 
