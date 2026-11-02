@@ -14,7 +14,7 @@ in this session from this package with `tools/qa.py`, `tools/capture.mjs` and `t
 | Restart at 148° (phase zero), period 5.858333 s, landEnd 0.391667, 0.12 s ramp | `TIMING.restart = 110/240 s` (147.72°, the nearest integer step), `cycle = 1406/240 s`. Flow rate ramps linearly over 0.12 s. The column is world-vertical from the pivot; first grains land at phase 0.31, the glass settles at 0.392. |
 | Fade late grains during the flip; smooth bottom level; canonical full chamber | Splash/rollers fade over 0.22 s from the flip start and ride the glass. The bottom level is one tabulated curve (shared by sim and renderer); its tip rise is capped at 240 units/s so the last units into the neck take a few frames. A full chamber is drawn as the whole chamber (both chambers draw the identical region across the wrap). |
 | 8-sample blur, half-frame shutter centred on the frame, w = smoothstep((travel-0.3)/2.2) at the ring's outer edge | Three blurred groups (sand bodies, walls, occlusion mask) sampled at the same eight shutter angles; pairwise averaging tree so a flat area rounds by at most one level; sharp/blur mix by w; at rest the sharp path is used directly. |
-| Glow +50% crest 0.13 s after the fastest rotation, tau 0.7, 0.08 s follower; float composition with fixed dither | Rim +50%, pool +34% (checkpoint ratio kept). Envelope rise 0.30 s (final value was not recovered; 0.30 chosen, the follower's delay is compensated so the visible crest lands at fastest + 0.13 s). Composed per frame in a WebGL2 fragment shader: rim texture at full gain + analytic pool, scaled, dithered with a per-pixel integer hash, then quantised. Fallback without WebGL2: 8-bit cross-fade of rest/crest images (can show one-level steps over flat regions during the pulse). |
+| Glow flare on the flip; float composition with fixed dither | Superseded by the design panel's continuous breath (see "Glow: design panel consensus"). The float composition with a fixed per-pixel dither is kept. |
 | Column head fades in, crisp sides, less splash, no fringe | Head fade over 30 units while falling free (and a 12-unit tail fade once the top is dry); fill is a vertical gradient inside a crisp clip. Splash share 0.30 → 0.10, rollers 0.32 → 0.18, splash velocities reduced. |
 | Opens at phase 0.6; still/poster/reduced motion at 2.5 with stream in front; pause when hidden | `OPEN_PHASE = 0.6`, `STATIC_PHASE = 2.5`; `streamLayer` modes kept. |
 
@@ -65,6 +65,55 @@ Both designers' acceptance criteria hold:
   (covered by blur).
 - No sand is drawn inside wall material, and there are no fringes or specks.
 
+## Glow: design panel consensus
+
+Owner: "the glow pulse is a little harsh on rotation … it could just be a continuous pulse", with Vercel's
+cursor-following triangle glow as inspiration (not to copy). vercel.com is blocked from this environment and no
+write-up of its implementation was found, so the panel worked from the owner's screenshots and pixel
+measurements of them (`tools/qa-logs/vercel-measurements.txt`). These show a light hidden behind the triangle,
+offset toward the cursor. The lit edge reaches about 230, halves by 0.1 of the side and is gone by about 1.5.
+Far edges keep a dim rim of about 40. The light is neutral grey with heavy grain.
+
+Diagnosis: the old glow sat dark for about 3 s, then went from 0 to full in about 0.3 s during the flip. That
+is a strobe hit, not a pulse.
+
+Agreed spec, implemented:
+
+1. A source behind the triangle, in the triangle's frame, neutral grey, silhouette-masked.
+2. Rest (breath b = 0) is the approved static look, unchanged. The SVG, lockups, poster and reduced-motion
+   frame stay as approved.
+3. Halo = h·w·[0.06·e^(−d/0.05S) + 0.05·e^(−d/0.40S)]. The weight w = clamp(1 + 12·(n·o), 0.6, 2.2) leans
+   the halo toward the source offset o.
+4. Breath b = ½ + ½·cos(2π(ph − 0.40)/cycle), cresting at phase 0.40, after the glass settles at 0.392.
+   The rim gains 15%·b and the pool 10%·b. The old flare is deleted, and there is no dead time.
+5. The source sits 0.04 S below the centroid and swings 0.04 S·sin(2πu) sideways, u being linear flip
+   progress. It is continuous across the wrap.
+6. Pointer light: opt-in, fine pointer only. It reaches 0.10 S, within ±100° of straight down, and its reach
+   fades to nothing past that arc (so the light never swings round the base). It rides critically damped
+   springs (0.6 s settle) and lets go on leave or after 2.5 s idle. The halo factor is h = b + 0.5·a·(1 − b),
+   and the rim also gains ×(1 + 0.25·a·max(0, w − 1)).
+7. Grain: the fixed per-pixel dither only.
+8. MP4: `-tune grain`, CRF 14, full-range 8-bit (see "Preview video and still").
+
+Why Vercel's primitives were adopted only in part:
+
+- Adopted: the hidden source behind an occluder, a long soft two-scale falloff, a dim rim kept on every edge,
+  and neutral grey.
+- Rejected:
+  - cursor-follow as the main behaviour. It is their signature and does nothing on touch, in the MP4 or in
+    stills, so here it is opt-in.
+  - the one-sided 230 hot edge, which conflicts with the approved soft rim on all edges.
+  - heavy grain, given the owner's sensitivity to stray pixels.
+
+Changes after implementation, agreed by both designers:
+
+- Pointer floor. The pointer had almost no effect near the breath trough, so the halo factor became
+  b + 0.5·a·(1 − b). This equals b with the pointer off, so the trough is unchanged.
+- Arc fade. A cursor crossing over the apex flipped the clamped target from one end of the arc to the other.
+  The reach now fades to zero past the arc.
+- Swing profile. sin(2·rot) whipped the source at the easing's peak, giving 4 levels per frame at the edge.
+  Linear flip progress halves its peak rate: 2.0 levels per frame, with the lean ratio still 1.87.
+
 ## QA suite (`python3 tools/qa.py <dpr>`), 1200x900 viewport, mark 420 px
 
 All checks passed at 1x and at 2x (device pixel ratio 2, the same viewport), re-run on the final code
@@ -82,8 +131,11 @@ Raw logs: `tools/qa-logs/`.
 | F: neck negative space beside the column pure black | 0 dirty frames over 439 |
 | H1: at rest, blur on == blur off | pixel-identical at 4 instants |
 | H2: blur onset / release, 240 fps difference series | 0 steps (max 0.029 / 0.017) |
-| J: glow smoothness through a whole cycle (measured outside the mark) | max per-frame change 0.0945 levels, 0 spikes |
-| I: glow crest | at 5.787 s (fastest rotation 5.657 + 0.13); rim band +42% (rim +50%, pool +34% mixed) |
+| J: glow smoothness through a whole cycle (outside the mark) | mean per-frame change 0.029 (≤ 0.05), max 0.123 (≤ 0.35), no frame > 3× its neighbours |
+| K1: breath trough is the static rest look | pixel-identical |
+| K2: rim change between 60 fps frames | 99.9th percentile ≤ 2.0 levels, the largest at the flip start |
+| K3: lean at the swing's peak (rot 42.6°) | halo 0.1 S out: 13.0 vs 6.9 levels (ratio 1.87, need ≥ 1.3) |
+| K4: breath visible with the pointer off | +30.1 levels near the base edge, crest vs trough |
 
 Rasteriser noise: two frames 2 µs apart at an ordinary instant differ on 50–60 pixels at 1x, at most 1–2 of
 them by more than 2 levels, all on the stream line. Grain streaks are thin round-capped strokes and a tiny
@@ -95,15 +147,22 @@ levels, the same as an ordinary instant.
 - `index.html` opened from disk without parameters: no page errors, the WebGL glow path is active, the frame
   changes within 0.7 s (autoplay from phase 0.6).
 - With `prefers-reduced-motion: reduce`: the frame is static and byte-identical to the explicit
-  phase-2.5, stream-in-front render.
+  phase-2.5, stream-in-front render with the glow at rest.
+- Pointer light, live page, real mouse: it leans left, right and down as the pointer moves. Above the apex it
+  stays calm and symmetric, and it lets go after the idle time. No page errors.
 - Every QA capture in this record was taken through `file://index.html` (the capture tool loads it that way).
 
 ## Preview video and still
 
 - `blacksand_hero_preview.mp4`: 1920x1080, 60 fps, 703 frames (exactly two cycles), opens at phase 0.6,
-  mark 480 px, libx264 veryfast CRF 14, yuv420p, faststart.
-- Loop seam: mean grayscale difference last frame → first frame 0.0184, ordinary adjacent step 0.0179.
-- `blacksand_hero_still@2x.png`: phase 2.5, 1600x1000 at 2x, mark 440 px, stream in front.
+  mark 480 px, libx264 slow -tune grain CRF 14, full-range 8-bit (yuvj420p, BT.709 tags), faststart.
+- Banding: limited-range 8-bit (the usual yuv420p) squeezes 256 levels into 220 luma steps and flattens the
+  dither. Contour rings showed in the glow's long halo at 3× gain, and no CRF fixed them (low-frequency error
+  0.59 levels mean, 2 max, at CRF 10 through 14). Full range removes them: low-frequency error at the breath
+  crest is 0.08 levels mean and 1 max against the lossless source. 10-bit is also clean but is poorly
+  supported for H.264 in browsers.
+- Loop seam: mean grayscale difference last frame → first frame 0.0148, ordinary adjacent step 0.0150.
+- `blacksand_hero_still@2x.png`: phase 2.5, 1600x1000 at 2x, mark 440 px, stream in front, glow at rest.
 - `blacksand_mark@2x.png`: from `blacksand_mark_on_black.svg` at 2x.
 
 ## Independent review
@@ -147,4 +206,7 @@ frames measured in its capture runs took 130–165 ms median with WebGL, the sam
   performance table. On a GPU-accelerated browser these are sub-millisecond operations.
 - Strobing at low refresh rates (30 Hz throttled tabs) cannot be judged from stills; the shutter is fixed at
   1/120 s, a full shutter at 120 Hz and a half shutter at 60 Hz.
-- The glow pulse's envelope rise (0.30 s) is a chosen value; the original session's final value was not recovered.
+- The glow is the panel's design from screenshots; Vercel's actual implementation could not be inspected.
+- The 2D fallback (no WebGL2) has the breath but not the lean or the pointer light.
+- With the breath, the glow is recomposed every frame. In software rasterisation that full-screen pass dominates the frame
+  time (see the performance table); on a GPU it is negligible.

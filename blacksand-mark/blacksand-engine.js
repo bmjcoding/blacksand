@@ -286,44 +286,27 @@ export function wallContact(G, polys, rot, x, yTop) {
 
 export const smoothstep = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
 
-// -------------------------------------------------------------- glow pulse ---
-// The light flares with the flip: a short rise to a crest 0.13 s after the fastest rotation,
-// an exponential decay (tau 0.7 s), rounded by a 0.08 s one-pole follower. Tabulated once
-// as a periodic function of phase, so it is a pure function of time and loops exactly.
-export const PULSE = { rise: 0.30, lead: 0.13, tau: 0.7, follow: 0.08 };
-const pulseTable = (() => {
-  const { flip, cycle, steps } = TIMING;
-  let fastest = 0, best = -1;
-  for (let i = 0; i <= 2000; i++) { const u = (i / 2000) * flip; const w = omegaAt(u + TIMING.flow); if (w > best) { best = w; fastest = u; } }
-  const target = fastest + PULSE.lead;                   // the visible crest, from the flip start
-  const a = DT / PULSE.follow;
-  const build = (tp) => {
-    const env = (u) => {                                 // u: time since this flip began
-      const prev = Math.exp(-(u + cycle - tp) / PULSE.tau); // tail of the previous flip's pulse
-      if (u < tp) return prev + smoothstep((u - (tp - PULSE.rise)) / PULSE.rise);
-      return prev + Math.exp(-(u - tp) / PULSE.tau);
-    };
-    const tab = new Float64Array(steps + 1);
-    let y = 0;
-    for (let pass = 0; pass < 4; pass++) {               // settle to the periodic solution
-      for (let i = 0; i < steps; i++) { y += (env(sinceFlip(i * DT)) - y) * a; if (pass === 3) tab[i] = y; }
-    }
-    tab[steps] = tab[0];
-    let mx = 0, at = 0; for (let i = 0; i < steps; i++) if (tab[i] > mx) { mx = tab[i]; at = i; }
-    for (let i = 0; i <= steps; i++) tab[i] /= mx;       // crest is exactly 1
-    return { tab, crest: sinceFlip(at * DT) };
-  };
-  // the follower delays the crest; pull the envelope forward so the visible crest lands on target
-  let tp = target, res = build(tp);
-  for (let k = 0; k < 4; k++) { tp += target - res.crest; res = build(tp); }
-  return { tab: res.tab, fastest, crest: res.crest };
-})();
-export const PULSE_CREST = pulseTable.crest;               // seconds after the flip start
-export function pulseAt(t) {
+// ------------------------------------------------------------------ glow ---
+// The backlight breathes continuously (design panel consensus, replacing the flash on the
+// flip): a raised cosine over exactly one cycle, cresting at phase 0.40, just after the glass
+// settles, so the flip rides the rising swell and the light blooms as the sand lands. Its
+// trough is the approved static look exactly. A hidden source behind the triangle leans
+// sideways with the glass; the halo is brightest on the side it leans toward.
+export const BREATH = { crest: 0.40 };
+export const breathAt = (t) => {
   const { ph } = wrap(t);
-  const x = ph / DT, i = Math.min(TIMING.steps - 1, Math.floor(x)), f = x - i;
-  return pulseTable.tab[i] + (pulseTable.tab[i + 1] - pulseTable.tab[i]) * f;
-}
+  return 0.5 + 0.5 * Math.cos((2 * Math.PI * (ph - BREATH.crest)) / TIMING.cycle);
+};
+// light-source offset in units of the triangle's side, in the triangle's (world) frame,
+// y down: 0.04 below the centroid at rest, swinging 0.04 sideways once per flip. The swing
+// follows linear flip progress u (not the eased rotation, whose peak speed would whip it):
+// sin(2 pi u) is 0 at both ends of the flip, and u does not wrap, so it is continuous.
+export const SOURCE = { down: 0.04, swing: 0.04 };
+export const sourceAt = (t) => {
+  const { ph } = wrap(t);
+  const u = turningAt(ph) ? Math.min(1, Math.max(0, sinceFlip(ph) / TIMING.flip)) : 0;
+  return [SOURCE.swing * Math.sin(2 * Math.PI * u), SOURCE.down];
+};
 
 // ------------------------------------------------------------------- PRNG ---
 
@@ -739,7 +722,7 @@ export function createSim(G, C, seed = 7) {
       if (top < head) column = { y0: top, y1: head, fadeLen, tailFade };
     }
     return { t: tt, ph, cycleIndex: k, fTop, fBot, peak: pk, crater: cr, craterK, impactC, rot, omega, parity, flipFade,
-      grains, spray, neckGrains, column, halfW, splash: S2, rollers: R2, core, pulse: pulseAt(tt) };
+      grains, spray, neckGrains, column, halfW, splash: S2, rollers: R2, core, breath: breathAt(tt), source: sourceAt(tt) };
   }
 
   return { stateAt, get t() { return t; }, DT };

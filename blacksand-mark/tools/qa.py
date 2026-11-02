@@ -292,26 +292,66 @@ def main():
         im = load(dJ, i).astype(np.int16)
         if prev is not None: dj.append(float(np.abs(im - prev)[outside].mean()))
         prev = im
-    dj = np.array(dj); spj = spikes(dj, mJ, k=2.5, floor=0.03)
-    report(dj.max() <= 0.12 and not spj, f'J glow smoothness: per-frame change outside the mark max {dj.max():.4f} mean {dj.mean():.4f}, {len(spj)} spikes')
+    # the glow breathes continuously, so it changes every frame: smooth means small and with no
+    # frame standing out from its neighbours (design panel limits)
+    dj = np.array(dj)
+    spj = [(i + 1, round(mJ[i + 1]['t'], 3), round(dj[i], 4)) for i in range(len(dj))
+           if dj[i] > 3 * max(1e-3, np.median(dj[max(0, i - 5):i + 6]))]
+    report(dj.mean() <= 0.05 and dj.max() <= 0.35 and not spj,
+           f'J glow smoothness: per-frame change outside the mark mean {dj.mean():.4f} (<= 0.05), max {dj.max():.4f} (<= 0.35), {len(spj)} frames > 3x their neighbours')
     for x in spj[:10]: print('    spike', x)
 
-    # PASS I: glow crest timing: brightest frame of the rim region vs the recorded crest
-    ts = [TM['flow'] + i / 60 for i in range(72)]
-    dI, mI = capture('I', ts, 'particles')
-    s, u, v = grid()
-    tri_edge = ~in_tri(u, v, 2) & in_tri(u, v, -24)        # just outside the triangle: the rim
-    bright = np.array([float(load(dI, i)[tri_edge].mean()) for i in range(len(mI))])
-    peak_i = int(np.argmax(bright))
-    crest = TM['flow'] + G['pulseCrest']
-    rest_level = float(load(dI, 0)[tri_edge].mean())
-    gain = bright[peak_i] / rest_level - 1
-    # the pulse has a flat top, so judge the crest by brightness: at the recorded crest the rim
-    # must be within 1% of its brightest, and the brightest frame within 3 frames of it
-    at_crest = float(np.interp(crest, ts, bright))
-    print(f'    rim mean at flip start {rest_level:.3f}, crest {bright[peak_i]:.3f} (+{100*gain:.0f}%) at t={ts[peak_i]:.3f}; at the recorded crest {crest:.3f}: {at_crest:.3f}')
-    report(at_crest >= 0.99 * bright[peak_i] and abs(ts[peak_i] - crest) <= 3 / 60 and 0.38 <= gain <= 0.55,
-           'I glow crest at the recorded time (fastest rotation + 0.13 s), rim band +38..55% (rim +50%, spill +34%)')
+    # PASS K (design panel acceptance for the glow). The particles are off; the glow alone.
+    # K1: at the breath's trough the frame is the approved static look: pixel-identical to a
+    #     render with the breath forced off (debug 'breath').
+    trough = (G['breathCrest'] + cyc / 2) % cyc
+    dK1, _ = capture('K1', [trough, trough + cyc], 'particles')
+    dK0, _ = capture('K0', [trough, trough + cyc], 'particles,breath')
+    okK1 = all(identical(f'{dK1}/f{k:05d}.png', f'{dK0}/f{k:05d}.png')[1] == 0 for k in range(2))
+    report(okK1, f'K1 breath trough (ph {trough:.3f}) is the static rest look, pixel-identical')
+    # K2: the rim never moves more than 2 levels between 60 fps frames, wrap included
+    #     (frames captured with particles and blur off, over a cycle and a bit)
+    s_, u, v = grid()
+    rimband = in_tri(u, v, -0.035 * 912) & ~in_tri(u, v, 2)       # just outside the triangle edge
+    # (reuses pass J's frames: the same cycle at 60 fps, particles and blur off)
+    prev = None; worst = 0; at = None
+    for i in range(len(mJ)):
+        im = load(dJ, i).astype(np.int16)
+        if prev is not None:
+            dd = np.abs(im - prev)[rimband]
+            q = float(np.percentile(dd, 99.9))
+            if q > worst: worst, at = q, mJ[i]['t']
+        prev = im
+    report(worst <= 2.0, f'K2 rim change between 60 fps frames: 99.9th percentile max {worst:.1f} levels (at t={at})')
+    # K3: at rot 45 deg (the swing's peak) the halo 0.1 side out from the left and right edges
+    #     differs by at least 30% (halo = frame minus the rest render)
+    import math as _m
+    # at the swing's peak (a quarter of the way through the flip)
+    t45 = TM['flow'] + 0.25 * TM['flip']
+    dA, mR = capture('K3', [t45], 'particles,blur'); best = 0
+    dB, _ = capture('K3r', [t45], 'particles,blur,breath')
+    A = load(dA, 0).astype(float); B = load(dB, 0).astype(float)
+    T_ = G['T']; side = G['side']
+    def out_pt(P, Q, frac):
+        mx, my = (P[0] + Q[0]) / 2, (P[1] + Q[1]) / 2
+        dx, dy = Q[0] - P[0], Q[1] - P[1]; n = _m.hypot(dx, dy); nx, ny = dy / n, -dx / n
+        cx = sum(p[0] for p in T_) / 3; cy = sum(p[1] for p in T_) / 3
+        if (cx - mx) * nx + (cy - my) * ny > 0: nx, ny = -nx, -ny
+        return mx + nx * frac * side, my + ny * frac * side
+    s0, ox_, oy_ = transform()
+    def sample(img, pt):
+        x = int(ox_ + pt[0] * s0); y = int(oy_ + pt[1] * s0)
+        return float(img[y - 3:y + 4, x - 3:x + 4].mean())
+    Lpt = out_pt(T_[0], T_[2], 0.1); Rpt = out_pt(T_[0], T_[1], 0.1)
+    hl = sample(A, Lpt) - sample(B, Lpt); hr = sample(A, Rpt) - sample(B, Rpt)
+    ratio = max(hl, hr) / max(1e-6, min(hl, hr))
+    report(ratio >= 1.3, f'K3 swing peak (u = 0.25), rot {mR[best]["rot"] * 57.2958:.1f} deg the halo 0.1 side out: left {hl:.1f}, right {hr:.1f} levels (ratio {ratio:.2f}, need >= 1.3)')
+    # K4: the pulse is visible with the pointer off: crest vs trough, near the base edge
+    crest = G['breathCrest']
+    dC, _ = capture('K4', [crest, trough], 'particles')
+    base_pt = out_pt(T_[1], T_[2], 0.05)
+    cr_v = sample(load(dC, 0).astype(float), base_pt); tr_v = sample(load(dC, 1).astype(float), base_pt)
+    report(cr_v - tr_v >= 12, f'K4 breath amplitude near the base edge: crest {cr_v:.1f} vs trough {tr_v:.1f} (+{cr_v - tr_v:.1f} levels, need >= 12)')
 
     print(f'\n{"ALL CHECKS PASSED" if fails == 0 else str(fails) + " CHECK(S) FAILED"} at {DPR:g}x')
     sys.exit(1 if fails else 0)

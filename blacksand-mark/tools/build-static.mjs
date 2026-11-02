@@ -3,7 +3,7 @@
 // for the lockups.
 //   node tools/build-static.mjs [outdir]
 import fs from 'node:fs';
-import { createGeometry, createChambers, createSim, STATIC_PHASE, STREAM, TIMING, PULSE_CREST } from '../blacksand-engine.js';
+import { createGeometry, createChambers, createSim, STATIC_PHASE, STREAM, TIMING, BREATH, SOURCE } from '../blacksand-engine.js';
 
 const out = process.argv[2] || new URL('..', import.meta.url).pathname;
 const G = createGeometry(process.env.NECK ? { neck: +process.env.NECK } : {}), C = createChambers(G);
@@ -145,6 +145,6 @@ fs.writeFileSync(new URL('mark_fragment.json', import.meta.url), JSON.stringify(
 // geometry + timing for the QA suite
 fs.writeFileSync(new URL('geom.json', import.meta.url), JSON.stringify({
   ix, iy, R, Rin: G.Rin, H, L, nk: G.nk, a: G.a, hx: G.hx, slope: G.slope, tl: G.tl, tr: G.tr, bl: G.bl, br: G.br, T,
-  timing: TIMING, pulseCrest: PULSE_CREST, KB: C.K_BOT, KT: C.K_TOP, taper: STREAM.taper, staticPhase: STATIC_PHASE,
+  timing: TIMING, breathCrest: BREATH.crest, source: SOURCE, side: Math.hypot(T[1][0] - T[2][0], T[1][1] - T[2][1]), KB: C.K_BOT, KT: C.K_TOP, taper: STREAM.taper, staticPhase: STATIC_PHASE,
 }));
 console.log('static phase', STATIC_PHASE, 'grains', st.grains.length, 'neck', st.neckGrains.length, 'bytes', fs.statSync(`${out}/blacksand_mark.svg`).size);

@@ -1,10 +1,10 @@
 PASS A stray pixels: 0 violations over 439 frames at 1x
 PASS B pops (glow+particles off): 0 spikes; diff mean 0.0103 max 0.1498
 PASS C boundaries (max channel diff, pixels differing):
-    flow end     (9, 58, 5, 'mark-space y 205..664, x 479..535')
-    land end     (4, 58, 2, 'mark-space y 161..1263, x 506..1045')
-    loop seam    (7, 52, 1, 'mark-space y 159..820, x 360..545')
-    loop seam 2  (7, 50, 1, 'mark-space y 159..820, x 367..545')
+    flow end     (9, 66, 5, 'mark-space y -226..1198, x 121..1286')
+    land end     (4, 60, 2, 'mark-space y 161..971, x -589..516')
+    loop seam    (7, 64, 1, 'mark-space y -19..932, x -660..1671')
+    loop seam 2  (7, 62, 1, 'mark-space y -19..932, x -660..1671')
 PASS C boundaries: the same picture 2 us either side (rounding noise only)
 PASS D same phase, two cycles apart (incl. mid-flip and mid-pour with particles):
     ph 2.500 (0, 0, 0, '')
@@ -28,9 +28,10 @@ PASS F neck sides pure black: 0 dirty frames over 439
 PASS H1 at rest the frame is exactly the sharp render
 PASS H2 blur onset: 0 steps in the 240 fps difference series (max 0.0305)
 PASS H2 blur release: 0 steps in the 240 fps difference series (max 0.0166)
-PASS J glow smoothness: per-frame change outside the mark max 0.0945 mean 0.0070, 0 spikes
-    rim mean at flip start 32.972, crest 46.714 (+42%) at t=5.783; at the recorded crest 5.787: 46.710
-PASS I glow crest at the recorded time (fastest rotation + 0.13 s), rim band +38..55% (rim +50%, spill +34%)
+PASS J glow smoothness: per-frame change outside the mark mean 0.0290 (<= 0.05), max 0.1228 (<= 0.35), 0 frames > 3x their neighbours
+PASS K1 breath trough (ph 3.329) is the static rest look, pixel-identical
+PASS K2 rim change between 60 fps frames: 99.9th percentile max 2.0 levels (at t=5.416666666666667)
+PASS K3 swing peak (u = 0.25), rot 42.6 deg the halo 0.1 side out: left 6.9, right 13.0 levels (ratio 1.87, need >= 1.3)
+PASS K4 breath amplitude near the base edge: crest 83.3 vs trough 53.2 (+30.1 levels, need >= 12)
 
 ALL CHECKS PASSED at 1x
-exit 0
