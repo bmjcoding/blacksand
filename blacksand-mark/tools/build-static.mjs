@@ -1,9 +1,11 @@
-// Builds the static backlit logo SVGs from the same engine state the hero opens on.
-//   node build-static.mjs <outdir>
+// Builds the static backlit logo SVGs from the same engine state the still frame uses
+// (STATIC_PHASE, stream in front), plus geom.json for the QA suite and the mark fragment
+// for the lockups.
+//   node tools/build-static.mjs [outdir]
 import fs from 'node:fs';
-import { createGeometry, createChambers, createSim, STATIC_PHASE, STREAM } from './blacksand-engine.js';
+import { createGeometry, createChambers, createSim, STATIC_PHASE, STREAM, TIMING, PULSE_CREST } from '../blacksand-engine.js';
 
-const out = process.argv[2] || '.';
+const out = process.argv[2] || new URL('..', import.meta.url).pathname;
 const G = createGeometry(process.env.NECK ? { neck: +process.env.NECK } : {}), C = createChambers(G);
 const st = createSim(G, C, 7).stateAt(STATIC_PHASE);
 const { ix, iy, R, H, L, T } = G;
@@ -25,6 +27,7 @@ const below = (pts) => P([...pts, [ix + R + 24, iy + R + 60], [ix - R - 24, iy +
 const line = (pts) => 'M' + pts.map(([x, y]) => `${f(x)} ${f(y)}`).join('L');
 const edgeTop = Math.min(1, (1 - st.fTop) / 0.12, st.fTop / 0.04);
 const edgeBot = Math.min(1, st.fBot / 0.06, (1 - st.fBot) / 0.04);
+if (st.fTop <= 0 || st.fTop >= 1 || st.fBot <= 0 || st.fBot >= 1 || st.rot !== 0) throw new Error('STATIC_PHASE must be an upright mid-pour frame');
 
 // grains, binned like the canvas renderer
 const BINS = 6, SB = 3, { rMin, rMax } = STREAM;
@@ -50,14 +53,16 @@ function binned(list0) {
 }
 const grains = binned(st.grains);
 const neckGrains = binned(st.neckGrains);
-// the neck column: exactly the opening's width at the neck
+// the neck column: exactly the opening's width at the neck. Mid-pour its head has landed,
+// so it is a solid sand-toned column (the fade-in applies only to a free-falling head).
 let column = '';
 if (st.column) {
   const N = 32, r = [], l = [];
   for (let i = 0; i <= N; i++) { const y = st.column.y0 + (st.column.y1 - st.column.y0) * i / N; r.push([ix + st.halfW(y), y]); l.push([ix - st.halfW(y), y]); }
   column = P([...r, ...l.reverse()]);
+  if (st.column.fadeLen > 0.01) throw new Error('STATIC_PHASE column head must have landed');
 }
-// core
+// core: the apex stream never stops, apex to neck
 let core = '';
 if (st.core) {
   const yA = G.apex[1], half = (y) => 1.3 * Math.min(1, Math.sqrt(Math.max(0, y - yA) / 46));
@@ -65,11 +70,11 @@ if (st.core) {
   for (let i = 0; i <= N; i++) { const y = st.core.y0 + (st.core.y1 - st.core.y0) * i / N; r.push([ix + half(y), y]); l.push([ix - half(y), y]); }
   core = `<path d="${P([...r, ...l.reverse()])}" fill="rgb(118,118,118)" fill-opacity="0.24"/>`;
 }
-// splash + rollers
+// splash + rollers, as the renderer draws them upright
 let parts = '';
 for (const p of st.splash) {
   const c = Math.round(STREAM_RGB[0] + (STREAM_RGB[1] - STREAM_RGB[0]) * Math.min(1, p.shade));
-  parts += `<path d="M${f(p.x - p.vx / 240)} ${f(p.y - p.vy / 240)}L${f(p.x)} ${f(p.y)}" stroke="rgb(${c},${c},${c})" stroke-width="${f(2 * p.r)}"/>`;
+  parts += `<path d="M${f(p.x - p.vx / 240)} ${f(p.y - p.vy / 240)}L${f(p.x)} ${f(p.y)}" stroke="rgb(${c},${c},${c})" stroke-opacity="0.7" stroke-width="${f(2 * p.r)}"/>`;
 }
 for (const p of st.rollers) {
   const c = Math.round(96 + 50 * p.shade);
@@ -136,5 +141,10 @@ ${body}
 fs.writeFileSync(`${out}/blacksand_mark.svg`, wrap(mark('bs', false)));
 fs.writeFileSync(`${out}/blacksand_mark_on_black.svg`, wrap(mark('bs', true)));
 // fragment for lockups: mark body plus its bounds
-fs.writeFileSync(`${out}/mark_fragment.json`, JSON.stringify({ body: mark('bsl', false, SPILL_L, VBOX_L, true), vb: VBOX_L, tri: T, iy, R }));
-console.log('grains', st.grains.length, 'neck', st.neckGrains.length, 'bytes', fs.statSync(`${out}/blacksand_mark.svg`).size);
+fs.writeFileSync(new URL('mark_fragment.json', import.meta.url), JSON.stringify({ body: mark('bsl', false, SPILL_L, VBOX_L, true), vb: VBOX_L, tri: T, iy, R }));
+// geometry + timing for the QA suite
+fs.writeFileSync(new URL('geom.json', import.meta.url), JSON.stringify({
+  ix, iy, R, Rin: G.Rin, H, L, nk: G.nk, a: G.a, hx: G.hx, slope: G.slope, tl: G.tl, tr: G.tr, bl: G.bl, br: G.br, T,
+  timing: TIMING, pulseCrest: PULSE_CREST, KB: C.K_BOT, KT: C.K_TOP, taper: STREAM.taper, staticPhase: STATIC_PHASE,
+}));
+console.log('static phase', STATIC_PHASE, 'grains', st.grains.length, 'neck', st.neckGrains.length, 'bytes', fs.statSync(`${out}/blacksand_mark.svg`).size);

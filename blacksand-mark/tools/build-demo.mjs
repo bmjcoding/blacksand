@@ -33,6 +33,8 @@ ${hero}
     markSize: p.has('mark') ? +p.get('mark') : undefined,
     streamLayer: p.get('layer') || undefined,
     debug: p.has('debug') ? Object.fromEntries(p.get('debug').split(',').filter(Boolean).map((k) => [k, false])) : undefined,
+    profile: p.has('profile'),
+    webgl: p.get('webgl') === '0' ? false : undefined,
   });
   window.heroReady = true;
 })();
