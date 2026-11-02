@@ -108,11 +108,11 @@ function LeftOut() {
 }
 
 /**
- * The full build version (e.g. 0.1.1-nightly.20261017.3238), stamped into the
- * composer's reserved end gutter while its switch is on. Hover, keyboard focus
+ * A fixed-size build-details icon in the composer's end gutter while its
+ * switch is on. Hover, keyboard focus
  * or a tap shows what the build changed, baked in at
  * build time (blacksandBuild.ts). The desktop's reported version wins if the
- * bundle predates a rename. A build that left features out shows a hollow dot,
+ * bundle predates a rename. A build that left features out shows an alert icon,
  * and the card lists them.
  */
 export function BlacksandVersionStamp() {
@@ -122,41 +122,61 @@ export function BlacksandVersionStamp() {
 function VersionStamp() {
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
+  const measureLayout = useRef<(() => void) | null>(null);
   const restoringFocus = useRef(false);
   const canvas = useChatCanvas();
   const frame = canvas?.layout.frame;
   useLayoutEffect(() => {
     const button = trigger.current;
+    const rail = button?.closest<HTMLElement>(".t3b-version-rail");
     const lane = button?.closest<HTMLElement>(".chat-composer-lane");
     const surface = lane?.closest<HTMLElement>("[data-chat-canvas]");
-    if (!button || !lane || !surface || !frame) return;
+    const stack = lane?.querySelector<HTMLElement>("[data-chat-composer-stack]");
+    if (!button || !rail || !lane || !stack) return;
     const measure = () => {
+      // Align with the actual primary action, not the bottom of a draft's
+      // checkout/context footer or the current editor/attachment height.
+      const actions = stack.querySelectorAll<HTMLElement>(
+        "[data-chat-composer-transition-actions], [data-chat-composer-mobile-pending-actions], [data-t3b-send]",
+      );
+      const actionBounds = Array.from(actions)
+        .filter((action) => getComputedStyle(action).visibility !== "hidden")
+        .map((action) => action.getBoundingClientRect())
+        .find((bounds) => bounds.width > 0 && bounds.height > 0);
+      if (actionBounds) {
+        lane.style.setProperty("--t3b-version-bottom",
+          `${lane.getBoundingClientRect().bottom - (actionBounds.top + actionBounds.height / 2) - 16}px`);
+      } else lane.style.removeProperty("--t3b-version-bottom");
+      // Measure the ordinary centered icon before considering an obstruction.
+      // Resetting this input prevents a previous reservation from feeding back
+      // into the next preview drag/resize decision. Both writes precede paint.
+      lane.style.removeProperty("--t3b-version-blocked-end");
+      if (!surface || !frame) return;
       const bounds = button.getBoundingClientRect();
       const origin = surface.getBoundingClientRect();
       const previewTop = origin.top + frame.y;
       const besidePreview = previewTop < bounds.bottom && previewTop + frame.height > bounds.top;
-      const laneBounds = lane.getBoundingClientRect();
-      const end = laneBounds.right - Number.parseFloat(getComputedStyle(lane).paddingRight);
+      const end = rail.getBoundingClientRect().right;
       const previewLeft = origin.left + frame.x;
-      // A preview beside the trigger requires compact mode. Reserve before it
-      // only when it occupies the unadjusted 32px end target; a preview moved
-      // away from that corner leaves the normal composer alignment intact.
-      const blocked = besidePreview && previewLeft < end && previewLeft + frame.width > end - 32
-        ? Math.max(0, end - previewLeft + 12)
+      const blocked = besidePreview && previewLeft < bounds.right && previewLeft + frame.width > bounds.left
+        ? Math.max(0, end - previewLeft + 8)
         : 0;
-      lane.toggleAttribute("data-t3b-version-preview", besidePreview);
       lane.style.setProperty("--t3b-version-blocked-end", `${blocked}px`);
     };
-    measure();
+    measureLayout.current = measure;
     // Reuse the app's shared observer: a centered draft can grow without
     // changing the canvas frame. No new observer or polling loop is created.
-    const stop = observeResize(lane, measure);
+    const stop = observeResize([lane, stack], measure);
     return () => {
+      measureLayout.current = null;
       stop();
-      lane.removeAttribute("data-t3b-version-preview");
       lane.style.removeProperty("--t3b-version-blocked-end");
+      lane.style.removeProperty("--t3b-version-bottom");
     };
   }, [frame?.x, frame?.y, frame?.width, frame?.height, canvas?.container.width, canvas?.container.height]);
+  // React action/footer changes must be measured before paint too; the shared
+  // observer also handles layout changes without a React commit here.
+  useLayoutEffect(() => { measureLayout.current?.(); });
   const update = useDesktopUpdateState();
   const build = BLACKSAND_T3_BUILD;
   const omitted = build.skipped.length > 0;
@@ -199,8 +219,6 @@ function VersionStamp() {
           data-drift={omitted ? "" : undefined}
         >
           <StampIcon aria-hidden="true" className="t3b-version-icon" />
-          <i aria-hidden="true" />
-          <span className="t3b-version-label">{version}</span>
         </PopoverTrigger>
         <PopoverPopup
           side="top"

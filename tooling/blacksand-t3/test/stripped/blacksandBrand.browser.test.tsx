@@ -39,10 +39,11 @@ vi.mock("../blacksandBuild", () => ({
 
 // ChatView's actual lane/stack/spacer structure, around the real ComposerSurface.
 // Avoid a live thread/backend/editor while exercising production CSS and shell.
-function Lane({ height = 100, context = false, hero = false, overlayRef }: {
+function Lane({ height = 100, context = false, hero = false, footer = false, overlayRef }: {
   height?: number;
   context?: boolean;
   hero?: boolean;
+  footer?: boolean;
   overlayRef?: (element: HTMLDivElement | null) => void;
 }) {
   return (
@@ -85,6 +86,7 @@ function Lane({ height = 100, context = false, hero = false, overlayRef }: {
                 </ComposerSurface.ContextStrip>
               ) : null}
             </ComposerSurface.Shell>
+            {footer ? <div style={{ height: 36 }}>Current checkout · Full access</div> : null}
             <div
               aria-hidden
               className="h-[calc(env(safe-area-inset-bottom)+1rem)] sm:h-[calc(env(safe-area-inset-bottom)+1.25rem)]"
@@ -106,6 +108,7 @@ function Shell({
   height?: number;
   context?: boolean;
   hero?: boolean;
+  footer?: boolean;
 }) {
   return (
     <AppSidebarLayout>
@@ -210,17 +213,19 @@ describe("responsive version stamp", () => {
     }
   });
   const cases = [
-    { width: 600, tall: 600, label: false },
-    { width: 1100, tall: 700, right: 300, height: 260, context: true, label: false },
-    { width: 2200, tall: 900, label: true },
-    { width: 2200, tall: 900, right: 700, height: 220, label: false },
-    { width: 2200, tall: 900, max: "72rem", context: true, label: true },
-    { width: 1600, tall: 800, max: "100%", label: false },
+    { width: 600, tall: 600 },
+    { width: 1100, tall: 700, right: 300, height: 260, context: true },
+    { width: 2200, tall: 900 },
+    { width: 2200, tall: 900, right: 700, height: 220 },
+    { width: 2200, tall: 900, max: "72rem", context: true },
+    { width: 1600, tall: 800, max: "100%" },
     // Effective CSS viewport of a 1280x900 window at 200% browser zoom.
-    { width: 640, tall: 450, max: "100%", height: 180, context: true, label: false },
-    { width: 360, tall: 400, max: "100%", hero: true, label: false },
+    { width: 640, tall: 450, max: "100%", height: 180, context: true },
+    { width: 360, tall: 400, max: "100%", hero: true },
+    { width: 1218, tall: 636, hero: true, footer: true },
+    { width: 1000, tall: 700, hero: true, footer: true, height: 260, context: true },
   ];
-  for (const { width, tall, label, ...props } of cases) {
+  for (const { width, tall, ...props } of cases) {
     it(`reserves bounds at ${width}x${tall}, ${JSON.stringify(props)}`, async () => {
       await page.viewport(width, tall);
       await using screen = await render(<Shell {...props} />);
@@ -228,20 +233,21 @@ describe("responsive version stamp", () => {
       const composer = screen.container.querySelector('[data-slot="composer-shell"]')!;
       const bounds = rect(stamp);
       inViewport(bounds);
-      expect(bounds.width).toBeGreaterThanOrEqual(32);
-      expect(bounds.height).toBeGreaterThanOrEqual(32);
+      expect(bounds.width).toBe(32);
+      expect(bounds.height).toBe(32);
       for (const node of screen.container.querySelectorAll(
         '[data-slot="composer-shell"], textarea, [data-t3b-send], [data-test-panel], [data-slot="sidebar"]',
       )) {
         separate(bounds, rect(node));
       }
-      expect(Math.abs(bounds.bottom - rect(composer).bottom)).toBeLessThan(1);
-      const version = stamp.querySelector<HTMLElement>(".t3b-version-label")!;
-      expect(getComputedStyle(version).display !== "none").toBe(label);
-      if (label) expect(version.scrollWidth).toBeLessThanOrEqual(version.clientWidth);
+      const action = rect(screen.container.querySelector('[data-t3b-send]')!);
+      expect(Math.abs(bounds.top + bounds.height / 2 - action.top - action.height / 2)).toBeLessThan(1);
+      const edge = rect(screen.container.querySelector(".chat-composer-lane")!).right;
+      expect(Math.abs(bounds.left + bounds.width / 2 - (rect(composer).right + edge) / 2)).toBeLessThan(1);
+      expect(stamp.querySelector(".t3b-version-label")).toBeNull();
       expect(stamp.getAttribute("aria-label")).toContain("0.1.7-nightly.20261031.3991");
       expect(stamp.getAttribute("aria-label")).toContain("features omitted");
-      if (!label) expect(stamp.querySelector("svg")?.classList.contains("lucide-circle-alert")).toBe(true);
+      expect(stamp.querySelector("svg")?.classList.contains("lucide-circle-alert")).toBe(true);
       expect(getComputedStyle(stamp).position).not.toBe("fixed");
     });
   }
@@ -271,20 +277,18 @@ describe("responsive version stamp", () => {
     await screen.rerender(<PreviewCase width={1280} preview={null} />);
     await vi.waitFor(() => {
       const lane = screen.container.querySelector<HTMLElement>(".chat-composer-lane")!;
-      expect(lane.hasAttribute("data-t3b-version-preview")).toBe(false);
       expect(lane.style.getPropertyValue("--t3b-version-blocked-end")).toBe("");
     });
   });
   it("responds to panel/max-width/height changes and releases the reservation when disabled", async () => {
     await page.viewport(2200, 900);
     await using screen = await render(<Shell />);
-    const shown = () =>
-      getComputedStyle(screen.container.querySelector(".t3b-version-label")!).display !== "none";
-    expect(shown()).toBe(true);
+    const compact = () => expect(rect(screen.container.querySelector(".t3b-version-stamp")!).width).toBe(32);
+    compact();
     await screen.rerender(<Shell right={700} height={270} context />);
-    expect(shown()).toBe(false);
+    compact();
     await screen.rerender(<Shell max="100%" />);
-    expect(shown()).toBe(false);
+    compact();
     const composer = screen.container.querySelector('[data-slot="composer-shell"]')!;
     const before = rect(composer).width;
     await act(() => setBlacksandInterface("stamp", false));

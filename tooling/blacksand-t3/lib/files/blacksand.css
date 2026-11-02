@@ -67,16 +67,17 @@ html[data-t3b-send="on"] [data-slot="composer-shell"]:has([data-composer-banner-
 
 /* ------------------------------------------------------- version stamp -- */
 
-/* Use the composer's own lane, after its safe-area/panel insets. The center
-   track keeps the chat max-width; the end track always reserves an icon and
-   grows into the spare gutter. :has leaves the upstream layout alone when the
-   appearance switch is off. No fixed positioning or viewport-width guesses. */
+/* Keep the composer centered at its usual max-width. Its existing outer
+   padding already holds an icon on desktop; only reserve extra space where
+   needed on narrow screens. The icon stays centered in that whole gutter. */
 .chat-composer-lane:has(> .t3b-version-rail) {
+  --t3b-version-edge-space: 0.75rem;
+  --t3b-version-min-rail: max(0px, calc(42px - var(--t3b-version-edge-space)));
   display: grid;
   grid-template-columns:
     minmax(0, 1fr)
-    minmax(0, min(var(--chat-content-max-width), calc(100% - 44px - var(--t3b-version-blocked-end, 0px))))
-    minmax(calc(32px + var(--t3b-version-blocked-end, 0px)), 1fr);
+    minmax(0, min(var(--chat-content-max-width), calc(100% - 12px - var(--t3b-version-min-rail) - var(--t3b-version-blocked-end, 0px))))
+    minmax(calc(var(--t3b-version-min-rail) + var(--t3b-version-blocked-end, 0px)), 1fr);
   column-gap: 6px;
   align-items: end;
 }
@@ -89,40 +90,36 @@ html[data-t3b-send="on"] [data-slot="composer-shell"]:has([data-composer-banner-
 .t3b-version-rail {
   grid-column: 3;
   min-width: 0;
-  container: t3b-version / inline-size;
   display: flex;
-  justify-content: flex-end;
-  margin-inline-end: var(--t3b-version-blocked-end, 0px);
-  /* Match ChatView's safe-area spacer: the button aligns with the bottom of
-     the whole composer (including its context strip), at any editor height. */
-  padding-bottom: calc(env(safe-area-inset-bottom) + 1rem);
+  justify-content: center;
+  /* Include the lane's ordinary outer padding in the free space. Its safe-area
+     and canvas/panel insets remain reserved by the upstream lane. */
+  margin-inline-start: -6px;
+  margin-inline-end: calc(var(--t3b-version-blocked-end, 0px) - var(--t3b-version-edge-space));
+  margin-bottom: var(--t3b-version-bottom, calc(env(safe-area-inset-bottom) + 1.5rem));
   pointer-events: auto;
 }
 
 @media (min-width: 640px) {
-  .t3b-version-rail {
-    padding-bottom: calc(env(safe-area-inset-bottom) + 1.25rem);
+  .chat-composer-lane:has(> .t3b-version-rail) {
+    --t3b-version-edge-space: 3rem;
   }
 }
 
 .t3b-version-stamp {
   --t3b-version-surface: var(--card);
   display: inline-flex;
-  flex: 0 1 auto;
-  min-width: 32px;
-  max-width: 100%;
-  min-height: 32px;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
   align-items: center;
   justify-content: center;
-  gap: 6px;
   padding: 6px;
   border: 0;
   border-radius: 4px;
   background: var(--t3b-version-surface);
   box-shadow: 0 0 0 1px var(--t3b-card-edge);
   color: var(--t3b-ember);
-  font: 700 9.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-  letter-spacing: 0.06em;
   cursor: pointer;
   outline: none;
   user-select: none;
@@ -148,39 +145,6 @@ html[data-theme-id] .t3b-version-stamp { --t3b-version-surface: var(--app-theme-
   height: 14px;
   flex-shrink: 0;
 }
-
-.t3b-version-label,
-.t3b-version-stamp > i {
-  display: none;
-}
-
-/* This is the actual free gutter, not the window: panels, zoom and the chat
-   width setting all affect it. Keep extra-long desktop-reported versions
-   bounded too; their complete value is always in the label and details. */
-@container t3b-version (min-width: 250px) {
-  .t3b-version-icon { display: none; }
-  .t3b-version-label {
-    display: block;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .t3b-version-stamp > i {
-    display: block;
-    flex-shrink: 0;
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: var(--t3b-ember);
-  }
-}
-
-/* The canvas may place a floating preview in the apparent end gutter. Keep a
-   compact target in the remaining space rather than covering preview content. */
-[data-t3b-version-preview] .t3b-version-icon { display: block; }
-[data-t3b-version-preview] .t3b-version-label,
-[data-t3b-version-preview] .t3b-version-stamp > i { display: none; }
 
 /* Near-neutral greys warmed a touch toward the accent, so the card sits with
    whatever colour the theme uses. */
@@ -290,12 +254,6 @@ html[data-theme-id] .t3b-version-stamp { --t3b-version-surface: var(--app-theme-
 .t3b-version-card code {
   color: var(--t3b-card-muted);
   font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-/* A build that left features out: a hollow dot, and the list leads the card's end. */
-.t3b-version-stamp[data-drift] > i {
-  background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--t3b-ember);
 }
 
 .t3b-version-card .t3b-version-drift {
