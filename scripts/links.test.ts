@@ -10,10 +10,10 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
-/** The tracked Markdown files, minus vendored copies of other projects. */
+/** Markdown in the working tree, including an unsigned move, minus vendored copies. */
 function markdownFiles(): string[] {
-  const out = execFileSync("git", ["ls-files", "-z", "--", "*.md"], { cwd: ROOT, encoding: "utf8" });
-  return out.split("\0").filter((file) => file && !file.includes("/vendor/"));
+  const out = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", "*.md"], { cwd: ROOT, encoding: "utf8" });
+  return [...new Set(out.split("\0"))].filter((file) => file && !file.includes("/vendor/") && fs.existsSync(path.join(ROOT, file)));
 }
 
 /** The link targets in `text`, outside code fences and inline code. */

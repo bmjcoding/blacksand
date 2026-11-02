@@ -17,26 +17,26 @@ on:
   push:
     branches: [main]
     paths:
-      - "tooling/t3code/bin/**"
-      - "tooling/t3code/lib/**"
-      - "tooling/t3code/pin.json"
-      - "tooling/t3code/test/stripped/**"
+      - "tooling/blacksand-t3/bin/**"
+      - "tooling/blacksand-t3/lib/**"
+      - "tooling/blacksand-t3/pin.json"
+      - "tooling/blacksand-t3/test/stripped/**"
       - ".github/workflows/build.yml"
-      - "tooling/t3code/ci/build-channels.mjs"
-      - "tooling/t3code/ci/is-main.mjs"
-      - "tooling/t3code/ci/render-runner.mjs"
-      - "tooling/t3code/ci/stripped-tests.mjs"
+      - "tooling/blacksand-t3/ci/build-channels.mjs"
+      - "tooling/blacksand-t3/ci/is-main.mjs"
+      - "tooling/blacksand-t3/ci/render-runner.mjs"
+      - "tooling/blacksand-t3/ci/stripped-tests.mjs"
   pull_request:
     paths:
-      - "tooling/t3code/bin/**"
-      - "tooling/t3code/lib/**"
-      - "tooling/t3code/pin.json"
-      - "tooling/t3code/test/stripped/**"
+      - "tooling/blacksand-t3/bin/**"
+      - "tooling/blacksand-t3/lib/**"
+      - "tooling/blacksand-t3/pin.json"
+      - "tooling/blacksand-t3/test/stripped/**"
       - ".github/workflows/build.yml"
-      - "tooling/t3code/ci/build-channels.mjs"
-      - "tooling/t3code/ci/is-main.mjs"
-      - "tooling/t3code/ci/render-runner.mjs"
-      - "tooling/t3code/ci/stripped-tests.mjs"
+      - "tooling/blacksand-t3/ci/build-channels.mjs"
+      - "tooling/blacksand-t3/ci/is-main.mjs"
+      - "tooling/blacksand-t3/ci/render-runner.mjs"
+      - "tooling/blacksand-t3/ci/stripped-tests.mjs"
   workflow_dispatch:
 
 permissions:
@@ -49,7 +49,7 @@ concurrency:
 # Paths in the steps are the t3 package's.
 defaults:
   run:
-    working-directory: tooling/t3code
+    working-directory: tooling/blacksand-t3
 
 jobs:
   channels:
@@ -135,10 +135,10 @@ jobs:
       # The *.browser.test.tsx ones run in upstream's Playwright project (headless
       # Chromium, the version upstream's lockfile pins).
       - name: Chromium for the browser tests
-        working-directory: tooling/t3code/build/work/apps/web
+        working-directory: tooling/blacksand-t3/build/work/apps/web
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Tests in the stripped checkout (tooling/t3code/test/stripped)
+      - name: Tests in the stripped checkout (tooling/blacksand-t3/test/stripped)
         run: node ci/stripped-tests.mjs build/work
 
       - name: The SSH runner as tunnel.ts renders it

@@ -43,7 +43,7 @@ jobs:
       - name: Type check
         run: |
           node_modules/.bin/tsc --noEmit
-          node_modules/.bin/tsc --noEmit -p tooling/t3code
+          node_modules/.bin/tsc --noEmit -p tooling/blacksand-t3
 
       - name: Tests (fast tier)
         run: node scripts/test.ts fast
@@ -52,7 +52,7 @@ jobs:
       # shell its shebang names.
       - name: Shell scripts
         run: |
-          scripts="blacksand .githooks/pre-push tooling/t3code/install.sh tooling/t3code/scripts/*.sh substrates/kubernetes/images/agent-tools.sh substrates/kubernetes/sandbox/steps.sh"
+          scripts="blacksand .githooks/pre-push tooling/blacksand-t3/install.sh tooling/blacksand-t3/scripts/*.sh substrates/kubernetes/images/agent-tools.sh substrates/kubernetes/sandbox/steps.sh"
           for script in $scripts; do
             case "$(head -n 1 "$script")" in
               *bash*) bash -n "$script" ;;
@@ -65,8 +65,8 @@ jobs:
       # The injected runner is template-literal source; check what /bin/sh on the
       # host runs. SC1090: it sources the account's server.env on purpose.
       # SC3067: test -O is in both shells it meets (macOS bash as sh, dash).
-      - name: SSH runner (tooling/t3code/lib/files/ssh-runner-blacksand.sh, rendered)
-        working-directory: tooling/t3code
+      - name: SSH runner (tooling/blacksand-t3/lib/files/ssh-runner-blacksand.sh, rendered)
+        working-directory: tooling/blacksand-t3
         run: |
           node ci/render-runner.mjs fragment lib/files/ssh-runner-blacksand.sh "$RUNNER_TEMP/runner.sh"
           sh -n "$RUNNER_TEMP/runner.sh"
@@ -82,10 +82,10 @@ jobs:
           "$RUNNER_TEMP/actionlint"
 
       - name: Every action is pinned to a full commit SHA
-        run: node tooling/t3code/ci/check-action-pins.mjs
+        run: node tooling/blacksand-t3/ci/check-action-pins.mjs
 
       - name: pin.json and lib/overrides.json are valid, and every pinned tag names its commit upstream
-        working-directory: tooling/t3code
+        working-directory: tooling/blacksand-t3
         run: |
           node -e 'import("./lib/pin.mjs").then((m) => m.readPin()).then((p) => console.log(JSON.stringify(p.channels)))'
           node -e 'import("./lib/overrides.mjs").then((m) => console.log(m.readOverrides().length, "security overrides,", m.readToolOverrides().length, "device tool overrides"))'
@@ -95,7 +95,7 @@ jobs:
       # catches that). A runner is no install: it checks as itself, said so
       # explicitly (lib/install-config.mjs buildAsYouProblem).
       - name: Strip rules apply to the pinned commit
-        working-directory: tooling/t3code
+        working-directory: tooling/blacksand-t3
         env:
           BLACKSAND_T3_UNISOLATED_BUILD: "1"
         run: |

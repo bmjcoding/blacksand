@@ -5,8 +5,11 @@
 import { REGULAR } from "./git.ts";
 import { addedApprovals, backwardMove, channelsOf, compareRefs, validatePin, type Pin } from "./pin.ts";
 
-/** The evaluator's principal in .allowed_signers. Every other listed principal signs as the owner. */
-export const EVALUATOR = "t3blackout-evaluator";
+/** The current evaluator principal; historical parent lists keep their original label. */
+export const EVALUATOR = "blacksand-evaluator";
+
+/** Both exact labels stay pin-only across an owner-signed rename. Other listed principals are owners. */
+export const isEvaluator = (principal: string | undefined): boolean => principal === EVALUATOR || principal === "t3blackout-evaluator";
 
 export interface EvaluatorCommit {
   /** How many parents it has. */

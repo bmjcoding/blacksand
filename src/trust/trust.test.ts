@@ -5,7 +5,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
 
-import { EVALUATOR, evaluatorShape, type EvaluatorCommit } from "./evaluator.ts";
+import { EVALUATOR, isEvaluator, evaluatorShape, type EvaluatorCommit } from "./evaluator.ts";
 import { gitEnv, type Git, type GitResult } from "./git.ts";
 import { pinBasis } from "./history.ts";
 import { LAYOUTS, ambiguous, layoutNames, layoutOf, packagePath, pinPath } from "./layout.ts";
@@ -16,47 +16,41 @@ const PIN = (ref: string) => `${JSON.stringify({ version: 1, channels: { nightly
 const OLD = PIN("v0.1.6-nightly.20261030.3904");
 const NEW = PIN("v0.1.6-nightly.20261030.3917");
 
-test("each commit is read in its own layout: a packages/t3 folder makes it the monorepo's, a tooling/t3code one the tooling layout's, and both none", () => {
-  assert.deepEqual(layoutNames("c"), ["c:packages/t3", "c:tooling/t3code"]);
+test("each historical layout has one fixed pin path; any combination of component folders is ambiguous", () => {
+  const folders = ["packages/t3", "tooling/t3code", "tooling/blacksand-t3"];
+  assert.deepEqual(layoutNames("c"), folders.map((folder) => `c:${folder}`));
   const at = (types: Record<string, string>) => layoutOf("c", (name) => types[name] ?? null);
-  assert.equal(at({ "c:packages/t3": "tree" }), "monorepo");
-  assert.equal(at({ "c:tooling/t3code": "tree" }), "tooling");
-  for (const type of ["blob", "commit"]) {
-    assert.equal(at({ "c:packages/t3": type }), "root", type);
-    assert.equal(at({ "c:tooling/t3code": type }), "root", type);
-    // Only a tree is a package folder: a file of the same name beside one doesn't make it ambiguous.
-    assert.equal(at({ "c:packages/t3": "tree", "c:tooling/t3code": type }), "monorepo", type);
-    assert.equal(at({ "c:packages/t3": type, "c:tooling/t3code": "tree" }), "tooling", type);
-  }
   assert.equal(at({}), "root");
-  // Two package folders: no layout, so no pin path to read.
-  assert.equal(at({ "c:packages/t3": "tree", "c:tooling/t3code": "tree" }), null);
-  assert.equal(ambiguous("commit c"), "commit c has both packages/t3 and tooling/t3code, so where its pin is can't be told; only one may hold the t3 package");
-  // Only another rev's folders are asked about, never a name the repository supplies.
+  for (const [i, folder] of folders.entries()) {
+    assert.equal(at({ [`c:${folder}`]: "tree" }), LAYOUTS[i + 1]);
+    for (const type of ["blob", "commit"]) {
+      assert.equal(at({ [`c:${folder}`]: type }), "root", type);
+      for (const other of folders.filter((f) => f !== folder)) {
+        assert.equal(at({ [`c:${folder}`]: "tree", [`c:${other}`]: type }), LAYOUTS[i + 1], type);
+      }
+    }
+    for (const other of folders.filter((f) => f !== folder)) assert.equal(at({ [`c:${folder}`]: "tree", [`c:${other}`]: "tree" }), null);
+  }
+  assert.equal(at(Object.fromEntries(folders.map((folder) => [`c:${folder}`, "tree"]))), null);
+  assert.equal(ambiguous("commit c"), "commit c has multiple component folders (packages/t3, tooling/t3code, tooling/blacksand-t3), so where its pin is can't be told; only one may hold the t3 package");
   assert.equal(layoutOf("c", (name) => (name === "d:tooling/t3code" ? "tree" : null)), "root");
-  assert.deepEqual(LAYOUTS.map(pinPath), ["pin.json", "packages/t3/pin.json", "tooling/t3code/pin.json"]);
-  assert.equal(packagePath("monorepo", "lib/overrides.json"), "packages/t3/lib/overrides.json");
-  assert.equal(packagePath("tooling", "lib/overrides.json"), "tooling/t3code/lib/overrides.json");
+  assert.deepEqual(LAYOUTS.map(pinPath), ["pin.json", ...folders.map((folder) => `${folder}/pin.json`)]);
+  for (const [i, folder] of folders.entries()) assert.equal(packagePath(LAYOUTS[i + 1]!, "lib/overrides.json"), `${folder}/lib/overrides.json`);
 });
 
 test("an evaluator commit may change only the pin file of its parent's layout, only forward, and only as a regular file", () => {
   const commit = (fields: Partial<EvaluatorCommit>): EvaluatorCommit => ({ parents: 1, files: ["pin.json"], pinFile: "pin.json", before: OLD, after: NEW, beforeMode: "100644", afterMode: "100644", ...fields });
   const shape = (pinFile: string, files: string[], before = OLD, after = NEW) => evaluatorShape(commit({ files, pinFile, before, after }));
-  assert.equal(shape("packages/t3/pin.json", ["packages/t3/pin.json"]), null);
-  assert.equal(shape("pin.json", ["pin.json"]), null);
-  // Across the move, the old path and the new one are each someone else's file.
-  assert.equal(shape("packages/t3/pin.json", ["pin.json"]), "changes pin.json, not just packages/t3/pin.json");
-  assert.equal(shape("pin.json", ["packages/t3/pin.json"]), "changes packages/t3/pin.json, not just pin.json");
-  assert.equal(shape("packages/t3/pin.json", ["packages/t3/pin.json"], NEW, OLD), "moves nightly back from v0.1.6-nightly.20261030.3917 to v0.1.6-nightly.20261030.3904");
-  assert.equal(evaluatorShape(commit({ files: ["packages/t3/pin.json"], pinFile: "packages/t3/pin.json", before: null, beforeMode: null })), "creates packages/t3/pin.json; its first version needs a commit you sign");
-  // Across the second move, likewise.
-  assert.equal(shape("tooling/t3code/pin.json", ["tooling/t3code/pin.json"]), null);
-  assert.equal(shape("tooling/t3code/pin.json", ["packages/t3/pin.json"]), "changes packages/t3/pin.json, not just tooling/t3code/pin.json");
-  assert.equal(shape("packages/t3/pin.json", ["tooling/t3code/pin.json"]), "changes tooling/t3code/pin.json, not just packages/t3/pin.json");
-  assert.equal(shape("tooling/t3code/pin.json", ["packages/t3/pin.json", "tooling/t3code/pin.json"]), "changes packages/t3/pin.json, tooling/t3code/pin.json, not just tooling/t3code/pin.json");
-  assert.equal(shape("tooling/t3code/pin.json", ["tooling/t3code/pin.json"], NEW, OLD), "moves nightly back from v0.1.6-nightly.20261030.3917 to v0.1.6-nightly.20261030.3904");
-  assert.equal(evaluatorShape(commit({ files: ["tooling/t3code/pin.json"], pinFile: "tooling/t3code/pin.json", before: null, beforeMode: null })), "creates tooling/t3code/pin.json; its first version needs a commit you sign");
-  assert.equal(evaluatorShape(commit({ files: ["tooling/t3code/pin.json"], pinFile: "tooling/t3code/pin.json", afterMode: "120000" })), "makes tooling/t3code/pin.json mode 120000; it must stay a regular file (100644)");
+  for (const pinFile of LAYOUTS.map(pinPath)) {
+    assert.equal(shape(pinFile, [pinFile]), null);
+    for (const other of LAYOUTS.map(pinPath).filter((p) => p !== pinFile)) {
+      assert.equal(shape(pinFile, [other]), `changes ${other}, not just ${pinFile}`);
+      assert.equal(shape(pinFile, [other, pinFile]), `changes ${other}, ${pinFile}, not just ${pinFile}`);
+    }
+    assert.equal(shape(pinFile, [pinFile], NEW, OLD), "moves nightly back from v0.1.6-nightly.20261030.3917 to v0.1.6-nightly.20261030.3904");
+    assert.equal(evaluatorShape(commit({ files: [pinFile], pinFile, before: null, beforeMode: null })), `creates ${pinFile}; its first version needs a commit you sign`);
+    assert.equal(evaluatorShape(commit({ files: [pinFile], pinFile, afterMode: "120000" })), `makes ${pinFile} mode 120000; it must stay a regular file (100644)`);
+  }
   assert.equal(evaluatorShape(commit({ parents: 2, files: [] })), "is a merge or a root commit");
   // A symlink whose target text is a valid pin, an executable pin, and one following an owner's symlink.
   assert.equal(evaluatorShape(commit({ afterMode: "120000" })), "makes pin.json mode 120000; it must stay a regular file (100644)");
@@ -64,9 +58,14 @@ test("an evaluator commit may change only the pin file of its parent's layout, o
   assert.equal(evaluatorShape(commit({ beforeMode: "120000" })), "follows a pin.json of mode 120000, not a regular file (100644)");
 });
 
+test("only the two exact evaluator labels have the restricted role", () => {
+  for (const name of [EVALUATOR, "t3blackout-evaluator"]) assert.equal(isEvaluator(name), true);
+  for (const name of [undefined, "owner@example.com", "blacksand-owner", "other-evaluator", "blacksand-evaluator-extra", "BLACKSAND-EVALUATOR", "blacksand-evaluator "]) assert.equal(isEvaluator(name), false, name);
+});
+
 test("a tip's pin rests on the newest owner commit on its first-parent line that changes it", () => {
   const of = new Map([
-    ["b", { principal: EVALUATOR, pinChanged: true }],
+    ["b", { principal: "t3blackout-evaluator", pinChanged: true }],
     ["c", { principal: "owner@example.com", pinChanged: true }],
     ["d", { principal: EVALUATOR, pinChanged: true }],
     ["e", { principal: "owner@example.com", pinChanged: false }],

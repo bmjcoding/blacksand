@@ -11,7 +11,7 @@
     "test:fast": "node scripts/test.ts fast",
     "test:deep": "node scripts/test.ts deep",
     "test:all": "node scripts/test.ts all",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tooling/t3code"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tooling/blacksand-t3"
   },
   "devDependencies": {
     "@types/node": "24.19.2",

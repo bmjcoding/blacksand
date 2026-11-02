@@ -8,7 +8,7 @@
 //
 // Outside the comparison: paths the tree doesn't have that its own .gitignore
 // files (byte-checked here, being in the tree), .git/info/exclude or the clone's
-// core.excludesFile ignore, such as node_modules/ and tooling/t3code/{build,state,upstream}/.
+// core.excludesFile ignore, such as node_modules/ and tooling/blacksand-t3/{build,state,upstream}/.
 // They're reported; no verified code imports them.
 
 import { createHash } from "node:crypto";

@@ -39,7 +39,7 @@ function walk(dir: string): string[] {
 const COMPONENT_AREAS = ["tooling", "substrates"];
 
 /**
- * A component's test/ folder, not its subfolders. tooling/t3code/test/stripped/
+ * A component's test/ folder, not its subfolders. tooling/blacksand-t3/test/stripped/
  * holds upstream's tests, which run inside a stripped upstream checkout. A test
  * file in any other subfolder would never run, so it's an error, not a skip.
  */

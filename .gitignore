@@ -1,6 +1,6 @@
-/tooling/t3code/upstream/
-/tooling/t3code/build/
-/tooling/t3code/state/
+/tooling/blacksand-t3/upstream/
+/tooling/blacksand-t3/build/
+/tooling/blacksand-t3/state/
 node_modules/
 *.log
 .DS_Store

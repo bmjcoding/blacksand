@@ -7,7 +7,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { EVALUATOR, evaluatorShape } from "./evaluator.ts";
+import { isEvaluator, evaluatorShape } from "./evaluator.ts";
 import { catBatch, objectIds, out, type Git } from "./git.ts";
 import { LAYOUTS, ambiguous, layoutNames, layoutOf, pinPath, type Layout } from "./layout.ts";
 import { SIGNERS, signatureKind, type SignatureKind } from "./signers.ts";
@@ -133,7 +133,7 @@ export function takeHistory(git: Git, revs: readonly string[], { root = null }: 
     for (const [list, shas] of lists) checkSignatures(git, dir, list, texts.get(list)?.bytes.toString("utf8") ?? "", shas, signed);
 
     // An evaluator commit's changed files and pins, for its bounds.
-    const bot = commits.filter((c) => signed.get(c.sha)?.principal === EVALUATOR && c.parents.length === 1);
+    const bot = commits.filter((c) => isEvaluator(signed.get(c.sha)?.principal) && c.parents.length === 1);
     const files = changedFiles(git, bot.map((c) => c.sha));
     if (!files) return UNREADABLE;
     const pinBlobs = bot.flatMap((c) => {
@@ -162,7 +162,7 @@ export function takeHistory(git: Git, revs: readonly string[], { root = null }: 
       // The first parent's layout says where this commit's pin is; a taken parent was checked before it, the trusted start wasn't.
       const before: Layout | null = layout(by(c));
       if (before === null) return { problem: ambiguous(parent === undefined ? label : `commit ${short(parent)}, which ${short(c.sha)} follows,`) };
-      if (principal === EVALUATOR) {
+      if (isEvaluator(principal)) {
         if (parent === undefined) return { problem: `${label} is the evaluator's; it needs one you sign` };
         const pinFile = pinPath(before);
         const why = evaluatorShape({ parents: c.parents.length, files: files.get(c.sha) ?? [], pinFile, after: pinText(c.sha, pinFile), before: pinText(parent, pinFile), afterMode: modeOf(`${c.sha}:${pinFile}`), beforeMode: modeOf(`${parent}:${pinFile}`) });
@@ -171,7 +171,7 @@ export function takeHistory(git: Git, revs: readonly string[], { root = null }: 
       const after = layout(c.sha);
       if (after === null) return { problem: ambiguous(label) };
       // An empty package tree changes no file, but would move where the pin is read.
-      if (principal === EVALUATOR && after !== before) return { problem: `evaluator commit ${short(c.sha)} changes the layout from ${before} to ${after}; only a commit you sign may` };
+      if (isEvaluator(principal) && after !== before) return { problem: `evaluator commit ${short(c.sha)} changes the layout from ${before} to ${after}; only a commit you sign may` };
       taken.push({ sha: c.sha, parents: c.parents, principal, pinChanged: parent !== undefined && pinBlob(c.sha) !== pinBlob(parent) });
     }
     return { commits: taken };
@@ -193,7 +193,7 @@ export function pinBasis(chain: readonly string[], of: ReadonlyMap<string, Pick<
   const bot: string[] = [];
   for (const sha of chain.slice(1)) {
     const commit = of.get(sha);
-    if (commit?.principal === EVALUATOR) bot.push(sha);
+    if (isEvaluator(commit?.principal)) bot.push(sha);
     else if (commit?.pinChanged) {
       trusted = sha;
       bot.length = 0;

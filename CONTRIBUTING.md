@@ -7,7 +7,7 @@ Issues and pull requests are welcome. Report vulnerabilities privately, as
 
 A machine running blacksand-t3 fast-forwards to `main` only when every new commit
 carries an SSH signature from a key in `.allowed_signers`. That includes commits on
-side branches. [Self-update](tooling/t3code/docs/updates/self-update.md) has the details.
+side branches. [Self-update](tooling/blacksand-t3/docs/updates/self-update.md) has the details.
 
 The list holds two keys: the owner's, and the CI evaluator's, which may sign only pin
 moves. So:
@@ -35,11 +35,11 @@ signature to land:
 | `substrates/kubernetes/src/node.ts` | the node egress floor |
 | `substrates/kubernetes/src/manifests.ts` | the sandbox Pod's lockdown |
 | `substrates/kubernetes/images/agent-tools.sh` | the pinned agent binaries |
-| `tooling/t3code/lib/rules.mjs`, `tooling/t3code/lib/features.mjs` | what is stripped and replaced, and which rules may be left out |
-| `tooling/t3code/lib/known-hosts.txt` | hosts upstream's source may name without failing the update |
-| `tooling/t3code/lib/native-assets.json`, `tooling/t3code/lib/known-device-tools.txt` | prebuilt files and device tool versions the app may install |
-| `tooling/t3code/lib/overrides.json`, `tooling/t3code/lib/known-resolutions.txt` | security overrides, and non-registry dependency sources |
-| `tooling/t3code/lib/pnpm.mjs` | the pinned pnpm and its digests |
+| `tooling/blacksand-t3/lib/rules.mjs`, `tooling/blacksand-t3/lib/features.mjs` | what is stripped and replaced, and which rules may be left out |
+| `tooling/blacksand-t3/lib/known-hosts.txt` | hosts upstream's source may name without failing the update |
+| `tooling/blacksand-t3/lib/native-assets.json`, `tooling/blacksand-t3/lib/known-device-tools.txt` | prebuilt files and device tool versions the app may install |
+| `tooling/blacksand-t3/lib/overrides.json`, `tooling/blacksand-t3/lib/known-resolutions.txt` | security overrides, and non-registry dependency sources |
+| `tooling/blacksand-t3/lib/pnpm.mjs` | the pinned pnpm and its digests |
 
 For a T3 rule change, include the output of `blacksand t3 check` against the pinned
 release, and say which upstream commit moved the code.
@@ -58,7 +58,7 @@ the shell scripts the push changes. `git push --no-verify` skips it once. To run
 same checks by hand:
 
 ```sh
-npm run typecheck    # tsc --noEmit, for src/ and scripts/, then tooling/t3code's TypeScript tests
+npm run typecheck    # tsc --noEmit, for src/ and scripts/, then tooling/blacksand-t3's TypeScript tests
 npm test             # the fast tier: under 10 s
 npm run test:deep    # signed histories, installer runs, real timeouts, property sweeps
 ```
@@ -77,11 +77,11 @@ Property tests use fast-check, in `fuzz-*.ts` and `*-property.test.ts` files. Th
 a fixed seed in the fast tier and a fresh one in the deep tier. A failure prints the
 seed and the command that replays it ([scripts/fuzz.ts](scripts/fuzz.ts)).
 
-Changes under `tooling/t3code/bin/`, `tooling/t3code/lib/` or `tooling/t3code/test/stripped/`
+Changes under `tooling/blacksand-t3/bin/`, `tooling/blacksand-t3/lib/` or `tooling/blacksand-t3/test/stripped/`
 also need a full build. Either run
 `BLACKSAND_T3_UNISOLATED_BUILD=1 blacksand t3 check --build` in a checkout that isn't
 an install, or let the `build.yml` workflow run.
-[Testing](tooling/t3code/docs/security/testing.md) describes the suite.
+[Testing](tooling/blacksand-t3/docs/security/testing.md) describes the suite.
 
 Changes to the Kubernetes sandbox also need its deep tests on a real cluster.
 `substrates/kubernetes/test/journey.deep.test.ts` lists the environment it needs.

@@ -2,7 +2,7 @@
 
 import { createHash } from "node:crypto";
 
-import { PNPM_BINARY_SHA256, PNPM_VERSION, buildToolsRoot } from "../../tooling/t3code/lib/pnpm.mjs";
+import { PNPM_BINARY_SHA256, PNPM_VERSION, buildToolsRoot } from "../../tooling/blacksand-t3/lib/pnpm.mjs";
 import { SSHD_KEYWORDS } from "../core/machine.ts";
 import { NO_LOGIN, absent, present, unknown, type Observed, type Sshd, type SshdConnection, type SshdSettings, type Tool, type User } from "../core/resource.ts";
 import type { Host, Output } from "./host.ts";
@@ -96,7 +96,7 @@ export function sshdOf(host: Host, enabled: boolean | null, accounts: Observed<s
 }
 
 /**
- * The pnpm builds run with (tooling/t3code/lib/pnpm.mjs): root's, for the build
+ * The pnpm builds run with (tooling/blacksand-t3/lib/pnpm.mjs): root's, for the build
  * account, else the one in the owner's ~/.local. Told by its SHA-256, without
  * running it: the pinned version when the digest is the pinned build's, else
  * null.

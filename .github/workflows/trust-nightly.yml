@@ -1,6 +1,6 @@
 # The commit-trust differential at full size, nightly and on demand: the old and
 # new verifiers on 10,000 generated signed histories
-# (tooling/t3code/test/trust-port.deep.test.mjs; ci.yml's deep tier runs 500 on
+# (tooling/blacksand-t3/test/trust-port.deep.test.mjs; ci.yml's deep tier runs 500 on
 # every push). A disagreement fails the job with its seed; rerun that seed
 # locally to get its repository and keys. Read-only token, no secrets.
 
@@ -30,4 +30,4 @@ jobs:
       - name: 10,000 generated signed histories
         env:
           TRUST_HISTORIES: "10000"
-        run: node --test tooling/t3code/test/trust-port.deep.test.mjs
+        run: node --test tooling/blacksand-t3/test/trust-port.deep.test.mjs

@@ -47,7 +47,7 @@ env:
 # Paths in the steps are the t3 package's.
 defaults:
   run:
-    working-directory: tooling/t3code
+    working-directory: tooling/blacksand-t3
 
 jobs:
   evaluate:
@@ -193,7 +193,7 @@ jobs:
           (umask 077 && printf '%s\n' "$SIGNING_KEY" > "$key")
           ref=$(node -p "require('./pin.json').channels[process.env.CHANNEL].ref")
           git -c core.hooksPath=/dev/null -c gpg.format=ssh -c gpg.ssh.program=ssh-keygen -c user.signingkey="$key" \
-            -c user.name="t3blackout evaluator" -c user.email="t3blackout-evaluator@users.noreply.github.com" \
+            -c user.name="blacksand evaluator" -c user.email="blacksand-evaluator@users.noreply.github.com" \
             commit -S -m "Pin $CHANNEL to $ref" -- pin.json
           rm -f "$key"
           # The token goes to git through its environment, not its command line.

@@ -24,12 +24,12 @@ Everything in this repository is in scope:
 - the Kubernetes sandbox: its proxy, manifests, node egress floor and run records
   (`substrates/kubernetes/`);
 - blacksand-t3:
-  - the strip rules and the files they inject (`tooling/t3code/lib/rules.mjs`,
-    `tooling/t3code/lib/files/`);
-  - the build, verification and install pipeline (`tooling/t3code/bin/`,
-    `tooling/t3code/lib/`);
-  - self-update and the pin trust rules (`tooling/t3code/lib/selfupdate.mjs`);
-  - the setup scripts (`tooling/t3code/install.sh`, `tooling/t3code/scripts/`);
+  - the strip rules and the files they inject (`tooling/blacksand-t3/lib/rules.mjs`,
+    `tooling/blacksand-t3/lib/files/`);
+  - the build, verification and install pipeline (`tooling/blacksand-t3/bin/`,
+    `tooling/blacksand-t3/lib/`);
+  - self-update and the pin trust rules (`tooling/blacksand-t3/lib/selfupdate.mjs`);
+  - the setup scripts (`tooling/blacksand-t3/install.sh`, `tooling/blacksand-t3/scripts/`);
 - the CI workflows and their scripts (`.github/`);
 - instructions in a README or `docs/` folder that would weaken a machine's security if
   followed as written.
@@ -51,7 +51,7 @@ Out of scope:
 - Third-party software: agent-sandbox, gVisor, Kubernetes, the agent CLIs, Tailscale,
   macOS, Homebrew, npm packages and the rest. Report it to that project.
 - The limits each component documents. For T3, that's the non-goals and accepted limits
-  in its [threat model](tooling/t3code/docs/security/threat-model.md#non-goals), such as
+  in its [threat model](tooling/blacksand-t3/docs/security/threat-model.md#non-goals), such as
   network enforcement at runtime, root or the admin account on a host, and power loss
   in the documented windows. For the Kubernetes sandbox, it's the list under
   [What it protects against](substrates/kubernetes/README.md#what-it-protects-against)
@@ -70,14 +70,14 @@ Out of scope:
 
 Only `main` is supported. Fixes land there as signed commits. There are no release
 branches. Machines running blacksand-t3 follow `main` through
-[self-update](tooling/t3code/docs/updates/self-update.md).
+[self-update](tooling/blacksand-t3/docs/updates/self-update.md).
 
 ## Security documentation
 
-- [Threat model](tooling/t3code/docs/security/threat-model.md) for T3
+- [Threat model](tooling/blacksand-t3/docs/security/threat-model.md) for T3
 - [What the Kubernetes sandbox protects against](substrates/kubernetes/README.md#what-it-protects-against)
-- [Privacy](tooling/t3code/docs/security/privacy.md)
-- [Supply chain](tooling/t3code/docs/security/supply-chain.md)
-- [Keys and incidents](tooling/t3code/docs/security/keys-and-incidents.md)
-- [Host hardening and the CIS Benchmark](tooling/t3code/docs/security/hardening-cis.md)
-- [Testing](tooling/t3code/docs/security/testing.md)
+- [Privacy](tooling/blacksand-t3/docs/security/privacy.md)
+- [Supply chain](tooling/blacksand-t3/docs/security/supply-chain.md)
+- [Keys and incidents](tooling/blacksand-t3/docs/security/keys-and-incidents.md)
+- [Host hardening and the CIS Benchmark](tooling/blacksand-t3/docs/security/hardening-cis.md)
+- [Testing](tooling/blacksand-t3/docs/security/testing.md)
