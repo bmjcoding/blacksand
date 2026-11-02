@@ -1776,11 +1776,17 @@ export const makeRules = ({ updater, build }) => [
   },
   {
     id: "web/blacksand-version-stamp",
-    why: "The build version stamped into the window's bottom-right corner, with its changes on hover (Blacksand themes)",
-    file: "apps/web/src/components/AppSidebarLayout.tsx",
+    why: "Build details beside the composer, in reserved responsive lane space, with hover/focus/tap access",
+    file: "apps/web/src/components/ChatView.tsx",
     edits: [
-      { find: 'import { isElectron } from "../env";', replace: 'import { isElectron } from "../env";\nimport { BlacksandVersionStamp } from "./BlacksandBrand";' },
-      { find: "        <SidebarControl />\n", replace: "        <SidebarControl />\n        <BlacksandVersionStamp />\n" },
+      {
+        find: 'import { ComposerSurface } from "./chat/ComposerSurface";',
+        replace: 'import { ComposerSurface } from "./chat/ComposerSurface";\nimport { BlacksandVersionStamp } from "./BlacksandBrand";',
+      },
+      {
+        find: "                  </div>\n                </div>\n              </div>\n            </div>\n\n            {canOperatePreview",
+        replace: "                  </div>\n                </div>\n                {embedded ? null : <BlacksandVersionStamp />}\n              </div>\n            </div>\n\n            {canOperatePreview",
+      },
     ],
   },
   {

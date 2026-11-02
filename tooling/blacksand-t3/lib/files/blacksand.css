@@ -67,39 +67,120 @@ html[data-t3b-send="on"] [data-slot="composer-shell"]:has([data-composer-banner-
 
 /* ------------------------------------------------------- version stamp -- */
 
-/* The build version in the window's bottom-right corner, styled as a stamp,
-   with what the build changed on hover or focus. BlacksandBrand.tsx only
-   renders it while Settings -> Appearance -> Version stamp is on. */
+/* Use the composer's own lane, after its safe-area/panel insets. The center
+   track keeps the chat max-width; the end track always reserves an icon and
+   grows into the spare gutter. :has leaves the upstream layout alone when the
+   appearance switch is off. No fixed positioning or viewport-width guesses. */
+.chat-composer-lane:has(> .t3b-version-rail) {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1fr)
+    minmax(0, min(var(--chat-content-max-width), calc(100% - 44px - var(--t3b-version-blocked-end, 0px))))
+    minmax(calc(32px + var(--t3b-version-blocked-end, 0px)), 1fr);
+  column-gap: 6px;
+  align-items: end;
+}
+
+.chat-composer-lane:has(> .t3b-version-rail) > [data-chat-composer-stack] {
+  grid-column: 2;
+  min-width: 0;
+}
+
+.t3b-version-rail {
+  grid-column: 3;
+  min-width: 0;
+  container: t3b-version / inline-size;
+  display: flex;
+  justify-content: flex-end;
+  margin-inline-end: var(--t3b-version-blocked-end, 0px);
+  /* Match ChatView's safe-area spacer: the button aligns with the bottom of
+     the whole composer (including its context strip), at any editor height. */
+  padding-bottom: calc(env(safe-area-inset-bottom) + 1rem);
+  pointer-events: auto;
+}
+
+@media (min-width: 640px) {
+  .t3b-version-rail {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 1.25rem);
+  }
+}
+
 .t3b-version-stamp {
-  position: fixed;
-  right: 12px;
-  bottom: 10px;
-  z-index: 30;
+  --t3b-version-surface: var(--card);
   display: inline-flex;
+  flex: 0 1 auto;
+  min-width: 32px;
+  max-width: 100%;
+  min-height: 32px;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 4px 7px;
-  border-radius: 2px;
-  background: #000;
+  padding: 6px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--t3b-version-surface);
   box-shadow: 0 0 0 1px var(--t3b-card-edge);
   color: var(--t3b-ember);
   font: 700 9.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
   letter-spacing: 0.06em;
-  cursor: default;
+  cursor: pointer;
   outline: none;
   user-select: none;
 }
 
-.t3b-version-stamp:focus-visible {
-  box-shadow: 0 0 0 1px var(--t3b-ember);
+/* Use ComposerSurface's theme surface and Glass treatment for its neighbor. */
+.dark .t3b-version-stamp { --t3b-version-surface: var(--surface-raised); }
+html[data-theme-id] .t3b-version-stamp { --t3b-version-surface: var(--app-theme-surface-raised); }
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .t3b-version-stamp {
+    background: color-mix(in oklab, var(--t3b-version-surface) var(--glass-opacity), transparent);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  }
 }
 
-.t3b-version-stamp > i {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--t3b-ember);
+.t3b-version-stamp:focus-visible {
+  box-shadow: 0 0 0 2px var(--t3b-ember);
 }
+
+.t3b-version-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.t3b-version-label,
+.t3b-version-stamp > i {
+  display: none;
+}
+
+/* This is the actual free gutter, not the window: panels, zoom and the chat
+   width setting all affect it. Keep extra-long desktop-reported versions
+   bounded too; their complete value is always in the label and details. */
+@container t3b-version (min-width: 250px) {
+  .t3b-version-icon { display: none; }
+  .t3b-version-label {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .t3b-version-stamp > i {
+    display: block;
+    flex-shrink: 0;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--t3b-ember);
+  }
+}
+
+/* The canvas may place a floating preview in the apparent end gutter. Keep a
+   compact target in the remaining space rather than covering preview content. */
+[data-t3b-version-preview] .t3b-version-icon { display: block; }
+[data-t3b-version-preview] .t3b-version-label,
+[data-t3b-version-preview] .t3b-version-stamp > i { display: none; }
 
 /* Near-neutral greys warmed a touch toward the accent, so the card sits with
    whatever colour the theme uses. */
@@ -112,24 +193,18 @@ html[data-t3b-send="on"] [data-slot="composer-shell"]:has([data-composer-banner-
   --t3b-card-muted: color-mix(in oklab, var(--t3b-accent) 10%, #7c7c7c);
 }
 
-/* The card sits above the stamp; its bottom padding bridges the gap so the
-   pointer can travel up into it without it closing. */
+/* The shared popover handles hover travel, focus, Escape, outside press and
+   viewport collisions. Its portal avoids the chat/panel overflow clipping. */
 .t3b-version-notes {
-  position: absolute;
-  right: -1px;
-  bottom: 100%;
-  display: none;
-  padding-bottom: 8px;
-}
-
-.t3b-version-stamp:is(:hover, :focus-within) .t3b-version-notes {
-  display: block;
+  width: 340px;
+  max-width: calc(100vw - 16px);
 }
 
 .t3b-version-card {
-  width: 340px;
-  max-height: min(420px, 60vh);
+  width: 100%;
+  max-height: min(420px, 60vh, var(--available-height, 60vh));
   overflow-y: auto;
+  overflow-wrap: anywhere;
   padding: 12px 14px;
   border-radius: 10px;
   background: var(--t3b-card);
