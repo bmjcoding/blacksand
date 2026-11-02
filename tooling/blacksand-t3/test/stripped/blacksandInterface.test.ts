@@ -35,8 +35,8 @@ describe("blacksand interface switches", () => {
       },
     });
     const { setBlacksandInterface } = await load();
-    expect(() => setBlacksandInterface("glow", false)).not.toThrow();
-    expect(attributes.get("data-t3b-glow")).toBe("off");
+    expect(() => setBlacksandInterface("selection", false)).not.toThrow();
+    expect(attributes.get("data-t3b-selection")).toBe("off");
   });
   it("reads stored switches", async () => {
     stubDom({ getItem: (key: string) => (key === "blacksand:interface:stamp" ? "off" : null), setItem: () => {} });

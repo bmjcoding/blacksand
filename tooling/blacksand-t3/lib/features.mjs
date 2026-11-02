@@ -74,24 +74,6 @@ export const features = [
     requires: ["styles"],
   },
   {
-    name: "glow-sidebar",
-    label: "Glow on the sidebar footer buttons",
-    description: "An ember ring and glow when you hover the icon buttons at the foot of the sidebar",
-    rules: ["web/blacksand-glow-sidebar"],
-  },
-  {
-    name: "glow-update",
-    label: "Glow on the update button",
-    description: "An ember ring and glow when you hover the sidebar's update button",
-    rules: ["web/blacksand-glow-update"],
-  },
-  {
-    name: "glow-attach",
-    label: "Glow on the attach button",
-    description: "An ember ring and glow when you hover the composer's attach button",
-    rules: ["web/blacksand-glow-attach"],
-  },
-  {
     name: "stage-pins",
     label: "Pinned patched dependencies",
     description: "Builds the app when a dependency upstream patches has published a newer version than its patch",

@@ -14,11 +14,6 @@ export const BLACKSAND_INTERFACE = {
     description: "A ringed send button in the theme's accent, and a glow around the chat box while you type.",
     searchTerms: "send button ring composer chat box glow accent",
   },
-  glow: {
-    title: "Button glow",
-    description: "A ring and glow when you hover the sidebar footer, update and attach buttons.",
-    searchTerms: "hover glow ring buttons sidebar footer update attach accent",
-  },
   stamp: {
     title: "Version stamp",
     description: "The build version in the window's bottom-right corner, with what changed and a preview of a waiting update.",

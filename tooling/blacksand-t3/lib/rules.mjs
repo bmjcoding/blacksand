@@ -1717,7 +1717,7 @@ export const makeRules = ({ updater, build }) => [
   // -------------------------------------------------------------- blacksand --
   {
     id: "web/blacksand-css",
-    why: "Ringed send button, composer glow, button glow, version stamp, accent text selection",
+    why: "Ringed send button, composer glow, version stamp, accent text selection",
     kind: "write",
     file: "apps/web/src/blacksand.css",
     content: readFile("blacksand.css"),
@@ -1791,36 +1791,8 @@ export const makeRules = ({ updater, build }) => [
     ],
   },
   {
-    id: "web/blacksand-glow-sidebar",
-    why: "Mark the sidebar footer's icon buttons for the hover glow, in the theme's accent (blacksand.css)",
-    file: "apps/web/src/components/sidebar/SidebarChrome.tsx",
-    edits: [
-      {
-        find: '<SidebarMenuButton aria-label={label} onClick={onClick} size="icon">',
-        replace: '<SidebarMenuButton aria-label={label} data-t3b-glow="" onClick={onClick} size="icon">',
-      },
-    ],
-  },
-  {
-    id: "web/blacksand-glow-update",
-    why: "Mark the sidebar's update button for the hover glow",
-    file: "apps/web/src/components/sidebar/SidebarUpdatePill.tsx",
-    edits: [
-      {
-        find: "      aria-disabled={isInteractionDisabled || undefined}\n",
-        replace: '      aria-disabled={isInteractionDisabled || undefined}\n      data-t3b-glow=""\n',
-      },
-    ],
-  },
-  {
-    id: "web/blacksand-glow-attach",
-    why: "Mark the composer's attach button for the hover glow",
-    file: "apps/web/src/components/chat/ComposerAttachmentStrip.tsx",
-    edits: [{ find: '              aria-label="Attach files"\n', replace: '              aria-label="Attach files"\n              data-t3b-glow=""\n' }],
-  },
-  {
     id: "web/blacksand-interface-file",
-    why: "The Blacksand interface switches (send ring, glow, version stamp, selection), per client, on by default",
+    why: "The Blacksand interface switches (send ring, version stamp, selection), per client, on by default",
     kind: "write",
     file: "apps/web/src/blacksandInterface.ts",
     content: readFile("blacksandInterface.ts"),

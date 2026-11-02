@@ -41,10 +41,9 @@ The rules remove what [privacy](../security/privacy.md) lists. They also give th
 its own name, bundle ID and data directory. The name is T3 Code (blacksand). The icon
 is upstream's, with a small blacksand badge in the corner. The sidebar logo is
 upstream's too, with a muted "blacksand" after it. A few touches follow whichever
-theme you pick: a ringed send button, button glow, a version stamp and accent text
-selection. Each has its own switch in **Settings → Appearance → Interface**. Blacksand
-adds no themes of its own. Use upstream's themes, or add a custom theme to change the
-accent.
+theme you pick: a ringed send button, a version stamp and accent text selection.
+Each has its own switch in **Settings → Appearance → Interface**. Blacksand adds no
+themes of its own. Use upstream's themes, or add a custom theme to change the accent.
 
 The badge's logo is [`docs/assets/blacksand.svg`](../../../../docs/assets/blacksand.svg).
 `tooling/blacksand-t3/lib/files/blacksand.svg` is a copy, so the T3 component builds on its

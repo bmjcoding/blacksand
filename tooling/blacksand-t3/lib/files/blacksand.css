@@ -320,31 +320,6 @@ html[data-t3b-send="on"] [data-slot="composer-shell"]:has([data-composer-banner-
   color: var(--t3b-card-muted);
 }
 
-/* ------------------------------------------------------- icon-button glow -- */
-
-/* The send button's ring and glow, on hover, for the other icon-only buttons
-   (sidebar footer, update, attach), marked with data-t3b-glow, while Settings ->
-   Appearance -> Button glow is on (blacksandInterface.ts). It takes the
-   send button's ember, the theme's accent lifted a step, so the two match. */
-:root {
-  --t3b-glow: var(--t3b-ember);
-}
-
-html[data-t3b-glow="on"] [data-t3b-glow] {
-  transition:
-    box-shadow 150ms ease-out,
-    color 150ms ease-out,
-    background-color 150ms ease-out;
-}
-
-html[data-t3b-glow="on"] [data-t3b-glow]:hover:not(:disabled, [aria-disabled="true"]) {
-  background: color-mix(in oklab, var(--t3b-glow) 12%, transparent);
-  color: var(--t3b-glow);
-  box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--t3b-glow) 55%, transparent),
-    0 0 18px color-mix(in oklab, var(--t3b-glow) 35%, transparent);
-}
-
 /* ------------------------------------------------------- text selection -- */
 
 /* Upstream leaves selected text to the system highlight, macOS blue on every
