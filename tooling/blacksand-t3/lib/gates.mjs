@@ -16,6 +16,7 @@ import { request } from "./http.mjs";
 import { inTree, parseLockfile, splitPackage } from "./lockfile.mjs";
 import { compareVersions, parseVersion } from "./semver.mjs";
 import { hostsIn } from "./strip-engine.mjs";
+import { nativeScanText } from "./native-scan-contexts.mjs";
 
 /** A minimum age in days: a finite, non-negative number, or this throws (an unreadable setting must not turn a gate off). */
 export function ageSetting(value, what = "minimum age") {
@@ -263,8 +264,8 @@ export const heldDependencies = (gate) => [
 
 const ANALYTICS = ["posthog", "sentry", "segment.io", "segment.com", "amplitude", "mixpanel", "datadog", "bugsnag", "rollbar", "statsig", "launchdarkly"];
 
-/** Hosts written as URLs (their real authority, lib/strip-engine.mjs hostsIn), and analytics names, in a package's shipped code. */
-export function scanPackage(dir) {
+/** Hosts and analytics in shipped code; exact native contexts require fetchPackage's verified identity. */
+export function scanPackage(dir, identity = null) {
   const hosts = new Set();
   const analytics = new Set();
   const walk = (current) => {
@@ -273,7 +274,8 @@ export function scanPackage(dir) {
       if (entry.isDirectory()) {
         if (entry.name !== "node_modules") walk(full);
       } else if (/\.(m?js|cjs|json|node)$/.test(entry.name) && !/\.map$/.test(entry.name)) {
-        const text = fs.readFileSync(full, "latin1");
+        const bytes = fs.readFileSync(full);
+        const text = entry.name.endsWith(".node") ? nativeScanText(bytes, path.relative(dir, full).split(path.sep).join("/"), identity) : bytes.toString("latin1");
         for (const { host } of hostsIn(text)) hosts.add(host);
         const lower = text.toLowerCase();
         for (const name of ANALYTICS) if (lower.includes(name)) analytics.add(name);
@@ -284,7 +286,7 @@ export function scanPackage(dir) {
   return { hosts, analytics };
 }
 
-/** Downloads `name@version` from npm, checks it against the registry's integrity hash and unpacks it under `into`: { dir, meta, publishedAt }. */
+/** Downloads and integrity-checks `name@version`: { dir, meta, publishedAt, identity (verified registry bytes) }. */
 export async function fetchPackage(name, version, into) {
   const meta = await npmMeta(name);
   const dist = meta?.versions?.[version]?.dist;
@@ -300,7 +302,10 @@ export async function fetchPackage(name, version, into) {
   fs.writeFileSync(tarball, bytes);
   const result = spawnSync("tar", ["-xzf", tarball, "-C", into], { encoding: "utf8" });
   if (result.status !== 0) throw new Error(`couldn't unpack ${name}@${version}: ${result.stderr.trim()}`);
-  return { dir: path.join(into, "package"), meta: meta.versions[version], publishedAt: meta.time?.[version] };
+  // npm tarballs have one top folder; @types packages need not call it package.
+  const tops = fs.readdirSync(into, { withFileTypes: true }).filter((entry) => entry.isDirectory());
+  if (tops.length !== 1) throw new Error(`${name}@${version}'s tarball doesn't have one package folder`);
+  return { dir: path.join(into, tops[0].name), meta: meta.versions[version], publishedAt: meta.time?.[version], identity: Object.freeze({ name, version, integrity: dist.integrity }) };
 }
 
 /**
@@ -332,8 +337,8 @@ export async function reviewDeviceTool(pin, previous, { isKnownHost, minDays = M
     if (prev.meta?.dist?.attestations && !next.meta?.dist?.attestations) {
       reasons.push(`no npm provenance, though ${previous} had it`);
     }
-    const before = scanPackage(prev.dir);
-    const after = scanPackage(next.dir);
+    const before = scanPackage(prev.dir, prev.identity);
+    const after = scanPackage(next.dir, next.identity);
     const newHosts = [...after.hosts].filter((host) => !before.hosts.has(host) && !isKnownHost(host)).sort();
     const newAnalytics = [...after.analytics].filter((tag) => !before.analytics.has(tag)).sort();
     if (newHosts.length) reasons.push(`new network hosts: ${newHosts.join(", ")}`);

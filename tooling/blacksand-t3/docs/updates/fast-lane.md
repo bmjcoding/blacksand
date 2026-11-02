@@ -99,6 +99,23 @@ it needs the owner's signature. Remove an entry once upstream ships the fix. An
 advisory with no fix in the same major line stays open as an
 [issue](evaluator.md#alerts).
 
+The `node-forge@1.4.0` override selects 1.4.1 within the same major. Its eight
+HIGH vulnerabilities are basicConstraints bypass (GHSA-5x38-2vff-x55p), PEM
+parsing ReDoS (GHSA-7wch-p9px-956x), nested DigestAlgorithm acceptance
+(GHSA-86w9-cpqp-85rv), fragmented-handshake crashes (GHSA-8hrf-8g6f-7xwp), TLS
+record recursion (GHSA-hqq3-7jhf-c5jx), zero-iteration PKCS#12 derivation
+(GHSA-jc66-7q78-782g),
+[non-canonical DigestInfo forgery](https://github.com/digitalbazaar/forge/security/advisories/GHSA-6qrw-m8cv-hcxf)
+and [ASN.1 BIT STRING exhaustion](https://github.com/digitalbazaar/forge/security/advisories/GHSA-rhr8-3pm8-cq29).
+Forge's repository advisories are always read alongside OSV and GitHub's
+database, including lower-rated reports. The maintainer's
+[nested-DigestAlgorithm report](https://github.com/digitalbazaar/forge/security/advisories/GHSA-2g46-22mc-6gwp)
+shares a CVE with the curated record and is merged; its 1.4.1 fix claim stays
+attributed to the maintainer. The
+[1.4.1 changelog](https://github.com/digitalbazaar/forge/blob/8a917370ec51731e817c2d547b7329a58f8210af/CHANGELOG.md)
+corroborates the fixes. UUID v7 and Zod v3 findings remain open; this override
+does not change their major versions.
+
 **Device tool overrides.** The `deviceTools` list in the same file raises a vulnerable
 device tool that upstream still pins. Today it raises `agent-device` from 0.21.31 to
 0.21.35, for GHSA-6845-fcpx-jc45 and GHSA-xr68-vpwv-cgg9. See

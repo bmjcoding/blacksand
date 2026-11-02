@@ -14,7 +14,7 @@ import assert from "node:assert/strict";
 import * as advisories from "../lib/advisories.mjs";
 import { findAdvisories, fixedVersions, isAlerting, severityOf } from "../lib/advisories.mjs";
 import { electronSecurityReason, makeFastLane, publisherContinuity, repoOf, runtimeAdvisories } from "../lib/fastlane.mjs";
-import { dependencyAgeGate, reviewAddedDeviceTools, reviewDeviceTool } from "../lib/gates.mjs";
+import { dependencyAgeGate, fetchPackage, reviewAddedDeviceTools, reviewDeviceTool, scanPackage } from "../lib/gates.mjs";
 import { request } from "../lib/http.mjs";
 
 const DAY = 86_400_000;
@@ -39,20 +39,40 @@ const noGithubAdvisories = (...pkgs) =>
   Object.fromEntries(["", "&type=malware"].map((type) => [`https://api.github.com/advisories?ecosystem=npm&per_page=100${type}&affects=${pkgs.map(encodeURIComponent).join(",")}`, () => json([])]));
 
 /** A gzipped npm tarball of `files` (under package/) and its sha512 integrity. */
-function tarball(files) {
+function tarball(files, top = "package") {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "t3b-trust-tgz-"));
   for (const [name, content] of Object.entries(files)) {
-    fs.mkdirSync(path.dirname(path.join(dir, "package", name)), { recursive: true });
-    fs.writeFileSync(path.join(dir, "package", name), content);
+    fs.mkdirSync(path.dirname(path.join(dir, top, name)), { recursive: true });
+    fs.writeFileSync(path.join(dir, top, name), content);
   }
   const out = path.join(dir, "out.tgz");
-  assert.equal(spawnSync("tar", ["-czf", out, "-C", dir, "package"]).status, 0);
+  assert.equal(spawnSync("tar", ["-czf", out, "-C", dir, top]).status, 0);
   const bytes = fs.readFileSync(out);
   fs.rmSync(dir, { recursive: true, force: true });
   return { bytes, integrity: `sha512-${createHash("sha512").update(bytes).digest("base64")}` };
 }
 
 // ------------------------------------------------------------------ fetch --
+
+test("verified fetch scans npm's sole top folder even when it isn't named package", async () => {
+  const { bytes, integrity } = tarball({ "index.js": "fetch('https://unreviewed.example.org/events'); sentry_init();" }, "types-entry");
+  const url = "https://registry.npmjs.org/trust-top-folder/-/trust-top-folder-1.0.0.tgz";
+  const badUrl = url.replace("1.0.0.tgz", "1.0.1.tgz");
+  mockFetch({
+    [registry("trust-top-folder")]: () => json({ versions: { "1.0.0": { dist: { tarball: url, integrity } }, "1.0.1": { dist: { tarball: badUrl, integrity } } } }),
+    [url]: () => new Response(bytes),
+    [badUrl]: () => new Response(Buffer.concat([bytes, Buffer.from("substituted")])),
+  });
+  const into = fs.mkdtempSync(path.join(os.tmpdir(), "t3b-top-folder-"));
+  try {
+    const fetched = await fetchPackage("trust-top-folder", "1.0.0", into);
+    assert.equal(path.basename(fetched.dir), "types-entry");
+    assert.deepEqual(fetched.identity, { name: "trust-top-folder", version: "1.0.0", integrity });
+    assert.ok(scanPackage(fetched.dir, fetched.identity).hosts.has("unreviewed.example.org"));
+    assert.ok(scanPackage(fetched.dir, fetched.identity).analytics.has("sentry"));
+    await assert.rejects(fetchPackage("trust-top-folder", "1.0.1", path.join(into, "bad")), /doesn't match the registry's integrity hash/);
+  } finally { fs.rmSync(into, { recursive: true, force: true }); }
+});
 
 test("request retries 5xx and transport errors, and fails fast on other statuses", async () => {
   let n = 0;

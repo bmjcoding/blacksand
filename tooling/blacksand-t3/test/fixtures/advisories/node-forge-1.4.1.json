@@ -1,0 +1,1874 @@
+{
+  "capturedAt": "2026-11-02T21:27:03.729447+00:00",
+  "sources": [
+    "https://api.osv.dev/v1/querybatch",
+    "https://api.github.com/advisories?ecosystem=npm&per_page=100&affects=node-forge%401.4.0,node-forge%401.4.1",
+    "https://api.github.com/repos/digitalbazaar/forge/security-advisories?state=published&per_page=100",
+    "https://registry.npmjs.org/node-forge"
+  ],
+  "metadata": {
+    "versions": {
+      "1.4.0": {
+        "name": "node-forge",
+        "version": "1.4.0",
+        "_npmUser": {
+          "name": "davidlehn"
+        },
+        "repository": {
+          "url": "git+https://github.com/digitalbazaar/forge.git",
+          "type": "git"
+        },
+        "dist": {
+          "shasum": "1c7b7d8bdc2d078739f58287d589d903a11b2fc2",
+          "tarball": "https://registry.npmjs.org/node-forge/-/node-forge-1.4.0.tgz",
+          "fileCount": 59,
+          "integrity": "sha512-LarFH0+6VfriEhqMMcLX2F7SwSXeWwnEAJEsYm5QKWchiVYVvJyV9v7UDvUv+w5HO23ZpQTXDv/GxdDdMyOuoQ==",
+          "signatures": [
+            {
+              "sig": "MEQCIHN+qilMnh4W7N6nrRE5KXZgu26uSkmTfjPiujxr0qAvAiB2zOy5/OdnRK68PHo2WfVDpoLCo8PgFJ5pyBuWqNUO9A==",
+              "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+            }
+          ],
+          "unpackedSize": 1647637
+        },
+        "gitHead": "fa385f92440879601240020f158bed68e444e83a"
+      },
+      "1.4.1": {
+        "name": "node-forge",
+        "version": "1.4.1",
+        "_npmUser": {
+          "name": "davidlehn"
+        },
+        "repository": {
+          "url": "git+https://github.com/digitalbazaar/forge.git",
+          "type": "git"
+        },
+        "dist": {
+          "shasum": "696367cbe60d1bf92cd2d926eaef18897e885cba",
+          "tarball": "https://registry.npmjs.org/node-forge/-/node-forge-1.4.1.tgz",
+          "fileCount": 59,
+          "integrity": "sha512-w5/MfWaeMrpR/5ba6fZyAUTLSuE6aYz7H/3cYrqwZEmf5eQS3IaaLgJt4MBv7HglGFWmV22K8h4U18RJQmw/ow==",
+          "signatures": [
+            {
+              "sig": "MEUCIQCEjH4/aVSC5SpcgtdYxTuM0NR/OAg8vHmpt8DLUDytFQIgVKswJQ19LTdUn5O2AWRrVuXX+I8MODFhHP+7htaoN+M=",
+              "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+            },
+            {
+              "sig": "MEUCIB3VtKPmQoFyjuJ/ttaSTH2YG4qeFOO1pZ6fYUFWOB4BAiEAxjiyuLhdiDQqPwz+g9Q3MGrIAy+IqxEWcJmzJAV1IAY=",
+              "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+            }
+          ],
+          "unpackedSize": 1665553
+        },
+        "gitHead": "8a917370ec51731e817c2d547b7329a58f8210af"
+      }
+    },
+    "time": {
+      "1.4.0": "2026-03-24T21:44:34.668Z",
+      "1.4.1": "2026-10-27T04:44:07.718Z"
+    }
+  },
+  "osv": [
+    {
+      "id": "GHSA-4487-j8r4-4g2f",
+      "aliases": [
+        "CVE-2026-118780"
+      ],
+      "summary": "Forge: verifyCertificateChain() removes trusted CA certificates with the same subject from the CA store",
+      "severity": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:L"
+        }
+      ],
+      "database_specific": {
+        "github_reviewed_at": "2026-10-30T23:02:14Z",
+        "nvd_published_at": "2026-10-29T19:17:20Z",
+        "cwe_ids": [
+          "CWE-295",
+          "CWE-471"
+        ],
+        "severity": "LOW",
+        "github_reviewed": true
+      },
+      "affected": [
+        {
+          "package": {
+            "name": "node-forge",
+            "ecosystem": "npm",
+            "purl": "pkg:npm/node-forge"
+          },
+          "ranges": [
+            {
+              "type": "SEMVER",
+              "events": [
+                {
+                  "introduced": "0"
+                },
+                {
+                  "fixed": "1.4.1"
+                }
+              ]
+            }
+          ],
+          "database_specific": {
+            "last_known_affected_version_range": "<= 1.4.0",
+            "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2026/10/GHSA-4487-j8r4-4g2f/GHSA-4487-j8r4-4g2f.json"
+          }
+        }
+      ]
+    },
+    {
+      "id": "GHSA-4642-5mcj-2rqw",
+      "aliases": [
+        "CVE-2026-118775"
+      ],
+      "summary": "Forge: ASN.1 OID first arc truncation in asn1.oidToDer",
+      "severity": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N"
+        }
+      ],
+      "database_specific": {
+        "github_reviewed_at": "2026-10-30T23:02:40Z",
+        "nvd_published_at": "2026-10-29T19:17:20Z",
+        "cwe_ids": [
+          "CWE-190"
+        ],
+        "severity": "LOW",
+        "github_reviewed": true
+      },
+      "affected": [
+        {
+          "package": {
+            "name": "node-forge",
+            "ecosystem": "npm",
+            "purl": "pkg:npm/node-forge"
+          },
+          "ranges": [
+            {
+              "type": "SEMVER",
+              "events": [
+                {
+                  "introduced": "0"
+                },
+                {
+                  "fixed": "1.4.1"
+                }
+              ]
+            }
+          ],
+          "database_specific": {
+            "last_known_affected_version_range": "<= 1.4.0",
+            "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2026/10/GHSA-4642-5mcj-2rqw/GHSA-4642-5mcj-2rqw.json"
+          }
+        }
+      ]
+    },
+    {
+      "id": "GHSA-525v-9gp9-w22h",
+      "aliases": [
+        "CVE-2026-118778"
+      ],
+      "summary": "Forge: TLS client crash when the server sends no certificate",
+      "severity": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        }
+      ],
+      "database_specific": {
+        "cwe_ids": [
+          "CWE-476"
+        ],
+        "severity": "MODERATE",
+        "github_reviewed": true,
+        "github_reviewed_at": "2026-10-30T23:02:30Z",
+        "nvd_published_at": "2026-10-29T19:17:20Z"
+      },
+      "affected": [
+        {
+          "package": {
+            "name": "node-forge",
+            "ecosystem": "npm",
+            "purl": "pkg:npm/node-forge"
+          },
+          "ranges": [
+            {
+              "type": "SEMVER",
+              "events": [
+                {
+                  "introduced": "0"
+                },
+                {
+                  "fixed": "1.4.1"
+                }
+              ]
+            }
+          ],
+          "database_specific": {
+            "last_known_affected_version_range": "<= 1.4.0",
+            "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2026/10/GHSA-525v-9gp9-w22h/GHSA-525v-9gp9-w22h.json"
+          }
+        }
+      ]
+    },
+    {
+      "id": "GHSA-5cwg-6vw7-rj6p",
+      "aliases": [
+        "CVE-2026-119186"
+      ],
+      "summary": "Forge: AES-GCM authentication bypass via unvalidated tagLength option",
+      "severity": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:H/A:N"
+        }
+      ],
+      "database_specific": {
+        "github_reviewed": true,
+        "github_reviewed_at": "2026-10-30T23:02:09Z",
+        "nvd_published_at": "2026-10-29T20:17:29Z",
+        "cwe_ids": [
+          "CWE-1284",
+          "CWE-354"
+        ],
+        "severity": "MODERATE"
+      },
+      "affected": [
+        {
+          "package": {
+            "name": "node-forge",
+            "ecosystem": "npm",
+            "purl": "pkg:npm/node-forge"
+          },
+          "ranges": [
+            {
+              "type": "SEMVER",
+              "events": [
+                {
+                  "introduced": "0"
+                },
+                {
+                  "fixed": "1.4.1"
+                }
+              ]
+            }
+          ],
+          "database_specific": {
+            "last_known_affected_version_range": "<= 1.4.0",
+            "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2026/10/GHSA-5cwg-6vw7-rj6p/GHSA-5cwg-6vw7-rj6p.json"
+          }
+        }
+      ]
+    },
+    {
+      "id": "GHSA-5x38-2vff-x55p",
+      "aliases": [
+        "CVE-2026-119190"
+      ],
+      "summary": "Forge: X.509 basicConstraints bypass in verifyCertificateChain() via deprecated extension OIDs 2.5.29.10 and 2.5.29.13",
+      "severity": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N"
+        }
+      ],
+      "database_specific": {
+        "nvd_published_at": "2026-10-29T20:17:30Z",
+        "cwe_ids": [
+          "CWE-295",
+          "CWE-436"
+        ],
+        "severity": "HIGH",
+        "github_reviewed": true,
+        "github_reviewed_at": "2026-10-30T23:01:46Z"
+      },
+      "affected": [
+        {
+          "package": {
+            "name": "node-forge",
+            "ecosystem": "npm",
+            "purl": "pkg:npm/node-forge"
+          },
+          "ranges": [
+            {
+              "type": "SEMVER",
+              "events": [
+                {
+                  "introduced": "0"
+                },
+                {
+                  "fixed": "1.4.1"
+                }
+              ]
+            }
+          ],
+          "database_specific": {
+            "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2026/10/GHSA-5x38-2vff-x55p/GHSA-5x38-2vff-x55p.json",
+            "last_known_affected_version_range": "<= 1.4.0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "GHSA-6wvx-3r32-xmcg",
+      "aliases": [
+        "CVE-2026-118777"
+      ],
+      "summary": "Forge: Prototype Pollution in forge.http cookie handling via a malicious Set-Cookie",
+      "severity": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:L"
+        }
+      ],
+      "database_specific": {
+        "nvd_published_at": "2026-10-29T19:17:20Z",
+        "cwe_ids": [
+          "CWE-1321"
+        ],
+        "severity": "MODERATE",
+        "github_reviewed": true,
+        "github_reviewed_at": "2026-10-30T23:02:35Z"
+      },
+      "affected": [
+        {
+          "package": {
+            "name": "node-forge",
+            "ecosystem": "npm",
+            "purl": "pkg:npm/node-forge"
+          },
+          "ranges": [
+            {
+              "type": "SEMVER",
+              "events": [
+                {
+                  "introduced": "0"
+                },
+                {
+                  "fixed": "1.4.1"
+                }
+              ]
+            }
+          ],
+          "database_specific": {
+            "last_known_affected_version_range": "<= 1.4.0",
+            "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2026/10/GHSA-6wvx-3r32-xmcg/GHSA-6wvx-3r32-xmcg.json"
+          }
+        }
+      ]
+    },
+    {
+      "id": "GHSA-7wch-p9px-956x",
+      "aliases": [
+        "CVE-2026-118779"
+      ],
+      "summary": "Forge: Regular expression denial of service in PEM decoding (pem.decode)",
+      "severity": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        }
+      ],
+      "database_specific": {
+        "nvd_published_at": "2026-10-29T19:17:20Z",
+        "cwe_ids": [
+          "CWE-1333",
+          "CWE-400"
+        ],
+        "severity": "HIGH",
+        "github_reviewed": true,
+        "github_reviewed_at": "2026-10-30T23:02:25Z"
+      },
+      "affected": [
+        {
+          "package": {
+            "name": "node-forge",
+            "ecosystem": "npm",
+            "purl": "pkg:npm/node-forge"
+          },
+          "ranges": [
+            {
+              "type": "SEMVER",
+              "events": [
+                {
+                  "introduced": "0"
+                },
+                {
+                  "fixed": "1.4.1"
+                }
+              ]
+            }
+          ],
+          "database_specific": {
+            "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2026/10/GHSA-7wch-p9px-956x/GHSA-7wch-p9px-956x.json",
+            "last_known_affected_version_range": "<= 1.4.0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "GHSA-86w9-cpqp-85rv",
+      "aliases": [
+        "CVE-2026-33894",
+        "CVE-2026-85393",
+        "GHSA-ppp5-5v6c-4jwp"
+      ],
+      "summary": "node-forge RSA PKCS#1 v1.5 signature verification accepts extra nested DigestAlgorithm elements",
+      "severity": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N"
+        },
+        {
+          "type": "CVSS_V4",
+          "score": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:H/VA:N/SC:N/SI:N/SA:N"
+        }
+      ],
+      "database_specific": {
+        "nvd_published_at": "2026-09-03T19:17:31Z",
+        "cwe_ids": [
+          "CWE-347"
+        ],
+        "severity": "HIGH",
+        "github_reviewed": true,
+        "github_reviewed_at": "2026-10-01T21:09:09Z"
+      },
+      "affected": [
+        {
+          "package": {
+            "name": "node-forge",
+            "ecosystem": "npm",
+            "purl": "pkg:npm/node-forge"
+          },
+          "ranges": [
+            {
+              "type": "SEMVER",
+              "events": [
+                {
+                  "introduced": "0"
+                },
+                {
+                  "last_affected": "1.4.0"
+                }
+              ]
+            }
+          ],
+          "database_specific": {
+            "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2026/09/GHSA-86w9-cpqp-85rv/GHSA-86w9-cpqp-85rv.json"
+          }
+        }
+      ]
+    },
+    {
+      "id": "GHSA-8hrf-8g6f-7xwp",
+      "aliases": [
+        "CVE-2026-119188"
+      ],
+      "summary": "Forge: Denial of service in TLS record processing via a record interleaved with a fragmented handshake message",
+      "severity": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        }
+      ],
+      "database_specific": {
+        "severity": "HIGH",
+        "github_reviewed": true,
+        "github_reviewed_at": "2026-10-30T23:02:00Z",
+        "nvd_published_at": "2026-10-29T20:17:29Z",
+        "cwe_ids": [
+          "CWE-248",
+          "CWE-476"
+        ]
+      },
+      "affected": [
+        {
+          "package": {
+            "name": "node-forge",
+            "ecosystem": "npm",
+            "purl": "pkg:npm/node-forge"
+          },
+          "ranges": [
+            {
+              "type": "SEMVER",
+              "events": [
+                {
+                  "introduced": "0"
+                },
+                {
+                  "fixed": "1.4.1"
+                }
+              ]
+            }
+          ],
+          "database_specific": {
+            "last_known_affected_version_range": "<= 1.4.0",
+            "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2026/10/GHSA-8hrf-8g6f-7xwp/GHSA-8hrf-8g6f-7xwp.json"
+          }
+        }
+      ]
+    },
+    {
+      "id": "GHSA-h6cr-wjv9-3cpp",
+      "aliases": [
+        "CVE-2026-118781"
+      ],
+      "summary": "Forge: Denial of Service via infinite loop in BigInteger.modInverse() with negative input (incomplete fix of CVE-2026-33891)",
+      "severity": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:L/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:L"
+        }
+      ],
+      "database_specific": {
+        "github_reviewed": true,
+        "github_reviewed_at": "2026-10-30T23:02:20Z",
+        "nvd_published_at": "2026-10-29T19:17:20Z",
+        "cwe_ids": [
+          "CWE-835"
+        ],
+        "severity": "LOW"
+      },
+      "affected": [
+        {
+          "package": {
+            "name": "node-forge",
+            "ecosystem": "npm",
+            "purl": "pkg:npm/node-forge"
+          },
+          "ranges": [
+            {
+              "type": "SEMVER",
+              "events": [
+                {
+                  "introduced": "0"
+                },
+                {
+                  "fixed": "1.4.1"
+                }
+              ]
+            }
+          ],
+          "database_specific": {
+            "last_known_affected_version_range": "<= 1.4.0",
+            "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2026/10/GHSA-h6cr-wjv9-3cpp/GHSA-h6cr-wjv9-3cpp.json"
+          }
+        }
+      ]
+    },
+    {
+      "id": "GHSA-hqq3-7jhf-c5jx",
+      "aliases": [
+        "CVE-2026-119187"
+      ],
+      "summary": "Forge: Denial of service in TLS record processing via call stack exhaustion",
+      "severity": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        }
+      ],
+      "database_specific": {
+        "nvd_published_at": "2026-10-29T20:17:29Z",
+        "cwe_ids": [
+          "CWE-674"
+        ],
+        "severity": "HIGH",
+        "github_reviewed": true,
+        "github_reviewed_at": "2026-10-30T23:01:54Z"
+      },
+      "affected": [
+        {
+          "package": {
+            "name": "node-forge",
+            "ecosystem": "npm",
+            "purl": "pkg:npm/node-forge"
+          },
+          "ranges": [
+            {
+              "type": "SEMVER",
+              "events": [
+                {
+                  "introduced": "0"
+                },
+                {
+                  "fixed": "1.4.1"
+                }
+              ]
+            }
+          ],
+          "database_specific": {
+            "last_known_affected_version_range": "<= 1.4.0",
+            "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2026/10/GHSA-hqq3-7jhf-c5jx/GHSA-hqq3-7jhf-c5jx.json"
+          }
+        }
+      ]
+    },
+    {
+      "id": "GHSA-jc66-7q78-782g",
+      "aliases": [
+        "CVE-2026-118782"
+      ],
+      "summary": "Forge: PKCS#12 MAC forgery and constant-key PBE via zero iteration count",
+      "severity": [
+        {
+          "type": "CVSS_V3",
+          "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N"
+        }
+      ],
+      "database_specific": {
+        "severity": "HIGH",
+        "github_reviewed": true,
+        "github_reviewed_at": "2026-10-30T23:02:05Z",
+        "nvd_published_at": "2026-10-29T19:17:20Z",
+        "cwe_ids": [
+          "CWE-1284",
+          "CWE-354"
+        ]
+      },
+      "affected": [
+        {
+          "package": {
+            "name": "node-forge",
+            "ecosystem": "npm",
+            "purl": "pkg:npm/node-forge"
+          },
+          "ranges": [
+            {
+              "type": "SEMVER",
+              "events": [
+                {
+                  "introduced": "0"
+                },
+                {
+                  "fixed": "1.4.1"
+                }
+              ]
+            }
+          ],
+          "database_specific": {
+            "last_known_affected_version_range": "<= 1.4.0",
+            "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2026/10/GHSA-jc66-7q78-782g/GHSA-jc66-7q78-782g.json"
+          }
+        }
+      ]
+    }
+  ],
+  "database": [
+    {
+      "ghsa_id": "GHSA-4642-5mcj-2rqw",
+      "cve_id": "CVE-2026-118775",
+      "identifiers": [
+        {
+          "value": "GHSA-4642-5mcj-2rqw",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-118775",
+          "type": "CVE"
+        }
+      ],
+      "summary": "Forge: ASN.1 OID first arc truncation in asn1.oidToDer",
+      "severity": "low",
+      "type": "reviewed",
+      "withdrawn_at": null,
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "first_patched_version": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-6wvx-3r32-xmcg",
+      "cve_id": "CVE-2026-118777",
+      "identifiers": [
+        {
+          "value": "GHSA-6wvx-3r32-xmcg",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-118777",
+          "type": "CVE"
+        }
+      ],
+      "summary": "Forge: Prototype Pollution in forge.http cookie handling via a malicious Set-Cookie",
+      "severity": "medium",
+      "type": "reviewed",
+      "withdrawn_at": null,
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "first_patched_version": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-525v-9gp9-w22h",
+      "cve_id": "CVE-2026-118778",
+      "identifiers": [
+        {
+          "value": "GHSA-525v-9gp9-w22h",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-118778",
+          "type": "CVE"
+        }
+      ],
+      "summary": "Forge: TLS client crash when the server sends no certificate",
+      "severity": "medium",
+      "type": "reviewed",
+      "withdrawn_at": null,
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "first_patched_version": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-7wch-p9px-956x",
+      "cve_id": "CVE-2026-118779",
+      "identifiers": [
+        {
+          "value": "GHSA-7wch-p9px-956x",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-118779",
+          "type": "CVE"
+        }
+      ],
+      "summary": "Forge: Regular expression denial of service in PEM decoding (pem.decode)",
+      "severity": "high",
+      "type": "reviewed",
+      "withdrawn_at": null,
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "first_patched_version": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-h6cr-wjv9-3cpp",
+      "cve_id": "CVE-2026-118781",
+      "identifiers": [
+        {
+          "value": "GHSA-h6cr-wjv9-3cpp",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-118781",
+          "type": "CVE"
+        }
+      ],
+      "summary": "Forge: Denial of Service via infinite loop in BigInteger.modInverse() with negative input (incomplete fix of CVE-2026-33891)",
+      "severity": "low",
+      "type": "reviewed",
+      "withdrawn_at": null,
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "first_patched_version": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-4487-j8r4-4g2f",
+      "cve_id": "CVE-2026-118780",
+      "identifiers": [
+        {
+          "value": "GHSA-4487-j8r4-4g2f",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-118780",
+          "type": "CVE"
+        }
+      ],
+      "summary": "Forge: verifyCertificateChain() removes trusted CA certificates with the same subject from the CA store",
+      "severity": "low",
+      "type": "reviewed",
+      "withdrawn_at": null,
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "first_patched_version": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-5cwg-6vw7-rj6p",
+      "cve_id": "CVE-2026-119186",
+      "identifiers": [
+        {
+          "value": "GHSA-5cwg-6vw7-rj6p",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-119186",
+          "type": "CVE"
+        }
+      ],
+      "summary": "Forge: AES-GCM authentication bypass via unvalidated tagLength option",
+      "severity": "medium",
+      "type": "reviewed",
+      "withdrawn_at": null,
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "first_patched_version": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-jc66-7q78-782g",
+      "cve_id": "CVE-2026-118782",
+      "identifiers": [
+        {
+          "value": "GHSA-jc66-7q78-782g",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-118782",
+          "type": "CVE"
+        }
+      ],
+      "summary": "Forge: PKCS#12 MAC forgery and constant-key PBE via zero iteration count",
+      "severity": "high",
+      "type": "reviewed",
+      "withdrawn_at": null,
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "first_patched_version": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-8hrf-8g6f-7xwp",
+      "cve_id": "CVE-2026-119188",
+      "identifiers": [
+        {
+          "value": "GHSA-8hrf-8g6f-7xwp",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-119188",
+          "type": "CVE"
+        }
+      ],
+      "summary": "Forge: Denial of service in TLS record processing via a record interleaved with a fragmented handshake message",
+      "severity": "high",
+      "type": "reviewed",
+      "withdrawn_at": null,
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "first_patched_version": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-hqq3-7jhf-c5jx",
+      "cve_id": "CVE-2026-119187",
+      "identifiers": [
+        {
+          "value": "GHSA-hqq3-7jhf-c5jx",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-119187",
+          "type": "CVE"
+        }
+      ],
+      "summary": "Forge: Denial of service in TLS record processing via call stack exhaustion",
+      "severity": "high",
+      "type": "reviewed",
+      "withdrawn_at": null,
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "first_patched_version": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-5x38-2vff-x55p",
+      "cve_id": "CVE-2026-119190",
+      "identifiers": [
+        {
+          "value": "GHSA-5x38-2vff-x55p",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-119190",
+          "type": "CVE"
+        }
+      ],
+      "summary": "Forge: X.509 basicConstraints bypass in verifyCertificateChain() via deprecated extension OIDs 2.5.29.10 and 2.5.29.13",
+      "severity": "high",
+      "type": "reviewed",
+      "withdrawn_at": null,
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "first_patched_version": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-86w9-cpqp-85rv",
+      "cve_id": "CVE-2026-85393",
+      "identifiers": [
+        {
+          "value": "GHSA-86w9-cpqp-85rv",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-85393",
+          "type": "CVE"
+        }
+      ],
+      "summary": "node-forge RSA PKCS#1 v1.5 signature verification accepts extra nested DigestAlgorithm elements",
+      "severity": "high",
+      "type": "reviewed",
+      "withdrawn_at": null,
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "first_patched_version": null,
+          "vulnerable_functions": []
+        }
+      ]
+    }
+  ],
+  "repository": [
+    {
+      "ghsa_id": "GHSA-4642-5mcj-2rqw",
+      "cve_id": "CVE-2026-118775",
+      "identifiers": [
+        {
+          "value": "GHSA-4642-5mcj-2rqw",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-118775",
+          "type": "CVE"
+        }
+      ],
+      "summary": "ASN.1 OID first arc truncation in asn1.oidToDer",
+      "severity": "low",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "patched_versions": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-9wg5-mj3p-v49q",
+      "cve_id": "CVE-2026-118774",
+      "identifiers": [
+        {
+          "value": "GHSA-9wg5-mj3p-v49q",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-118774",
+          "type": "CVE"
+        }
+      ],
+      "summary": "Certificate signature verified with the issuer's RSA signature scheme",
+      "severity": "low",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "patched_versions": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-h6cr-wjv9-3cpp",
+      "cve_id": "CVE-2026-118781",
+      "identifiers": [
+        {
+          "value": "GHSA-h6cr-wjv9-3cpp",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-118781",
+          "type": "CVE"
+        }
+      ],
+      "summary": "Denial of Service via infinite loop in BigInteger.modInverse() with negative input (incomplete fix of CVE-2026-33891)",
+      "severity": "low",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "patched_versions": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-4487-j8r4-4g2f",
+      "cve_id": "CVE-2026-118780",
+      "identifiers": [
+        {
+          "value": "GHSA-4487-j8r4-4g2f",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-118780",
+          "type": "CVE"
+        }
+      ],
+      "summary": "verifyCertificateChain() removes trusted CA certificates with the same subject from the CA store",
+      "severity": "low",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "patched_versions": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-5cwg-6vw7-rj6p",
+      "cve_id": "CVE-2026-119186",
+      "identifiers": [
+        {
+          "value": "GHSA-5cwg-6vw7-rj6p",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-119186",
+          "type": "CVE"
+        }
+      ],
+      "summary": "AES-GCM authentication bypass via unvalidated tagLength option",
+      "severity": "medium",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "patched_versions": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-jc66-7q78-782g",
+      "cve_id": "CVE-2026-118782",
+      "identifiers": [
+        {
+          "value": "GHSA-jc66-7q78-782g",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-118782",
+          "type": "CVE"
+        }
+      ],
+      "summary": "PKCS#12 MAC forgery and constant-key PBE via zero iteration count",
+      "severity": "high",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "patched_versions": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-8hrf-8g6f-7xwp",
+      "cve_id": "CVE-2026-119188",
+      "identifiers": [
+        {
+          "value": "GHSA-8hrf-8g6f-7xwp",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-119188",
+          "type": "CVE"
+        }
+      ],
+      "summary": "Denial of service in TLS record processing via a record interleaved with a fragmented handshake message",
+      "severity": "high",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "patched_versions": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-hqq3-7jhf-c5jx",
+      "cve_id": "CVE-2026-119187",
+      "identifiers": [
+        {
+          "value": "GHSA-hqq3-7jhf-c5jx",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-119187",
+          "type": "CVE"
+        }
+      ],
+      "summary": "Denial of service in TLS record processing via call stack exhaustion",
+      "severity": "high",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "patched_versions": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-2g46-22mc-6gwp",
+      "cve_id": "CVE-2026-85393",
+      "identifiers": [
+        {
+          "value": "GHSA-2g46-22mc-6gwp",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-85393",
+          "type": "CVE"
+        }
+      ],
+      "summary": "RSA PKCS#1 v1.5 signature forgery via extra elements in nested DigestAlgorithm",
+      "severity": "high",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "patched_versions": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-6qrw-m8cv-hcxf",
+      "cve_id": "CVE-2026-119192",
+      "identifiers": [
+        {
+          "value": "GHSA-6qrw-m8cv-hcxf",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-119192",
+          "type": "CVE"
+        }
+      ],
+      "summary": "RSA PKCS#1 v1.5 signature forgery via non-canonical DigestInfo encoding",
+      "severity": "high",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "patched_versions": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-5x38-2vff-x55p",
+      "cve_id": "CVE-2026-119190",
+      "identifiers": [
+        {
+          "value": "GHSA-5x38-2vff-x55p",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-119190",
+          "type": "CVE"
+        }
+      ],
+      "summary": "X.509 basicConstraints bypass in verifyCertificateChain() via deprecated extension OIDs 2.5.29.10 and 2.5.29.13",
+      "severity": "high",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "patched_versions": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-rhr8-3pm8-cq29",
+      "cve_id": "CVE-2026-119191",
+      "identifiers": [
+        {
+          "value": "GHSA-rhr8-3pm8-cq29",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-119191",
+          "type": "CVE"
+        }
+      ],
+      "summary": "ASN.1 resource exhaustion via BIT STRING decoding in asn1.fromDer",
+      "severity": "high",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "patched_versions": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-525v-9gp9-w22h",
+      "cve_id": "CVE-2026-118778",
+      "identifiers": [
+        {
+          "value": "GHSA-525v-9gp9-w22h",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-118778",
+          "type": "CVE"
+        }
+      ],
+      "summary": "TLS client crash when the server sends no certificate",
+      "severity": "medium",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "patched_versions": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-6wvx-3r32-xmcg",
+      "cve_id": "CVE-2026-118777",
+      "identifiers": [
+        {
+          "value": "GHSA-6wvx-3r32-xmcg",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-118777",
+          "type": "CVE"
+        }
+      ],
+      "summary": "Prototype Pollution in forge.http cookie handling via a malicious Set-Cookie",
+      "severity": "medium",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "patched_versions": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-2vgq-wchc-25w7",
+      "cve_id": "CVE-2026-118776",
+      "identifiers": [
+        {
+          "value": "GHSA-2vgq-wchc-25w7",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-118776",
+          "type": "CVE"
+        }
+      ],
+      "summary": "Incomplete PKCS#7 padding validation in AES/DES CBC and ECB decryption",
+      "severity": "low",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "patched_versions": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-h46v-rmh6-fq4f",
+      "cve_id": "CVE-2026-119189",
+      "identifiers": [
+        {
+          "value": "GHSA-h46v-rmh6-fq4f",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-119189",
+          "type": "CVE"
+        }
+      ],
+      "summary": "X.509 pathLenConstraint not enforced by verifyCertificateChain() for CA certificates without keyUsage",
+      "severity": "medium",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "patched_versions": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-2328-f5f3-gj25",
+      "cve_id": "CVE-2026-33896",
+      "identifiers": [
+        {
+          "value": "GHSA-2328-f5f3-gj25",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-33896",
+          "type": "CVE"
+        }
+      ],
+      "summary": "basicConstraints bypass in certificate chain verification (RFC 5280 violation)",
+      "severity": "high",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.3.3",
+          "patched_versions": "1.4.0",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-q67f-28xg-22rw",
+      "cve_id": "CVE-2026-33895",
+      "identifiers": [
+        {
+          "value": "GHSA-q67f-28xg-22rw",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-33895",
+          "type": "CVE"
+        }
+      ],
+      "summary": "Signature forgery in Ed25519 due to missing S < L check",
+      "severity": "high",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<=1.3.3",
+          "patched_versions": "1.4.0",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-ppp5-5v6c-4jwp",
+      "cve_id": "CVE-2026-33894",
+      "identifiers": [
+        {
+          "value": "GHSA-ppp5-5v6c-4jwp",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-33894",
+          "type": "CVE"
+        }
+      ],
+      "summary": "Signature forgery in RSA-PKCS due to ASN.1 extra field  ",
+      "severity": "high",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<=1.3.3",
+          "patched_versions": "1.4.0",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-5m6q-g25r-mvwx",
+      "cve_id": "CVE-2026-33891",
+      "identifiers": [
+        {
+          "value": "GHSA-5m6q-g25r-mvwx",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-33891",
+          "type": "CVE"
+        }
+      ],
+      "summary": "Denial of Service via Infinite Loop in BigInteger.modInverse() with Zero Input",
+      "severity": "high",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.3.1",
+          "patched_versions": "1.4.0",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-7wch-p9px-956x",
+      "cve_id": "CVE-2026-118779",
+      "identifiers": [
+        {
+          "value": "GHSA-7wch-p9px-956x",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2026-118779",
+          "type": "CVE"
+        }
+      ],
+      "summary": "Regular expression denial of service in PEM decoding (pem.decode)",
+      "severity": "high",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.0",
+          "patched_versions": "1.4.1",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-65ch-62r8-g69g",
+      "cve_id": "CVE-2025-66030",
+      "identifiers": [
+        {
+          "value": "GHSA-65ch-62r8-g69g",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2025-66030",
+          "type": "CVE"
+        }
+      ],
+      "summary": "node-forge ASN.1 OID Integer Truncation",
+      "severity": "medium",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "< 1.3.2",
+          "patched_versions": "1.3.2",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-554w-wpv2-vw27",
+      "cve_id": "CVE-2025-66031",
+      "identifiers": [
+        {
+          "value": "GHSA-554w-wpv2-vw27",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2025-66031",
+          "type": "CVE"
+        }
+      ],
+      "summary": "node-forge ASN.1 Unbounded Recursion",
+      "severity": "high",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "< 1.3.2",
+          "patched_versions": "1.3.2",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-5gfm-wpxj-wjgq",
+      "cve_id": "CVE-2025-12816",
+      "identifiers": [
+        {
+          "value": "GHSA-5gfm-wpxj-wjgq",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2025-12816",
+          "type": "CVE"
+        }
+      ],
+      "summary": "node-forge ASN.1 Validator Desynchronization",
+      "severity": "high",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "< 1.3.2",
+          "patched_versions": "1.3.2",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-x4jg-mjrx-434g",
+      "cve_id": "CVE-2022-24772",
+      "identifiers": [
+        {
+          "value": "GHSA-x4jg-mjrx-434g",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2022-24772",
+          "type": "CVE"
+        }
+      ],
+      "summary": "RSA PKCS#1 v1.5 signature verification failing to check tailing garbage bytes can lead to signature forgery.",
+      "severity": "high",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "< 1.3.0",
+          "patched_versions": "1.3.0",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-cfm4-qjh2-4765",
+      "cve_id": "CVE-2022-24771",
+      "identifiers": [
+        {
+          "value": "GHSA-cfm4-qjh2-4765",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2022-24771",
+          "type": "CVE"
+        }
+      ],
+      "summary": "RSA PKCS#1 v1.5 signature verification leniency in checking `digestAlgorithm` structure can lead to signature forgery.",
+      "severity": "high",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "< 1.3.0",
+          "patched_versions": "1.3.0",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-2r2c-g63r-vccr",
+      "cve_id": "CVE-2022-24773",
+      "identifiers": [
+        {
+          "value": "GHSA-2r2c-g63r-vccr",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2022-24773",
+          "type": "CVE"
+        }
+      ],
+      "summary": "RSA PKCS#1 v1.5 signature verification leniency in checking `DigestInfo` structure.",
+      "severity": "medium",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "< 1.3.0",
+          "patched_versions": "1.3.0",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-gf8q-jrpm-jvxq",
+      "cve_id": null,
+      "identifiers": [
+        {
+          "value": "GHSA-gf8q-jrpm-jvxq",
+          "type": "GHSA"
+        }
+      ],
+      "summary": "URL parsing in node-forge could lead to undesired behavior.",
+      "severity": "low",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "< 1.0.0",
+          "patched_versions": "1.0.0",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-5rrq-pxf6-6jx5",
+      "cve_id": null,
+      "identifiers": [
+        {
+          "value": "GHSA-5rrq-pxf6-6jx5",
+          "type": "GHSA"
+        }
+      ],
+      "summary": "Improperly Controlled Modification of Object Prototype Attributes ('Prototype Pollution') in node-forge debug API.",
+      "severity": "low",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "< 1.0.0",
+          "patched_versions": "1.0.0",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-wxgw-qj99-44c2",
+      "cve_id": "CVE-2020-7720",
+      "identifiers": [
+        {
+          "value": "GHSA-wxgw-qj99-44c2",
+          "type": "GHSA"
+        },
+        {
+          "value": "CVE-2020-7720",
+          "type": "CVE"
+        }
+      ],
+      "summary": "Improperly Controlled Modification of Object Prototype Attributes ('Prototype Pollution') in node-forge util.setPath API",
+      "severity": "low",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "< 0.10.0",
+          "patched_versions": "0.10.0",
+          "vulnerable_functions": []
+        }
+      ]
+    }
+  ]
+}

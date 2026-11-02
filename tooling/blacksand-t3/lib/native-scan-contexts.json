@@ -1,0 +1,323 @@
+[
+  {
+    "name": "@node-datachannel/android-arm64",
+    "version": "0.33.6",
+    "integrity": "sha512-UzSnd1vSN//3pqyvuufbaIQemvRfIHn/7DAy7wjoYk9tzkJp4SMk1FrNhkhmev89SH/h7yTac6PlGxGe5oHcKw==",
+    "path": "node_datachannel.node",
+    "sha256": "9dbb5e6136f3416be0b13445a5cb8d7f7f6cba96d6a3fffd4b9441edb689b4db",
+    "matches": {
+      "sentry": [
+        521232,
+        521426,
+        651564,
+        1133005,
+        1135633,
+        1135698,
+        1140862,
+        1141013,
+        1141078,
+        1141441,
+        1144051,
+        1144116,
+        2337668,
+        35669927,
+        35751511,
+        36420100,
+        36420167,
+        37140449,
+        37864923,
+        38104069,
+        38104899,
+        38814155,
+        38814220,
+        39055249,
+        39288217,
+        39547900,
+        40019887,
+        41000899,
+        41001549,
+        46475324,
+        46475646,
+        46630909,
+        47266235,
+        47270230,
+        47270295,
+        47276501,
+        47276652,
+        47276717,
+        47277080,
+        47281057,
+        47281122
+      ],
+      "android.googlesource.com": [
+        9732334,
+        9732519,
+        38349118
+      ]
+    }
+  },
+  {
+    "name": "@node-datachannel/darwin-arm64",
+    "version": "0.33.6",
+    "integrity": "sha512-vE2fN6D0BJJ3yZo5guJo2j1q7JeQbl+VyIs6vbkjEp654tQtTo3y7a4l3xB0bwDD27TOlkOlaSLJQRj6ZXqQdQ==",
+    "path": "node_datachannel.node",
+    "sha256": "325829afa497aaf11e2d2ebb18c0232cc57c4b802adfd1b405327ffdca4ee8d6",
+    "matches": {
+      "sentry": [
+        5606810,
+        6418541,
+        6418981,
+        6419051,
+        7658775,
+        7659166,
+        7659229
+      ]
+    }
+  },
+  {
+    "name": "@node-datachannel/darwin-x64",
+    "version": "0.33.6",
+    "integrity": "sha512-EtRB2THMR11XMzbNhMEwaZtipaUxFz+PgeVx7hE+er6Ai1Fzzv7XexrMWDG11ahdpEZ8fAxlxuyELs33/WH1Cg==",
+    "path": "node_datachannel.node",
+    "sha256": "cf0a30d2ce3663f62d37e52fbd57e4c55d22ad16bf57542b53ea34a33a8cd85f",
+    "matches": {
+      "sentry": [
+        5799374,
+        6772617,
+        6773057,
+        6773127,
+        8039919,
+        8040310,
+        8040373
+      ]
+    }
+  },
+  {
+    "name": "@node-datachannel/linux-arm64-gnu",
+    "version": "0.33.6",
+    "integrity": "sha512-phMRjx8NEfW70i768LCQDEF2C6Q2vtYsS4DPXv/zbb2cJClaU5fjKFQfQ1XBCNIi1ClfpSd3Cl/rn/7SS+paTQ==",
+    "path": "node_datachannel.node",
+    "sha256": "c90753d8f41bcd5019d887ca5370d741b92159c59b3b76401ed73f3ab25e502e",
+    "matches": {
+      "sentry": [
+        5300810,
+        7671821,
+        7718478,
+        7731282,
+        7773205,
+        7778906,
+        7841037,
+        7875678,
+        7936675,
+        8037419,
+        8039770,
+        8070947,
+        8083875,
+        8086087,
+        8142123,
+        8245239,
+        8306696,
+        8355853,
+        8414724,
+        8443148,
+        8470749
+      ],
+      "gcc.gnu.org": [
+        5408024
+      ]
+    }
+  },
+  {
+    "name": "@node-datachannel/linux-arm64-musl",
+    "version": "0.33.6",
+    "integrity": "sha512-T9bqllJ9YkpgqgRFEfsPpfgfMDXdA7CIiJ4c1XXGPLSeqVFgDbf/WCewkE7q4xA+tKRLoOOtc2XgMGwVnlxXVQ==",
+    "path": "node_datachannel.node",
+    "sha256": "41cf8787881135d25296c30bf219d102891230ac7b49b23c32b8d4fd328aa8e3",
+    "matches": {
+      "sentry": [
+        700343,
+        14785428,
+        14785544,
+        14785723,
+        14845914,
+        14876209,
+        14890917,
+        14898525,
+        14945626,
+        15010161,
+        15010185,
+        15037691,
+        15062376,
+        15084198,
+        15097970,
+        15104680,
+        15105068,
+        15108545,
+        15131080,
+        15155429,
+        15155446,
+        15174381,
+        15177444,
+        15222991,
+        15250355,
+        15273868,
+        15296241,
+        15343438,
+        15388609,
+        15401658,
+        15401847,
+        15421934,
+        15446402,
+        19578271,
+        19578789,
+        19694294,
+        19694367,
+        19694440,
+        19694513,
+        19712312,
+        19713223,
+        19714721,
+        19716958,
+        19738475,
+        19738494,
+        19738513,
+        19738530,
+        19738691,
+        19740303,
+        19740359,
+        19740415,
+        19740468,
+        19740770
+      ],
+      "gcc.gnu.org": [
+        746854
+      ]
+    }
+  },
+  {
+    "name": "@node-datachannel/linux-x64-gnu",
+    "version": "0.33.6",
+    "integrity": "sha512-NUTbne64++ZxwEJ9uppAAmYnFAfJAggf7gboioPdhr13P17GTQRCUgmipYrh1V0D4333x6NCBZyQaNv0n4WmpQ==",
+    "path": "node_datachannel.node",
+    "sha256": "ebadcb570e5b2a51156cb485015b67dd76d6152002c90e39a7a41ed564068f4b",
+    "matches": {
+      "sentry": [
+        5935464,
+        8197000,
+        8243565,
+        8256365,
+        8298233,
+        8303927,
+        8366052,
+        8400731,
+        8461796,
+        8562565,
+        8564916,
+        8596083,
+        8609053,
+        8611265,
+        8667262,
+        8770218,
+        8831875,
+        8880922,
+        8939951,
+        8968482,
+        8996057
+      ],
+      "gcc.gnu.org": [
+        6019952
+      ]
+    }
+  },
+  {
+    "name": "@node-datachannel/linux-x64-musl",
+    "version": "0.33.6",
+    "integrity": "sha512-dlWP4ycOJrTAl9UvxGofq0zwPhl6iAr1b0ZcBUgDfb2CXmbcJWCvg6OsJ6u8BVSV41eNXALmaRpU0wttas/f1g==",
+    "path": "node_datachannel.node",
+    "sha256": "20730aceca33f4d934c69ffe6c1d21c216ab6a249b820b9307f1a7ae38e33ed4",
+    "matches": {
+      "sentry": [
+        663716,
+        15433012,
+        15433128,
+        15433307,
+        15495722,
+        15526449,
+        15541474,
+        15548891,
+        15599161,
+        15665749,
+        15665773,
+        15694313,
+        15718954,
+        15742565,
+        15756607,
+        15763317,
+        15763705,
+        15766613,
+        15790292,
+        15815764,
+        15815781,
+        15835822,
+        15838559,
+        15884911,
+        15912846,
+        15937122,
+        15959434,
+        16007475,
+        16053464,
+        16067991,
+        16068180,
+        16089403,
+        16115025,
+        19821613,
+        19822131,
+        19937605,
+        19937678,
+        19937751,
+        19937824,
+        19955627,
+        19956538,
+        19958036,
+        19960273,
+        19981790,
+        19981809,
+        19981828,
+        19981845,
+        19982006,
+        19983618,
+        19983674,
+        19983730,
+        19983783,
+        19984085
+      ],
+      "gcc.gnu.org": [
+        710627
+      ]
+    }
+  },
+  {
+    "name": "@node-datachannel/win32-arm64-msvc",
+    "version": "0.33.6",
+    "integrity": "sha512-ttly7XRUrSOcOOGJvtm9gh2beAPUNOBOUc3Hk82LfMHHP7jJMkXNDns/ML+UVGommAcNyPhoZkRH62O7tSVQYw==",
+    "path": "node_datachannel.node",
+    "sha256": "e0294cdccd6fae3a4d683638e6187302262a1f5a7479784881ec3f5d70170fdb",
+    "matches": {
+      "sentry": [
+        4995458
+      ]
+    }
+  },
+  {
+    "name": "@node-datachannel/win32-x64-msvc",
+    "version": "0.33.6",
+    "integrity": "sha512-N5GW6XH11Iuu+kyHLTiCMcCHdwWwpKqvtYril0LzQm6xBgmGQN3JXxFmgi4g4usw1nLy6WhBWADjbhSXJiiEMA==",
+    "path": "node_datachannel.node",
+    "sha256": "38d531bf9210559205b3ddea2f72fc9eaee7bad72f24c83987b4257665994cbe",
+    "matches": {
+      "sentry": [
+        6075282
+      ]
+    }
+  }
+]
