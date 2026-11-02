@@ -1,7 +1,8 @@
-// Injected by blacksand. The version indicator beside the composer and its
+// Injected by blacksand. The window-corner version indicator and its
 // "changes in this build" card; styled in blacksand.css.
 
 import { useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { CircleAlertIcon, InfoIcon } from "lucide-react";
 
 import { Popover, PopoverPopup, PopoverTitle, PopoverTrigger } from "./ui/popover";
@@ -10,7 +11,6 @@ import { openDesktopUpdateReleaseNotes } from "./desktopUpdate.toast";
 import { useDesktopUpdateState } from "../state/desktopUpdate";
 import { BLACKSAND_T3_BUILD } from "../blacksandBuild";
 import { useBlacksandInterface } from "../blacksandInterface";
-import { useChatCanvas } from "./chat/ChatCanvasContext";
 import { observeResize } from "../lib/observeResize";
 
 type Change = (typeof BLACKSAND_T3_BUILD)["upstream"]["items"][number];
@@ -108,8 +108,8 @@ function LeftOut() {
 }
 
 /**
- * A fixed-size build-details icon in the composer's end gutter while its
- * switch is on. Hover, keyboard focus
+ * The build version in the window corner, compact where space is limited.
+ * Hover, keyboard focus
  * or a tap shows what the build changed, baked in at
  * build time (blacksandBuild.ts). The desktop's reported version wins if the
  * bundle predates a rename. A build that left features out shows an alert icon,
@@ -121,67 +121,49 @@ export function BlacksandVersionStamp() {
 
 function VersionStamp() {
   const [open, setOpen] = useState(false);
+  const anchor = useRef<HTMLSpanElement>(null);
+  const label = useRef<HTMLSpanElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const measureLayout = useRef<(() => void) | null>(null);
   const restoringFocus = useRef(false);
-  const canvas = useChatCanvas();
-  const frame = canvas?.layout.frame;
+  const update = useDesktopUpdateState();
+  const build = BLACKSAND_T3_BUILD;
+  const version = update?.currentVersion ?? build.version ?? "dev";
   useLayoutEffect(() => {
     const button = trigger.current;
     const rail = button?.closest<HTMLElement>(".t3b-version-rail");
-    const lane = button?.closest<HTMLElement>(".chat-composer-lane");
-    const surface = lane?.closest<HTMLElement>("[data-chat-canvas]");
+    const lane = anchor.current?.closest<HTMLElement>(".chat-composer-lane");
+    const overlay = lane?.closest<HTMLElement>("[data-chat-composer-overlay]");
     const stack = lane?.querySelector<HTMLElement>("[data-chat-composer-stack]");
-    if (!button || !rail || !lane || !stack) return;
+    const text = label.current;
+    if (!button || !rail || !lane || !overlay || !stack || !text) return;
     const measure = () => {
-      // Align with the actual primary action, not the bottom of a draft's
-      // checkout/context footer or the current editor/attachment height.
-      const actions = stack.querySelectorAll<HTMLElement>(
-        "[data-chat-composer-transition-actions], [data-chat-composer-mobile-pending-actions], [data-t3b-send]",
-      );
-      const actionBounds = Array.from(actions)
-        .filter((action) => getComputedStyle(action).visibility !== "hidden")
-        .map((action) => action.getBoundingClientRect())
-        .find((bounds) => bounds.width > 0 && bounds.height > 0);
-      if (actionBounds) {
-        lane.style.setProperty("--t3b-version-bottom",
-          `${lane.getBoundingClientRect().bottom - (actionBounds.top + actionBounds.height / 2) - 16}px`);
-      } else lane.style.removeProperty("--t3b-version-bottom");
-      // Measure the ordinary centered icon before considering an obstruction.
-      // Resetting this input prevents a previous reservation from feeding back
-      // into the next preview drag/resize decision. Both writes precede paint.
-      lane.style.removeProperty("--t3b-version-blocked-end");
-      if (!surface || !frame) return;
+      lane.removeAttribute("data-t3b-version-corner-reserve");
       const bounds = button.getBoundingClientRect();
-      const origin = surface.getBoundingClientRect();
-      const previewTop = origin.top + frame.y;
-      const besidePreview = previewTop < bounds.bottom && previewTop + frame.height > bounds.top;
-      const end = rail.getBoundingClientRect().right;
-      const previewLeft = origin.left + frame.x;
-      const blocked = besidePreview && previewLeft < bounds.right && previewLeft + frame.width > bounds.left
-        ? Math.max(0, end - previewLeft + 8)
-        : 0;
-      lane.style.setProperty("--t3b-version-blocked-end", `${blocked}px`);
+      const pane = lane.getBoundingClientRect();
+      const composer = stack.querySelector('[data-slot="composer-shell"]')?.getBoundingClientRect();
+      const besideComposer = composer && composer.top < bounds.bottom + 8 && composer.bottom > bounds.top - 8;
+      const fullLeft = bounds.right - text.getBoundingClientRect().width - 32;
+      const compact = fullLeft < pane.left + 12 || bounds.right > pane.right ||
+        Boolean(besideComposer && fullLeft < composer.right + 8);
+      rail.toggleAttribute("data-compact", compact);
+      if (compact && besideComposer && bounds.right - 32 < composer.right + 8 && bounds.right > composer.left) {
+        lane.setAttribute("data-t3b-version-corner-reserve", "");
+      }
     };
     measureLayout.current = measure;
-    // Reuse the app's shared observer: a centered draft can grow without
-    // changing the canvas frame. No new observer or polling loop is created.
-    const stop = observeResize([lane, stack], measure);
+    const stop = observeResize([overlay, lane, stack, text], measure);
     return () => {
       measureLayout.current = null;
       stop();
-      lane.style.removeProperty("--t3b-version-blocked-end");
-      lane.style.removeProperty("--t3b-version-bottom");
+      lane.removeAttribute("data-t3b-version-corner-reserve");
     };
-  }, [frame?.x, frame?.y, frame?.width, frame?.height, canvas?.container.width, canvas?.container.height]);
-  // React action/footer changes must be measured before paint too; the shared
-  // observer also handles layout changes without a React commit here.
+  }, [version]);
+  // Check newly committed composer geometry before paint; resizing uses the
+  // same shared observer. The badge itself always stays in the window corner.
   useLayoutEffect(() => { measureLayout.current?.(); });
-  const update = useDesktopUpdateState();
-  const build = BLACKSAND_T3_BUILD;
   const omitted = build.skipped.length > 0;
   const StampIcon = omitted ? CircleAlertIcon : InfoIcon;
-  const version = update?.currentVersion ?? build.version ?? "dev";
   const built = build.builtAt
     ? new Date(build.builtAt).toLocaleString(undefined, {
         month: "short",
@@ -190,7 +172,9 @@ function VersionStamp() {
         minute: "2-digit",
       })
     : null;
-  return (
+  return <>
+    <span ref={anchor} hidden />
+    {createPortal(
     <div className="t3b-version-rail">
       <Popover
         open={open}
@@ -219,6 +203,7 @@ function VersionStamp() {
           data-drift={omitted ? "" : undefined}
         >
           <StampIcon aria-hidden="true" className="t3b-version-icon" />
+          <span ref={label} aria-hidden="true" className="t3b-version-label">{version}</span>
         </PopoverTrigger>
         <PopoverPopup
           side="top"
@@ -254,6 +239,6 @@ function VersionStamp() {
           </div>
         </PopoverPopup>
       </Popover>
-    </div>
-  );
+    </div>, document.body)}
+  </>;
 }

@@ -67,51 +67,27 @@ html[data-t3b-send="on"] [data-slot="composer-shell"]:has([data-composer-banner-
 
 /* ------------------------------------------------------- version stamp -- */
 
-/* Keep the composer centered at its usual max-width. Its existing outer
-   padding already holds an icon on desktop; only reserve extra space where
-   needed on narrow screens. The icon stays centered in that whole gutter. */
-.chat-composer-lane:has(> .t3b-version-rail) {
-  --t3b-version-edge-space: 0.75rem;
-  --t3b-version-min-rail: max(0px, calc(42px - var(--t3b-version-edge-space)));
-  display: grid;
-  grid-template-columns:
-    minmax(0, 1fr)
-    minmax(0, min(var(--chat-content-max-width), calc(100% - 12px - var(--t3b-version-min-rail) - var(--t3b-version-blocked-end, 0px))))
-    minmax(calc(var(--t3b-version-min-rail) + var(--t3b-version-blocked-end, 0px)), 1fr);
-  column-gap: 6px;
-  align-items: end;
-}
-
-.chat-composer-lane:has(> .t3b-version-rail) > [data-chat-composer-stack] {
-  grid-column: 2;
-  min-width: 0;
+/* The badge belongs to the window, including while a draft composer is centered.
+   Only a bottom composer that would cover the compact target needs clearance. */
+.chat-composer-lane[data-t3b-version-corner-reserve] {
+  padding-inline-end: calc(env(safe-area-inset-right) + 4rem + var(--chat-lane-inset-end, 0px));
 }
 
 .t3b-version-rail {
-  grid-column: 3;
-  min-width: 0;
-  display: flex;
-  justify-content: center;
-  /* Include the lane's ordinary outer padding in the free space. Its safe-area
-     and canvas/panel insets remain reserved by the upstream lane. */
-  margin-inline-start: -6px;
-  margin-inline-end: calc(var(--t3b-version-blocked-end, 0px) - var(--t3b-version-edge-space));
-  margin-bottom: var(--t3b-version-bottom, calc(env(safe-area-inset-bottom) + 1.5rem));
+  position: fixed;
+  inset-inline-end: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 49;
   pointer-events: auto;
-}
-
-@media (min-width: 640px) {
-  .chat-composer-lane:has(> .t3b-version-rail) {
-    --t3b-version-edge-space: 3rem;
-  }
 }
 
 .t3b-version-stamp {
   --t3b-version-surface: var(--card);
   display: inline-flex;
-  flex: 0 0 32px;
-  width: 32px;
+  position: relative;
+  min-width: 32px;
   height: 32px;
+  gap: 6px;
   align-items: center;
   justify-content: center;
   padding: 6px;
@@ -120,6 +96,8 @@ html[data-t3b-send="on"] [data-slot="composer-shell"]:has([data-composer-banner-
   background: var(--t3b-version-surface);
   box-shadow: 0 0 0 1px var(--t3b-card-edge);
   color: var(--t3b-ember);
+  font: 700 9.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.06em;
   cursor: pointer;
   outline: none;
   user-select: none;
@@ -144,6 +122,15 @@ html[data-theme-id] .t3b-version-stamp { --t3b-version-surface: var(--app-theme-
   width: 14px;
   height: 14px;
   flex-shrink: 0;
+}
+
+/* Hidden text keeps its intrinsic width measurable in compact mode. */
+.t3b-version-label { white-space: nowrap; }
+.t3b-version-rail[data-compact] .t3b-version-stamp { width: 32px; gap: 0; }
+.t3b-version-rail[data-compact] .t3b-version-label {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* Near-neutral greys warmed a touch toward the accent, so the card sits with

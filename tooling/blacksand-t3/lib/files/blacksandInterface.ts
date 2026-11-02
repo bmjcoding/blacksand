@@ -16,8 +16,8 @@ export const BLACKSAND_INTERFACE = {
   },
   stamp: {
     title: "Version stamp",
-    description: "Build details beside the composer. Hover, focus or tap for changes and omitted features.",
-    searchTerms: "version build stamp composer changelog changes omitted features",
+    description: "The build version in the window's bottom-right corner. Hover, focus or tap for changes and omitted features.",
+    searchTerms: "version build stamp corner changelog changes omitted features",
   },
   selection: {
     title: "Accent text selection",

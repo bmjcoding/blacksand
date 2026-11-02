@@ -170,9 +170,10 @@ const floatingPreview: ChatCanvasPreview = {
   key: "fixture", source: { width: 1280, height: 720 }, width: null, position: null,
 };
 function previewClear(container: HTMLElement) {
-  const stamp = container.querySelector(".t3b-version-stamp")!;
+  const stamp = document.querySelector(".t3b-version-stamp")!;
   const bounds = rect(stamp);
-  separate(bounds, rect(container.querySelector("[data-test-preview]")!));
+  const hit = document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2);
+  expect(hit === stamp || stamp.contains(hit)).toBe(true);
   separate(bounds, rect(container.querySelector('[data-slot="composer-shell"]')!));
   inViewport(bounds);
   expect(bounds.width).toBeGreaterThanOrEqual(32);
@@ -199,7 +200,7 @@ describe("responsive version stamp", () => {
           for (const opacity of ["50%", "80%", "100%"]) {
             html.style.setProperty("--glass-opacity", opacity);
             const composer = getComputedStyle(screen.container.querySelector('[data-slot="composer-shell"]')!, "::before");
-            const stamp = getComputedStyle(screen.container.querySelector(".t3b-version-stamp")!);
+            const stamp = getComputedStyle(document.querySelector(".t3b-version-stamp")!);
             expect(stamp.backgroundColor).toBe(composer.backgroundColor);
             expect(stamp.backdropFilter).toBe(composer.backdropFilter);
             expect(stamp.opacity).toBe("1");
@@ -215,44 +216,42 @@ describe("responsive version stamp", () => {
   const cases = [
     { width: 600, tall: 600 },
     { width: 1100, tall: 700, right: 300, height: 260, context: true },
-    { width: 2200, tall: 900 },
+    { width: 2200, tall: 900, full: true },
     { width: 2200, tall: 900, right: 700, height: 220 },
-    { width: 2200, tall: 900, max: "72rem", context: true },
+    { width: 2200, tall: 900, max: "72rem", context: true, full: true },
     { width: 1600, tall: 800, max: "100%" },
     // Effective CSS viewport of a 1280x900 window at 200% browser zoom.
     { width: 640, tall: 450, max: "100%", height: 180, context: true },
-    { width: 360, tall: 400, max: "100%", hero: true },
-    { width: 1218, tall: 636, hero: true, footer: true },
-    { width: 1000, tall: 700, hero: true, footer: true, height: 260, context: true },
+    { width: 360, tall: 400, max: "100%", hero: true, full: true },
+    { width: 1218, tall: 636, hero: true, footer: true, full: true },
+    { width: 1000, tall: 700, hero: true, footer: true, height: 260, context: true, full: true },
   ];
-  for (const { width, tall, ...props } of cases) {
+  for (const { width, tall, full = false, ...props } of cases) {
     it(`reserves bounds at ${width}x${tall}, ${JSON.stringify(props)}`, async () => {
       await page.viewport(width, tall);
       await using screen = await render(<Shell {...props} />);
-      const stamp = screen.container.querySelector<HTMLButtonElement>(".t3b-version-stamp")!;
-      const composer = screen.container.querySelector('[data-slot="composer-shell"]')!;
+      const stamp = document.querySelector<HTMLButtonElement>(".t3b-version-stamp")!;
       const bounds = rect(stamp);
       inViewport(bounds);
-      expect(bounds.width).toBe(32);
+      if (full) expect(bounds.width).toBeGreaterThan(32); else expect(bounds.width).toBe(32);
       expect(bounds.height).toBe(32);
       for (const node of screen.container.querySelectorAll(
-        '[data-slot="composer-shell"], textarea, [data-t3b-send], [data-test-panel], [data-slot="sidebar"]',
+        '[data-slot="composer-shell"], textarea, [data-t3b-send]',
       )) {
         separate(bounds, rect(node));
       }
-      const action = rect(screen.container.querySelector('[data-t3b-send]')!);
-      expect(Math.abs(bounds.top + bounds.height / 2 - action.top - action.height / 2)).toBeLessThan(1);
-      const edge = rect(screen.container.querySelector(".chat-composer-lane")!).right;
-      expect(Math.abs(bounds.left + bounds.width / 2 - (rect(composer).right + edge) / 2)).toBeLessThan(1);
-      expect(stamp.querySelector(".t3b-version-label")).toBeNull();
+      expect(Math.abs(window.innerWidth - bounds.right - 16)).toBeLessThan(1);
+      expect(Math.abs(window.innerHeight - bounds.bottom - 16)).toBeLessThan(1);
+      const version = stamp.querySelector<HTMLElement>(".t3b-version-label")!;
+      expect(getComputedStyle(version).visibility).toBe(full ? "visible" : "hidden");
       expect(stamp.getAttribute("aria-label")).toContain("0.1.7-nightly.20261031.3991");
       expect(stamp.getAttribute("aria-label")).toContain("features omitted");
       expect(stamp.querySelector("svg")?.classList.contains("lucide-circle-alert")).toBe(true);
-      expect(getComputedStyle(stamp).position).not.toBe("fixed");
+      expect(getComputedStyle(stamp.parentElement!).position).toBe("fixed");
     });
   }
   for (const width of [1000, 1280, 1500, 2200]) {
-    it(`keeps a reserved trigger clear of the real floating canvas preview at ${width}px`, async () => {
+    it(`keeps the window-corner trigger reachable above the floating canvas preview at ${width}px`, async () => {
       await page.viewport(width, 700);
       await using screen = await render(<PreviewCase width={width} preview={floatingPreview} />);
       await vi.waitFor(() => {
@@ -276,33 +275,60 @@ describe("responsive version stamp", () => {
     }
     await screen.rerender(<PreviewCase width={1280} preview={null} />);
     await vi.waitFor(() => {
-      const lane = screen.container.querySelector<HTMLElement>(".chat-composer-lane")!;
-      expect(lane.style.getPropertyValue("--t3b-version-blocked-end")).toBe("");
+      const stamp = document.querySelector(".t3b-version-stamp")!;
+      expect(rect(stamp).bottom).toBe(window.innerHeight - 16);
     });
   });
   it("responds to panel/max-width/height changes and releases the reservation when disabled", async () => {
     await page.viewport(2200, 900);
     await using screen = await render(<Shell />);
-    const compact = () => expect(rect(screen.container.querySelector(".t3b-version-stamp")!).width).toBe(32);
-    compact();
+    const width = () => rect(document.querySelector(".t3b-version-stamp")!).width;
+    expect(width()).toBeGreaterThan(32);
     await screen.rerender(<Shell right={700} height={270} context />);
-    compact();
+    await vi.waitFor(() => expect(width()).toBe(32));
     await screen.rerender(<Shell max="100%" />);
-    compact();
+    await vi.waitFor(() => expect(width()).toBe(32));
     const composer = screen.container.querySelector('[data-slot="composer-shell"]')!;
     const before = rect(composer).width;
     await act(() => setBlacksandInterface("stamp", false));
-    expect(screen.container.querySelector(".t3b-version-rail")).toBeNull();
+    expect(document.querySelector(".t3b-version-rail")).toBeNull();
     expect(rect(composer).width).toBeGreaterThan(before);
     expect(getComputedStyle(screen.container.querySelector(".chat-composer-lane")!).display).toBe(
       "block",
     );
   });
+  it("restores the full version after narrowing and widening the same window", async () => {
+    await page.viewport(2200, 700);
+    await using screen = await render(<Shell />);
+    const bounds = () => rect(document.querySelector(".t3b-version-stamp")!);
+    expect(bounds().width).toBeGreaterThan(32);
+    await page.viewport(1100, 700);
+    await vi.waitFor(() => expect(bounds().width).toBe(32));
+    expect(bounds().right).toBe(1084);
+    await page.viewport(2200, 700);
+    await vi.waitFor(() => expect(bounds().width).toBeGreaterThan(32));
+    expect(bounds().right).toBe(2184);
+    expect(bounds().bottom).toBe(684);
+  });
+  it("keeps the corner fixed when the same draft moves between the center and bottom", async () => {
+    await page.viewport(1100, 700);
+    await using screen = await render(<Shell />);
+    const bounds = () => rect(document.querySelector(".t3b-version-stamp")!);
+    expect(bounds().width).toBe(32);
+    await screen.rerender(<Shell hero />);
+    await vi.waitFor(() => expect(bounds().width).toBeGreaterThan(32));
+    expect(bounds().right).toBe(1084);
+    expect(bounds().bottom).toBe(684);
+    await screen.rerender(<Shell />);
+    await vi.waitFor(() => expect(bounds().width).toBe(32));
+    expect(bounds().right).toBe(1084);
+    expect(bounds().bottom).toBe(684);
+  });
   for (const width of [360, 2200]) {
     it(`opens readable, reachable changes on hover at ${width}px`, async () => {
       await page.viewport(width, 600);
       await using screen = await render(<Shell />);
-      await userEvent.hover(screen.container.querySelector(".t3b-version-stamp")!);
+      await userEvent.hover(document.querySelector(".t3b-version-stamp")!);
       await expect.element(page.getByRole("heading", { name: /^Upstream/ })).toBeVisible();
       await expect.element(page.getByRole("heading", { name: /^Blacksand/ })).toBeVisible();
       const card = document.querySelector(".t3b-version-card")!;
@@ -335,7 +361,7 @@ describe("responsive version stamp", () => {
       );
       await userEvent.click(screen.getByRole("button", { name: "Stop", exact: true }));
       await userEvent.keyboard("{Tab}");
-      const stamp = screen.container.querySelector(".t3b-version-stamp")!;
+      const stamp = document.querySelector(".t3b-version-stamp")!;
       expect(document.activeElement).toBe(stamp);
       await expect.element(page.getByRole("heading", { name: /^Upstream/ })).toBeVisible();
       expect(stamp.getAttribute("aria-expanded")).toBe("true");
@@ -360,7 +386,7 @@ describe("responsive version stamp", () => {
         <Lane />
       </div>,
     );
-    const stamp = screen.container.querySelector(".t3b-version-stamp")!;
+    const stamp = document.querySelector(".t3b-version-stamp")!;
     // Avoid hover opening first: pointerdown/up/click is the touch activation path.
     const tap = () =>
       act(() => {

@@ -1776,7 +1776,7 @@ export const makeRules = ({ updater, build }) => [
   },
   {
     id: "web/blacksand-version-stamp",
-    why: "Build details beside the composer, in reserved responsive lane space, with hover/focus/tap access",
+    why: "Window-corner build details, compact when needed to keep the composer clear, with hover/focus/tap access",
     file: "apps/web/src/components/ChatView.tsx",
     edits: [
       {
