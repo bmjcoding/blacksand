@@ -1,10 +1,10 @@
 PASS A stray pixels: 0 violations over 439 frames at 2x
 PASS B pops (glow+particles off): 0 spikes; diff mean 0.0112 max 0.1513
 PASS C boundaries (max channel diff, pixels differing):
-    flow end     (23, 258, 56, 'mark-space y 145..676, x 469..536')
-    land end     (6, 210, 23, 'mark-space y 141..1179, x 344..1078')
-    loop seam    (15, 244, 23, 'mark-space y 157..1335, x -265..1275')
-    loop seam 2  (15, 248, 23, 'mark-space y 157..1335, x -265..1275')
+    flow end     (28, 255, 50, 'mark-space y 162..680, x 474..556')
+    land end     (7, 236, 23, 'mark-space y 146..1179, x 344..1078')
+    loop seam    (15, 211, 40, 'mark-space y 141..1335, x -265..1275')
+    loop seam 2  (15, 215, 40, 'mark-space y 141..1335, x -265..1275')
 PASS C boundaries: the same picture 2 us either side (rounding noise only)
 PASS D same phase, two cycles apart (incl. mid-flip and mid-pour with particles):
     ph 2.500 (0, 0, 0, '')
@@ -13,21 +13,21 @@ PASS D same phase, two cycles apart (incl. mid-flip and mid-pour with particles)
     ph 0.600 (0, 0, 0, '')
     ph 1.000 (0, 0, 0, '')
     ph 3.300 (0, 0, 0, '')
-    ph 5.350 (26, 44, 10, 'mark-space y 631..670, x 474..547')
-    ph 5.600 (1, 7, 0, 'mark-space y 628..668, x 477..516')
+    ph 5.350 (17, 40, 6, 'mark-space y 639..670, x 476..550')
+    ph 5.600 (1, 7, 0, 'mark-space y 630..667, x 472..515')
     ph 5.700 (0, 0, 0, '')
     ph 5.808 (0, 0, 0, '')
 PASS D two-cycle periodicity: the same picture (rounding noise only)
 PASS E stream hidden inside sand: 0 frames with leaks over 439 frames
-PASS G stream crosses the ring band: visible in 439/439 frames
+PASS G stream crosses the ring band: visible in 429/429 frames (10 frames end at a wall under the ring)
 PASS F neck sides pure black: 0 dirty frames over 439
     rest t=1.0000 blur on vs off (0, 0, 0, '')
     rest t=3.0000 blur on vs off (0, 0, 0, '')
     rest t=5.3833 blur on vs off (0, 0, 0, '')
     rest t=0.4083 blur on vs off (0, 0, 0, '')
 PASS H1 at rest the frame is exactly the sharp render
-PASS H2 blur onset: 0 steps in the 240 fps difference series (max 0.0345)
-PASS H2 blur release: 0 steps in the 240 fps difference series (max 0.0170)
+PASS H2 blur onset: 0 steps in the 240 fps difference series (max 0.0359)
+PASS H2 blur release: 0 steps in the 240 fps difference series (max 0.0168)
 PASS J glow smoothness: per-frame change outside the mark max 0.0946 mean 0.0070, 0 spikes
     rim mean at flip start 32.371, crest 45.805 (+42%) at t=5.783; at the recorded crest 5.787: 45.802
 PASS I glow crest at the recorded time (fastest rotation + 0.13 s), rim band +38..55% (rim +50%, spill +34%)
