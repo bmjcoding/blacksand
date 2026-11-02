@@ -250,9 +250,15 @@ jobs:
           }
           git config core.hooksPath /dev/null
           pin="$RUNNER_TEMP/pin/pin.json"
-          [ -f "$pin" ] && [ ! -L "$pin" ] || { echo "no pin.json in the check job's artifact"; exit 1; }
+          if [ ! -f "$pin" ] || [ -L "$pin" ]; then
+            echo "no pin.json in the check job's artifact"
+            exit 1
+          fi
           sha="$RUNNER_TEMP/pin/main-sha"
-          [ -f "$sha" ] && [ ! -L "$sha" ] || { echo "no checked main SHA"; exit 1; }
+          if [ ! -f "$sha" ] || [ -L "$sha" ]; then
+            echo "no checked main SHA"
+            exit 1
+          fi
           head=$(git rev-parse HEAD)
           [[ "$head" =~ ^[0-9a-f]{40}$ ]]
           printf '%s\n' "$head" | cmp -s - "$sha" || { echo "main differs from the check job's exact SHA: not signing"; exit 1; }
