@@ -1,19 +1,35 @@
 
-describe("native window opacity at creation", () => {
-  it.effect("reapplies the saved percentage on startup and every new main window", () => Effect.gen(function* () {
-    for (const percent of [100, 73]) {
+describe("native window background material at creation", () => {
+  it.effect("creates native blur independently of saved tint and preserves it on theme sync", () => Effect.gen(function* () {
+    for (const percent of [100, 73, 50]) {
       const fake = makeFakeBrowserWindow();
+      const options: Electron.BrowserWindowConstructorOptions[] = [];
       const createCount = yield* Ref.make(0);
       const mainWindow = yield* Ref.make<Option.Option<Electron.BrowserWindow>>(Option.none());
-      const layer = layerTest({ window: fake.window, createCount, mainWindow,
+      const layer = layerTest({ window: fake.window, createCount, mainWindow, createdWindowOptions: options,
         desktopSettings: { ...DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS, localEnvironmentEnabled: false, windowOpacity: percent },
       });
       yield* Effect.gen(function* () {
         const desktop = yield* DesktopWindow.DesktopWindow;
         yield* desktop.createMainIfBackendReady;
+        yield* desktop.syncAppearance;
+        assert.deepEqual(vi.mocked(fake.window.setBackgroundColor).mock.calls, [["#00000000"]]);
         yield* Ref.set(mainWindow, Option.none());
+        yield* desktop.syncAppearance;
+        assert.notEqual(vi.mocked(fake.window.setBackgroundColor).mock.calls.at(-1)?.[0], "#00000000");
         yield* desktop.activate;
-        assert.deepEqual(fake.setOpacity.mock.calls, [[percent / 100], [percent / 100]]);
+        for (const option of options) {
+          assert.equal(option.vibrancy, "under-window");
+          assert.equal(option.visualEffectState, "active");
+          assert.equal(option.backgroundColor, "#00000000");
+          assert.equal(option.opacity, undefined);
+          assert.equal(option.transparent, undefined);
+          assert.equal(option.webPreferences?.sandbox, true);
+          assert.equal(option.webPreferences?.contextIsolation, true);
+          assert.equal(option.webPreferences?.nodeIntegration, false);
+        }
+        assert.equal(options.length, 2);
+        assert.equal(fake.setOpacity.mock.calls.length, 0);
       }).pipe(Effect.provide(layer));
     }
   }));

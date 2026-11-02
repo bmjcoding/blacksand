@@ -239,3 +239,20 @@ html[data-t3b-send="on"] [data-slot="composer-shell"]:has([data-composer-banner-
 html[data-t3b-selection="on"] ::selection {
   background-color: color-mix(in oklab, var(--t3b-accent) 38%, transparent);
 }
+
+/* Native blur is supplied by Electron's macOS NSVisualEffectView, beneath the
+   web contents. One tint layer avoids cumulative alpha through nested panels.
+   These classes mark audited base layers; never change --background/Glass or
+   target general .bg-background descendants (Settings and portals use them). */
+html[data-t3b-window-material="on"],
+html[data-t3b-window-material="on"] body,
+html[data-t3b-window-material="on"] #root {
+  /* useTheme writes opaque inline colors here when syncing browser chrome. */
+  background-color: transparent !important;
+}
+html[data-t3b-window-material="on"] [data-t3b-window-shell] {
+  background-color: color-mix(in srgb, var(--app-chrome-background) var(--t3b-window-tint), transparent);
+}
+html[data-t3b-window-material="on"] [data-t3b-window-shell] .t3b-window-clear:not(:is([role="dialog"], [role="menu"], [data-slot$="-popup"]) *) {
+  background-color: transparent;
+}

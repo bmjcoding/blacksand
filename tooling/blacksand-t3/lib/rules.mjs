@@ -1827,28 +1827,28 @@ export const makeRules = ({ updater, build }) => [
 
   {
     "id": "desktop/window-opacity-file",
-    "why": "Native whole-window opacity, persisted in desktop settings",
+    "why": "Native macOS background material and shell tint, persisted in desktop settings",
     "kind": "write",
     "file": "apps/desktop/src/settings/blacksandWindowOpacity.ts",
     "content": readFile("blacksandWindowOpacity.ts")
   },
   {
     "id": "desktop/window-opacity-ipc-file",
-    "why": "Native whole-window opacity, persisted in desktop settings",
+    "why": "Native macOS background material and shell tint, persisted in desktop settings",
     "kind": "write",
     "file": "apps/desktop/src/ipc/methods/blacksandWindowOpacity.ts",
     "content": readFile("blacksandWindowOpacityIpc.ts")
   },
   {
     "id": "web/window-opacity-setting-file",
-    "why": "Native whole-window opacity, persisted in desktop settings",
+    "why": "Native macOS background material and shell tint, persisted in desktop settings",
     "kind": "write",
     "file": "apps/web/src/components/settings/BlacksandWindowOpacitySettings.tsx",
     "content": readFile("BlacksandWindowOpacitySettings.tsx")
   },
   {
     "id": "desktop/window-opacity-preference",
-    "why": "Native whole-window opacity, independent of upstream Glass opacity",
+    "why": "Native macOS background material and shell tint, independent of upstream Glass opacity",
     "file": "apps/desktop/src/settings/DesktopAppSettings.ts",
     "edits": [
       {
@@ -1891,22 +1891,61 @@ export const makeRules = ({ updater, build }) => [
   },
   {
     "id": "desktop/window-opacity-startup",
-    "why": "Native whole-window opacity, independent of upstream Glass opacity",
+    "why": "Native macOS background material and shell tint, independent of upstream Glass opacity",
     "file": "apps/desktop/src/window/DesktopWindow.ts",
     "edits": [
       {
         "find": "import { copyContextMenuImage } from \"./ContextMenuImage.ts\";",
-        "replace": "import { copyContextMenuImage } from \"./ContextMenuImage.ts\";\nimport { applyWindowOpacity, supportsWindowOpacity } from \"../settings/blacksandWindowOpacity.ts\";"
-      },
-      {
-        "find": "    yield* rendererHistory.register(window.webContents, { surface: \"main\" });",
-        "replace": "    if (supportsWindowOpacity(environment.platform)) applyWindowOpacity(window, persistedSettings.windowOpacity);\n    yield* rendererHistory.register(window.webContents, { surface: \"main\" });"
+        "replace": "import { copyContextMenuImage } from \"./ContextMenuImage.ts\";\nimport { windowMaterialOptions, supportsWindowOpacity } from \"../settings/blacksandWindowOpacity.ts\";"
       }
     ]
   },
   {
+    id: "desktop/window-background-material",
+    why: "Native behind-window blur on the main macOS window; keep auxiliary windows opaque",
+    file: "apps/desktop/src/window/DesktopWindow.ts",
+    edits: [
+      { find: "      ...iconOption,", replace: "      ...windowMaterialOptions(environment.platform),\n      ...iconOption," },
+      { find: "  platform: NodeJS.Platform,\n): Effect.Effect<void> {", replace: "  platform: NodeJS.Platform,\n  material: boolean,\n): Effect.Effect<void> {" },
+      { find: "    window.setBackgroundColor(getInitialWindowBackgroundColor(shouldUseDarkColors));", replace: '    window.setBackgroundColor(material ? "#00000000" : getInitialWindowBackgroundColor(shouldUseDarkColors));' },
+      { find: "      yield* electronWindow.syncAllAppearance((window) =>\n        syncWindowAppearance(window, shouldUseDarkColors, environment.platform),", replace: "      const main = Option.getOrNull(yield* electronWindow.main);\n      yield* electronWindow.syncAllAppearance((window) =>\n        syncWindowAppearance(window, shouldUseDarkColors, environment.platform, window === main && supportsWindowOpacity(environment.platform))," },
+    ],
+  },
+  {
+    id: "web/window-material-file",
+    why: "Apply saved tint only after the main-window capability check",
+    kind: "write",
+    file: "apps/web/src/blacksandWindowMaterial.ts",
+    content: readFile("blacksandWindowMaterial.ts"),
+  },
+  {
+    id: "web/window-material-startup",
+    why: "Restore tint on reload without changing Glass or shared theme tokens",
+    file: "apps/web/src/main.tsx",
+    edits: [{ find: 'import "./blacksandInterface";', replace: 'import "./blacksandInterface";\nimport { loadWindowTint } from "./blacksandWindowMaterial";\nvoid loadWindowTint();' }],
+  },
+  {
+    id: "web/window-material-shell",
+    why: "One tint layer behind the main shell, with explicit base layers cleared",
+    file: "apps/web/src/components/AppSidebarLayout.tsx",
+    edits: [{ find: '        data-panel-animations={routePanelAnimationsActive ? "true" : "false"}', replace: '        data-t3b-window-shell=""\n        data-panel-animations={routePanelAnimationsActive ? "true" : "false"}' }],
+  },
+  ...[
+    ["ui/sidebar.tsx", "bg-sidebar surface-grain", 3],
+    ["ui/sidebar.tsx", "bg-background surface-grain", 1],
+    ["ChatView.tsx", "bg-background", 3],
+    ["preview/PreviewPanelShell.tsx", "bg-background", 1],
+    ["DiffPanelShell.tsx", "bg-background", 3],
+    ["DiffPanel.tsx", "overflow-hidden bg-background", 1],
+  ].map(([file, find, count], index) => ({
+    id: `web/window-material-base-${index}`,
+    why: "Clear only audited main-shell base layers, never controls or portal surfaces",
+    file: `apps/web/src/components/${file}`,
+    edits: [{ find, replace: `${find} t3b-window-clear`, count }],
+  })),
+  {
     "id": "desktop/window-opacity-channel",
-    "why": "Native whole-window opacity, independent of upstream Glass opacity",
+    "why": "Native macOS background material and shell tint, independent of upstream Glass opacity",
     "file": "apps/desktop/src/ipc/channels.ts",
     "edits": [
       {
@@ -1917,7 +1956,7 @@ export const makeRules = ({ updater, build }) => [
   },
   {
     "id": "desktop/window-opacity-handler",
-    "why": "Native whole-window opacity, independent of upstream Glass opacity",
+    "why": "Native macOS background material and shell tint, independent of upstream Glass opacity",
     "file": "apps/desktop/src/ipc/DesktopIpcHandlers.ts",
     "edits": [
       {
@@ -1932,7 +1971,7 @@ export const makeRules = ({ updater, build }) => [
   },
   {
     "id": "desktop/window-opacity-preload",
-    "why": "Native whole-window opacity, independent of upstream Glass opacity",
+    "why": "Native macOS background material and shell tint, independent of upstream Glass opacity",
     "file": "apps/desktop/src/preload.ts",
     "edits": [
       {
@@ -1943,7 +1982,7 @@ export const makeRules = ({ updater, build }) => [
   },
   {
     "id": "contracts/window-opacity-bridge",
-    "why": "Native whole-window opacity, independent of upstream Glass opacity",
+    "why": "Native macOS background material and shell tint, independent of upstream Glass opacity",
     "file": "packages/contracts/src/ipc.ts",
     "edits": [
       {
@@ -1954,7 +1993,7 @@ export const makeRules = ({ updater, build }) => [
   },
   {
     "id": "web/window-opacity-setting-row",
-    "why": "Native whole-window opacity, independent of upstream Glass opacity",
+    "why": "Native macOS background material and shell tint, independent of upstream Glass opacity",
     "file": "apps/web/src/components/settings/AppearanceSettingsPanel.tsx",
     "edits": [
       {
@@ -1969,12 +2008,12 @@ export const makeRules = ({ updater, build }) => [
   },
   {
     "id": "web/window-opacity-setting-search",
-    "why": "Native whole-window opacity, independent of upstream Glass opacity",
+    "why": "Native macOS background material and shell tint, independent of upstream Glass opacity",
     "file": "apps/web/src/components/settings/settingsSearch.ts",
     "edits": [
       {
         "find": "  {\n    id: \"chat-width\",",
-        "replace": "  {\n    id: \"blacksand-window-opacity\",\n    title: \"Window opacity\",\n    desktopOnly: true,\n    to: \"/settings/appearance\",\n    searchTerms: [\"desktop window native opacity transparency entire text controls\"],\n  },\n  {\n    id: \"chat-width\","
+        "replace": "  {\n    id: \"blacksand-window-opacity\",\n    title: \"Window background tint\",\n    desktopOnly: true,\n    to: \"/settings/appearance\",\n    searchTerms: [\"desktop window background tint smoked glass native macos blur\"],\n  },\n  {\n    id: \"chat-width\","
       }
     ]
   },

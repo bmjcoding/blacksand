@@ -1,5 +1,5 @@
 
-describe("native window opacity preference", () => {
+describe("native window background tint preference", () => {
   it.effect("defaults to 100, survives reload and resets to an omitted default", () => withSettings(
     Effect.gen(function* () {
       const settings = yield* DesktopAppSettings.DesktopAppSettings;
@@ -12,6 +12,23 @@ describe("native window opacity preference", () => {
       yield* settings.setWindowOpacity(100);
       assert.equal(JSON.parse(yield* fs.readFileString(environment.desktopSettingsPath)).windowOpacity, undefined);
       assert.equal((yield* settings.load).windowOpacity, 100);
+    }),
+  ));
+});
+
+describe("legacy tint preference validation", () => {
+  it.effect("reinterprets safe stored opacity and defaults malformed values without losing other settings", () => withSettings(
+    Effect.gen(function* () {
+      const settings = yield* DesktopAppSettings.DesktopAppSettings;
+      const environment = yield* DesktopEnvironment.DesktopEnvironment;
+      const fs = yield* FileSystem.FileSystem;
+      yield* fs.makeDirectory(environment.stateDir, { recursive: true });
+      for (const value of [73, 50, 100, 49, 101, 73.5, "73", null, {}, []]) {
+        yield* fs.writeFileString(environment.desktopSettingsPath, JSON.stringify({ windowOpacity: value, localEnvironmentEnabled: false }));
+        const loaded = yield* settings.load;
+        assert.equal(loaded.windowOpacity, typeof value === "number" && Number.isInteger(value) && value >= 50 && value <= 100 ? value : 100);
+        assert.equal(loaded.localEnvironmentEnabled, false);
+      }
     }),
   ));
 });

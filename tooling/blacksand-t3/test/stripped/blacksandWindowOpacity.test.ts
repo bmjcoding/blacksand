@@ -6,20 +6,21 @@ import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Electron from "electron";
 import * as ElectronWindow from "../../electron/ElectronWindow.ts";
 import * as DesktopAppSettings from "../../settings/DesktopAppSettings.ts";
+import { windowMaterialOptions } from "../../settings/blacksandWindowOpacity.ts";
 import { getBlacksandWindowOpacity, setBlacksandWindowOpacity } from "./blacksandWindowOpacity.ts";
 vi.mock("electron", () => ({}));
 
 const mainFrame = {};
 const native = { webContents: { id: 7, mainFrame }, isDestroyed: () => false, setOpacity: vi.fn() };
 const event = { sender: { id: 7 }, senderFrame: mainFrame };
-const run = <A, E, R>(effect: Effect.Effect<A, E, R>, platform: NodeJS.Platform = "darwin") => Effect.runPromise(effect.pipe(
+const run = <A, E, R>(effect: Effect.Effect<A, E, R>, platform: NodeJS.Platform = "darwin", main: Electron.BrowserWindow | null = native as unknown as Electron.BrowserWindow) => Effect.runPromise(effect.pipe(
   Effect.provide(DesktopAppSettings.layerTest()),
-  Effect.provideService(ElectronWindow.ElectronWindow, { main: Effect.succeed(Option.some(native as unknown as Electron.BrowserWindow)) } as ElectronWindow.ElectronWindow["Service"]),
+  Effect.provideService(ElectronWindow.ElectronWindow, { main: Effect.succeed(Option.fromNullishOr(main)) } as ElectronWindow.ElectronWindow["Service"]),
   Effect.provideService(HostProcess.Platform, platform),
 ) as Effect.Effect<A, E>);
 
-describe("native window opacity IPC", () => {
-  it("defaults to 100, applies to the native window, persists and resets", async () => {
+describe("native window background tint IPC", () => {
+  it("defaults to 100, persists tint and resets without fading foreground", async () => {
     native.setOpacity.mockClear();
     await run(Effect.gen(function* () {
       expect(yield* getBlacksandWindowOpacity.handler(undefined, event)).toBe(100);
@@ -28,14 +29,17 @@ describe("native window opacity IPC", () => {
       yield* setBlacksandWindowOpacity.handler(100, event);
       expect(yield* getBlacksandWindowOpacity.handler(undefined, event)).toBe(100);
     }));
-    expect(native.setOpacity.mock.calls).toEqual([[0.73], [1]]);
+    expect(native.setOpacity).not.toHaveBeenCalled();
   });
   it("rejects malformed, nonfinite and out-of-range payloads before any native call", async () => {
     native.setOpacity.mockClear();
-    for (const input of [NaN, Infinity, -Infinity, 49, 101, 75.5, "75", null, {}, [], { percent: 75, windowId: 7 }]) {
+    for (const input of [undefined, NaN, Infinity, -Infinity, 49, 101, 75.5, "75", null, {}, [], { percent: 75, windowId: 7 }]) {
       await expect(run(setBlacksandWindowOpacity.handler(input, event))).rejects.toBeDefined();
     }
     expect(native.setOpacity).not.toHaveBeenCalled();
+    await run(Effect.gen(function* () {
+      expect(yield* getBlacksandWindowOpacity.handler(undefined, event)).toBe(100);
+    }));
   });
   it("rejects foreign contents, subframes and missing frame identity", async () => {
     native.setOpacity.mockClear();
@@ -47,8 +51,18 @@ describe("native window opacity IPC", () => {
   });
   it("reports unsupported platforms without a native call", async () => {
     native.setOpacity.mockClear();
-    expect(await run(getBlacksandWindowOpacity.handler(undefined, event), "linux")).toBeNull();
-    await expect(run(setBlacksandWindowOpacity.handler(80, event), "linux")).rejects.toBeDefined();
+    for (const platform of ["linux", "win32"] as const) {
+      expect(windowMaterialOptions(platform)).toEqual({});
+      expect(await run(getBlacksandWindowOpacity.handler(undefined, event), platform)).toBeNull();
+      await expect(run(setBlacksandWindowOpacity.handler(80, event), platform)).rejects.toBeDefined();
+    }
     expect(native.setOpacity).not.toHaveBeenCalled();
+  });
+  it("refuses an absent or destroyed main window", async () => {
+    await expect(run(getBlacksandWindowOpacity.handler(undefined, event), "darwin", null)).rejects.toBeDefined();
+    await expect(run(setBlacksandWindowOpacity.handler(73, event), "darwin", null)).rejects.toBeDefined();
+    using destroyed = vi.spyOn(native, "isDestroyed").mockReturnValue(true);
+    await expect(run(getBlacksandWindowOpacity.handler(undefined, event))).rejects.toBeDefined();
+    await expect(run(setBlacksandWindowOpacity.handler(73, event))).rejects.toBeDefined();
   });
 });
