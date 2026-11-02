@@ -36,8 +36,8 @@ export const features = [
   {
     name: "brand-file",
     label: "Blacksand brand components",
-    description: "The version stamp component, and this build's version info and drift report",
-    rules: ["web/blacksand-brand-file", "web/blacksand-build-info", "web/blacksand-drift-report"],
+    description: "The version stamp component, and this build's version info",
+    rules: ["web/blacksand-brand-file", "web/blacksand-build-info"],
     // Its components read the interface switches, which load with the styles.
     requires: ["styles"],
   },
@@ -50,15 +50,9 @@ export const features = [
   {
     name: "version-stamp",
     label: "Version stamp",
-    description: "The build version in the window's corner, with its changes and this report on hover",
+    description: "The build version in the window's corner, with its changes and omitted features on hover",
     rules: ["web/blacksand-version-stamp"],
     requires: ["brand-file", "styles"],
-  },
-  {
-    name: "drift-viewer",
-    label: "Report with screenshots in the app",
-    description: "The version stamp opens this report, screenshots included; without it, a copy without them",
-    rules: ["desktop/drift-report-*", "contracts/drift-report-bridge"],
   },
   {
     name: "send-button",

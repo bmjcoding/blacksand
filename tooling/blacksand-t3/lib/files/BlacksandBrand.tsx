@@ -1,10 +1,9 @@
 // Injected by blacksand. The version stamp in the window's corner and its
 // "changes in this build" card; styled in blacksand.css.
 
-import { useCallback, useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import { type MouseEvent, type ReactNode } from "react";
 
 import { openDesktopUpdateReleaseNotes } from "./desktopUpdate.toast";
-import { Dialog, DialogClose, DialogPopup, DialogTitle } from "./ui/dialog";
 import { useDesktopUpdateState } from "../state/desktopUpdate";
 import { BLACKSAND_T3_BUILD } from "../blacksandBuild";
 import { useBlacksandInterface } from "../blacksandInterface";
@@ -87,135 +86,19 @@ function ChangeList({
   );
 }
 
-/**
- * The desktop's copy of a build's report, screenshots included (state/drift,
- * written after the build), and the staged build's preview. Cast rather than
- * typed: the bridge methods are their own feature (lib/features.mjs), and this
- * file must build without them.
- */
-const blacksandBridge = () =>
-  window.desktopBridge as
-    | {
-        getBlacksandDriftReport?: (version?: string | null) => Promise<string | null>;
-        previewBlacksandBuild?: () => Promise<string | null>;
-      }
-    | undefined;
-const reportBridge = () => blacksandBridge()?.getBlacksandDriftReport;
-
-/** Features this build left out (lib/features.mjs), and the way into the report. */
-function WhatChanged({ onOpen }: { readonly onOpen: () => void }) {
+/** Features this build left out, with no report UI or bridge. */
+function LeftOut() {
   const skipped = BLACKSAND_T3_BUILD.skipped;
-  if (skipped.length === 0 && !reportBridge()) return null;
+  if (skipped.length === 0) return null;
   return (
     <section className="t3b-version-drift">
-      {skipped.length > 0 ? (
-        <>
-          <h4>
-            Left out<span> · upstream moved their code</span>
-          </h4>
-          <ul>
-            {skipped.map((feature) => (
-              <li key={feature.name}>
-                {feature.label}
-                {feature.reason === "requires" && feature.requires ? <span> (needs {feature.requires})</span> : null}
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : null}
-      <button onClick={onOpen} type="button">
-        See what changed
-      </button>
+      <h4>Left out<span> · upstream moved their code</span></h4>
+      <ul>{skipped.map((feature) => (
+        <li key={feature.name}>{feature.label}
+          {feature.reason === "requires" && feature.requires ? <span> (needs {feature.requires})</span> : null}
+        </li>
+      ))}</ul>
     </section>
-  );
-}
-
-/**
- * A build that's staged and installs on restart (upstream's update state says
- * "downloaded"): open it in a sandboxed window first (`blacksand t3 preview`),
- * or read its report.
- */
-function NextBuild({ version, onReport }: { readonly version: string; readonly onReport: () => void }) {
-  const preview = blacksandBridge()?.previewBlacksandBuild;
-  const [status, setStatus] = useState<string | null>(null);
-  if (!preview && !reportBridge()) return null;
-  const open = () => {
-    if (!preview) return;
-    setStatus("Opening the preview…");
-    void preview()
-      .then((problem) => setStatus(problem ?? "It's open in a window of its own, on a copy of your profile. Close that window when you're done."))
-      .catch(() => setStatus("The preview couldn't start."));
-  };
-  return (
-    <section className="t3b-version-drift t3b-version-next">
-      <h4>
-        {version}
-        <span> · ready, installs on restart</span>
-      </h4>
-      <div>
-        {preview ? (
-          <button onClick={open} type="button">
-            Preview
-          </button>
-        ) : null}
-        {reportBridge() ? (
-          <button onClick={onReport} type="button">
-            What changed
-          </button>
-        ) : null}
-      </div>
-      {status ? <p>{status}</p> : null}
-    </section>
-  );
-}
-
-/**
- * A build's report (lib/drift.mjs) in a frame over the window: the desktop's
- * copy with screenshots, else for this build the one baked into
- * blacksandDrift.ts. `version`: another build's (a staged one). It has no
- * scripts; links open in the browser, # links scroll. Upstream's modal dialog
- * moves focus into it, keeps Tab inside, closes on Escape or a click outside,
- * and returns focus to the version stamp.
- */
-function DriftReport({ version, onClose }: { readonly version: string | null; readonly onClose: () => void }) {
-  const [html, setHtml] = useState<string | null | undefined>(undefined);
-  useEffect(() => {
-    const baked = () =>
-      version ? Promise.resolve(null) : import("../blacksandDrift").then((module) => module.BLACKSAND_T3_DRIFT_REPORT);
-    const fromDesktop = reportBridge();
-    void (fromDesktop ? fromDesktop(version).catch(() => null) : Promise.resolve(null))
-      .then((report) => report ?? baked())
-      .then(setHtml);
-  }, [version]);
-  const routeLinks = (frame: HTMLIFrameElement) => {
-    const doc = frame.contentDocument;
-    doc?.addEventListener("click", (event) => {
-      const link = (event.target as Element | null)?.closest?.("a[href]");
-      const href = link?.getAttribute("href");
-      if (!href) return;
-      event.preventDefault();
-      if (href.startsWith("#")) doc.getElementById(href.slice(1))?.scrollIntoView({ behavior: "smooth" });
-      else openUrl(href);
-    });
-    // Keys inside the frame never reach the dialog.
-    doc?.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") onClose();
-    });
-  };
-  return (
-    <Dialog onOpenChange={(open) => !open && onClose()} open>
-      <DialogPopup bottomStickOnMobile={false} className="t3b-drift-panel" showCloseButton={false}>
-        <header>
-          <DialogTitle>{version ? `What changed in ${version}` : "What changed"}</DialogTitle>
-          <DialogClose aria-label="Close">×</DialogClose>
-        </header>
-        {html ? (
-          <iframe onLoad={(event) => routeLinks(event.currentTarget)} srcDoc={html} title="What changed" />
-        ) : (
-          <p>{html === null ? "This build has no report." : "Loading…"}</p>
-        )}
-      </DialogPopup>
-    </Dialog>
   );
 }
 
@@ -224,8 +107,7 @@ function DriftReport({ version, onClose }: { readonly version: string | null; re
  * window's bottom-right corner while its switch is on. Hovering or focusing it shows what the build changed, baked in at
  * build time (blacksandBuild.ts). The desktop's reported version wins if the
  * bundle predates a rename. A build that left features out shows a hollow dot,
- * and the card lists them with a way into what upstream changed. A staged
- * build adds a way to preview it.
+ * and the card lists them.
  */
 export function BlacksandVersionStamp() {
   return useBlacksandInterface("stamp") ? <VersionStamp /> : null;
@@ -235,10 +117,6 @@ function VersionStamp() {
   const update = useDesktopUpdateState();
   const build = BLACKSAND_T3_BUILD;
   const version = update?.currentVersion ?? build.version ?? "dev";
-  const next = update?.status === "downloaded" && update.downloadedVersion !== version ? update.downloadedVersion : null;
-  // Whose report is open: this build's (null) or the staged one's.
-  const [report, setReport] = useState<{ readonly version: string | null } | null>(null);
-  const closeReport = useCallback(() => setReport(null), []);
   const built = build.builtAt
     ? new Date(build.builtAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
     : null;
@@ -247,7 +125,6 @@ function VersionStamp() {
       aria-label={`T3 Code (blacksand) ${version}`}
       className="t3b-version-stamp"
       data-drift={build.skipped.length > 0 ? "" : undefined}
-      data-next={next ? "" : undefined}
       role="note"
       tabIndex={0}
     >
@@ -274,11 +151,9 @@ function VersionStamp() {
             render={(change, repo) => <BlacksandTitle change={change} repo={repo} />}
             title="Blacksand"
           />
-          <WhatChanged onOpen={() => setReport({ version: null })} />
-          {next ? <NextBuild onReport={() => setReport({ version: next })} version={next} /> : null}
+          <LeftOut />
         </div>
       </div>
-      {report ? <DriftReport onClose={closeReport} version={report.version} /> : null}
     </div>
   );
 }

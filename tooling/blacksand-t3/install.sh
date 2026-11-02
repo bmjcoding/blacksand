@@ -50,12 +50,14 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/scripts/host-common.sh"
 
 ROLE=ui
 UNISOLATED=0
+UI_CUTOVER=0
 while (($#)); do
   case "$1" in
     --role) ROLE="${2:-}"; shift 2 ;;
     --role=*) ROLE="${1#--role=}"; shift ;;
+    --ui-cutover) UI_CUTOVER=1; shift ;;
     --unisolated-build) UNISOLATED=1; shift ;;
-    *) printf 'usage: ./install.sh [--role ui|host|both] [--unisolated-build]\n' >&2; exit 2 ;;
+    *) printf 'usage: ./install.sh [--role ui|host|both] [--unisolated-build] [--ui-cutover]\n' >&2; exit 2 ;;
   esac
 done
 case "$ROLE" in ui | host | both) ;; *) printf 'unknown role: %s (ui, host or both)\n' "$ROLE" >&2; exit 2 ;; esac
@@ -429,12 +431,12 @@ mac_setup() {
     say "Installing ${missing[*]} with Homebrew"
     brew install "${missing[@]}"
   fi
-  have op || { say "Installing the 1Password CLI"; brew install --cask 1password-cli; }
   hash -r
   problem="$(git_problem)" || die "$problem (git on PATH: $(command -v git || echo none)). Run: brew install git"
   node_ok || die "Node $NODE_MAJOR or newer with the Oct 2026 security fixes is required (24.22.1 or later on 24.x, or 26.12.1 or later; found $(node --version)). Run: brew upgrade node"
 
   if bin/t3 signing status | grep -q "not set up"; then
+    have op || { say "Installing the 1Password CLI"; brew install --cask 1password-cli; }
     [[ -d /Applications/1Password.app ]] || die "Install the 1Password app and sign in, then rerun ./install.sh"
     op vault list >/dev/null 2>&1 ||
       die "Turn on 1Password → Settings → Developer → \"Integrate with 1Password CLI\", then rerun ./install.sh"
@@ -693,7 +695,20 @@ setup_own_toolchain() {
 
 # --- main -----------------------------------------------------------------------
 main() {
-  refuse_legacy_install
+  if ((UI_CUTOVER)); then
+    # Explicit desktop-only coexistence: never provision legacy/shared services,
+    # replace the running app/data, weaken build isolation, or schedule activation.
+    [[ "$ROLE" == ui && "$(uname -s)" == Darwin && "$UNISOLATED" == 0 ]] ||
+      die "--ui-cutover requires macOS, --role ui and an isolated build account"
+    [[ "${BLACKSAND_T3_APPS:-}" == "$HOME/Applications" && "${BLACKSAND_T3_HOME:-$HOME/.blacksand/t3}" == "$HOME/.blacksand/t3" ]] ||
+      die "--ui-cutover requires BLACKSAND_T3_APPS=$HOME/Applications and the separate default Blacksand profile"
+    local signing_status
+    signing_status="$(bin/t3 signing status)" || die "could not inspect the configured signing identity"
+    [[ "$signing_status" != *"not set up"* ]] ||
+      die "--ui-cutover requires the configured local signing identity first"
+  else
+    refuse_legacy_install
+  fi
   case "$(uname -s)" in
     Darwin) mac_setup ;;
     Linux) linux_setup ;;
@@ -714,6 +729,13 @@ main() {
   fi
 
   say "Building and installing T3 Code (blacksand) (a few minutes on first run)"
+  if ((UI_CUTOVER)); then
+    bin/t3 update --force --stage-only
+    say "Blacksand is staged. The legacy app and data remain in place."
+    say "After inspecting the staged app and completing the profile cutover, run: blacksand t3 launch"
+    say "Automatic updates were not scheduled; enable them after the cutover is verified."
+    return
+  fi
   bin/t3 update
 
   if [[ "$DAY" == hourly ]]; then say "Scheduling the update check: hourly, and on update requests"; else say "Scheduling the update: ${DAY}, ${HOUR}:00"; fi

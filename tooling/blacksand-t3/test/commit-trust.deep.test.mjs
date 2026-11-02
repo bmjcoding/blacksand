@@ -63,8 +63,9 @@ test("self-update records what it verified only on top of a HEAD verified here: 
   const fresh = f.fresh();
   // The owner's README change lands by self-update, from the unverified fresh HEAD.
   const readme = f.commit(f.owner, { "README.md": "notes\n" }, "README");
-  assert.equal(await hourly(f, { repo: fresh }), "updated");
-  assert.equal(head(fresh), readme);
+  mockFetch(f.routes);
+  assert.equal(await hourly(f, { repo: fresh }), "held");
+  assert.notEqual(head(fresh), readme);
   assert.equal(recorded(fresh), null, "not recorded: the young pin it came with was never checked");
   mockFetch(f.routes);
   assert.equal((await verify(f, fresh)).result, "held");
@@ -555,7 +556,7 @@ test("a clock four days ahead doesn't admit an hour-old dependency, and says how
   assert.match(ahead.message, /it's 4 days ahead of the npm registry's/);
   assert.equal(recorded(repo), null, "nothing recorded");
   assert.equal((await verify(f, repo, { now: T + 3 * DAY, server: T + 3 * DAY - 9 * 60_000 })).result, "verified");
-  fs.rmSync(path.join(repo, ".git", "t3blackout-verified"));
+  fs.rmSync(path.join(repo, ".git", "blacksand-trust-v1-verified"));
   assert.match((await verify(f, repo, { now: T + 3 * DAY, server: T + 3 * DAY - 11 * 60_000 })).message, AHEAD);
   assert.equal((await verify(f, repo, { now: T + 3 * DAY, server: T + 5 * DAY })).result, "verified");
 });
@@ -569,7 +570,7 @@ test("self-update takes no age by a clock that's ahead either, and records with 
   assert.equal(await f.update({ now: T + 4 * DAY, clock: async () => T }), "held");
   assert.match(f.logs.at(-1), AHEAD);
   assert.equal(await f.update({ now: T + 4 * DAY, clock: async () => T + 4 * DAY }), "updated");
-  assert.equal(fs.readFileSync(path.join(f.clone, ".git", "t3blackout-verified"), "utf8"), `${f.head()} ${T + 4 * DAY}\n`);
+  assert.equal(fs.readFileSync(path.join(f.clone, ".git", "blacksand-trust-v1-verified"), "utf8"), `${f.head()} ${T + 4 * DAY}\n`);
   f.commit(f.owner, { "pin.json": pin(NIGHTLY(3940), f.shas[2]) }, "Pin nightly (owner)");
   assert.equal(await f.update({ now: T + 4 * DAY, clock: async () => assert.fail("no age was taken") }), "updated");
 });
@@ -581,13 +582,13 @@ test("a record dated after the clock, or without a time, is checked again; one f
   // Verified with the clock (and the registry) three days on: recorded with that time.
   const later = T + 3 * DAY;
   assert.equal((await verify(f, repo, { now: later, server: later })).result, "verified");
-  assert.equal(fs.readFileSync(path.join(repo, ".git", "t3blackout-verified"), "utf8"), `${head(repo)} ${later}\n`);
+  assert.equal(fs.readFileSync(path.join(repo, ".git", "blacksand-trust-v1-verified"), "utf8"), `${head(repo)} ${later}\n`);
   assert.match((await verify(f, repo, { now: later + DAY })).message, /^\w+ was verified here$/, "after it: the record stands");
   // The clock reads earlier than the record (it was ahead, and is right now): checked again, and held.
   const corrected = await verify(f, repo, { now: T });
   assert.equal(corrected.result, "held");
   assert.match(corrected.message, /adds dependencies under 3 days old/);
-  fs.writeFileSync(path.join(repo, ".git", "t3blackout-verified"), `${head(repo)}\n`);
+  fs.writeFileSync(path.join(repo, ".git", "blacksand-trust-v1-verified"), `${head(repo)}\n`);
   assert.equal((await verify(f, repo, { now: T })).result, "held");
 });
 
@@ -609,4 +610,18 @@ test("the registry's clock is its HTTPS Date header, whatever the status; with n
   mockFetch({ ...f.routes, "https://registry.npmjs.org/": () => { throw new TypeError("fetch failed"); } });
   assert.equal((await verifyHead(later)).result, "skipped");
   assert.equal(recorded(later.repo), null);
+});
+
+test("production verification refuses a HEAD changed during pin gates and never stamps it", async () => {
+  const f = youngPin("delivery-head-race", T);
+  const repo = f.fresh("racing-head");
+  const root = run(repo, ["rev-parse", "HEAD^"]);
+  mockFetch(f.routes);
+  const later = T + 3 * DAY;
+  const verdict = await verifyHead({ repo, upstream: f.upstream, now: later, advisories: noAdvisories, report: () => {},
+    clock: async () => { run(repo, ["reset", "-q", "--hard", root]); return later; },
+  });
+  assert.equal(verdict.result, "refused");
+  assert.match(verdict.message, /HEAD moved/);
+  assert.equal(recorded(repo), null);
 });

@@ -72,8 +72,8 @@ example, when a self-update landed and its rebuild failed. Neither a restart nor
 
 ## Review before you restart
 
-While a build waits, the version stamp's hover card offers **Preview** and **What
-changed**.
+The version stamp lists upstream and Blacksand changes and omitted features.
+Optional CLI diagnostics remain available while a build waits:
 
 - **Preview** (`blacksand t3 preview`) opens the waiting build in its own Chrome
   window. It runs against a copy of your profile, which has your projects, threads
@@ -87,7 +87,7 @@ changed**.
   - Closing the window stops the server and deletes the copy.
 
   Linux has no sandbox for the preview yet, so on Linux it gets an empty profile.
-- **What changed** opens the [build report](upstream-rules.md#the-build-report).
+- `blacksand t3 drift` opens the [build report](upstream-rules.md#the-build-report).
   `blacksand t3 review` gathers the report and every upstream commit since your build
   for an agent to read. Ask the agent what you'd notice and where to look in the
   preview. For each feature the build left out, ask whether to re-hook it, retire it

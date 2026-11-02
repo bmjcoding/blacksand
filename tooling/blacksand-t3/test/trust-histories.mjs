@@ -445,7 +445,7 @@ export async function runSeeds({ from, count, layouts = true }) {
       const rendered = render(world, history, other);
       const heard = [];
       const fresh = await inState(world, history, rendered, async () => {
-        const verdict = await verifyHeadTs({ repo: world.repo, now: history.now, gates: t3Gates({ ...options, report: (line) => heard.push(line) }) }).then((value) => ({ value }), (error) => ({ threw: String(error?.message ?? error) }));
+        const verdict = await verifyHeadTs({ repo: world.repo, now: history.now, record: "t3blackout-verified", gates: t3Gates({ ...options, report: (line) => heard.push(line) }) }).then((value) => ({ value }), (error) => ({ threw: String(error?.message ?? error) }));
         return { ...verdict, record: fs.existsSync(path.join(world.gitDir, "t3blackout-verified")) ? fs.readFileSync(path.join(world.gitDir, "t3blackout-verified"), "utf8") : null, reports: heard, unplayed: [] };
       });
       const verdict = `${fresh.value?.result ?? "threw"}${/evaluator commit\(s\) since/.test(fresh.value?.message ?? "") ? " after evaluator commits" : ""}`;

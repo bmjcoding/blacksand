@@ -106,9 +106,13 @@ test("installers that can't keep to the release age are manual, and ACP agents n
   assert.match(acp, /if \(!BLACKSAND_PREBUILT_BINARIES\) \{\n\s+return yield\* new AcpRegistryError/);
 });
 
-test("the preview start waits for its window", () => {
-  assert.match(file("blacksandDriftReport.ts"), /event\.type === "preview-open"/);
-  assert.match(fs.readFileSync(new URL("../lib/preview.mjs", import.meta.url), "utf8"), /emit\(\{ type: "preview-open", version \}\)/);
+test("the version stamp keeps changes and omissions without custom report or preview UI", () => {
+  assert.doesNotMatch(rules.map((rule) => rule.id).join("\n"), /drift-report/);
+  assert.equal(featureByName("drift-viewer"), undefined);
+  assert.doesNotMatch(file("BlacksandBrand.tsx"), /DriftReport|NextBuild|previewBlacksandBuild|getBlacksandDriftReport|iframe|Dialog/);
+  assert.match(file("BlacksandBrand.tsx"), /<LeftOut \/>/);
+  assert.match(file("BlacksandBrand.tsx"), /title="Upstream"/);
+  assert.match(file("BlacksandBrand.tsx"), /title="Blacksand"/);
 });
 
 test("the app is called T3 Code (blacksand) everywhere it shows its name, with no stage label", () => {

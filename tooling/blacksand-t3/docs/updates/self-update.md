@@ -13,13 +13,19 @@ the update lock. That's how a rule fix pushed from one machine reaches the other
 Signature checks stop someone who gets into the GitHub account from pushing code that
 every machine runs.
 
-## Delivery limitation
+## Shared verifier and records
 
-T3's active updater still uses the historical root-only verifier in
-`lib/selfupdate.mjs`. It does not yet use the layout-aware `src/trust` verifier,
-and can miss pin gates across a folder move. Installing or delivering T3 from
-this repository remains blocked until that integration and separate verification
-records are implemented. Supporting the new signer label does not close that gap.
+Both the production updater and direct pre-build `verifyHead` call
+`src/trust/check.ts`. T3's pin gates live in `lib/pin-gates.mjs` and are adapted
+by `lib/trust-gates.mjs`. There is no second active history verifier.
+
+Current checks use `.git/blacksand-trust-v1-verified`. The old
+`t3blackout-verified` file is never read, even for an identical HEAD, an offline
+update or a timestamp in the past or future. Without a current record on the
+first-parent chain, verification starts from the root. An unverified clone's
+HEAD cannot supply a trusted pin basis. A HEAD changed during verification is
+refused and not recorded. Isolated build snapshots preserve the component and
+`src/trust` directory layout so the same runtime imports work in the worker.
 
 The layout-aware verifier retains root, `packages/t3`, `tooling/t3code`, and
 `tooling/blacksand-t3` histories. It reads each commit against its first parent's

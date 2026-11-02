@@ -108,3 +108,34 @@ The app keeps its data in `~/.blacksand/t3`, never in upstream's `~/.t3`. It has
 own bundle ID, Chromium profile, Keychain item and runtime name, so you can install
 it beside the official app. Both apps register `t3code://` links. With both
 installed, the system picks which one opens them.
+
+## Desktop-only cutover from T3 Blackout on macOS
+
+Normal setup and all host provisioning still refuse a legacy installation.
+`./install.sh --role ui --ui-cutover` is an explicit exception for the desktop UI:
+set `BLACKSAND_T3_APPS="$HOME/Applications"` and use the separate default
+`~/.blacksand/t3` profile. It requires administrator access for the separate build
+account and a configured local signing identity. It cannot use
+`--unisolated-build`, a host role or Linux.
+
+Before running it, preserve the legacy app, its profiles and signing state.
+An owner can copy their existing dedicated signing keychain and adjacent password
+file into this component's private `state/` directory without exporting the key.
+Both files must remain owner-only. The existing valid `T3 Blackout Local Signing`
+identity is accepted there, as is the current Blacksand identity. No identity means
+staging fails; there is no ad-hoc app-signing fallback. A self-signed certificate
+can still cause macOS Keychain prompts after updates.
+
+The cutover command builds and stages only. It leaves the running legacy app,
+data, build home and host services alone and does not schedule updates. Inspect
+the staged signed app, complete the cold profile copy after quitting the legacy
+UI, then run `blacksand t3 launch`. It applies the pending build before opening
+Blacksand with its new profile. The old application remains available for rollback. Enable
+`blacksand t3 schedule` only after verifying the new desktop. Importing working
+data is a separate owner-directed step; never move or wipe the live legacy profile.
+
+On macOS and Windows, Settings → Appearance has a native **Window opacity** slider
+immediately below **Glass opacity**. It changes the entire native window from
+50% to 100%, defaults to 100%, saves across launches and can be reset to 100%.
+Glass opacity still controls upstream's surfaces independently. The native row
+is absent in a plain browser and on unsupported platforms.

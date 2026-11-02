@@ -1,13 +1,8 @@
-// The t3 package's pin gates (src/trust/check.ts PinGates), for the TypeScript
-// verifier: the gates lib/selfupdate.mjs's own checkTip runs, by the same code
-// (pinGates over reviewApprovals and checkDependencies, then clockProblem). The
-// owner's lists and overrides they read at the tip come from the verifier, which
-// knows where the package sits in that commit (src/trust/layout.ts).
-
+// Adapts the existing T3 pin gates to src/trust/check.ts PinGates.
 import { openAdvisories } from "./evaluate.mjs";
 import { registryTime } from "./gates.mjs";
 import { UPSTREAM_URL } from "./git.mjs";
-import { checkDependencies, clockProblem, pinGates, reviewApprovals } from "./selfupdate.mjs";
+import { checkDependencies, clockProblem, pinGates, reviewApprovals } from "./pin-gates.mjs";
 import { log } from "./util.mjs";
 
 /**

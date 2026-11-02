@@ -1,0 +1,17 @@
+
+describe("native window opacity preference", () => {
+  it.effect("defaults to 100, survives reload and resets to an omitted default", () => withSettings(
+    Effect.gen(function* () {
+      const settings = yield* DesktopAppSettings.DesktopAppSettings;
+      const environment = yield* DesktopEnvironment.DesktopEnvironment;
+      const fs = yield* FileSystem.FileSystem;
+      assert.equal((yield* settings.get).windowOpacity, 100);
+      yield* settings.setWindowOpacity(73);
+      assert.equal(JSON.parse(yield* fs.readFileString(environment.desktopSettingsPath)).windowOpacity, 73);
+      assert.equal((yield* settings.load).windowOpacity, 73);
+      yield* settings.setWindowOpacity(100);
+      assert.equal(JSON.parse(yield* fs.readFileString(environment.desktopSettingsPath)).windowOpacity, undefined);
+      assert.equal((yield* settings.load).windowOpacity, 100);
+    }),
+  ));
+});

@@ -137,7 +137,7 @@ export async function checkTip(git: Git, { tip, start, gates }: { tip: string; s
 }
 
 /** Where a clone keeps the last HEAD verified in it, and when: in its git directory, so a fresh clone starts without one. */
-export const RECORD = "t3blackout-verified";
+export const RECORD = "blacksand-trust-v1-verified";
 
 const recordOf = (git: Git, record: string) => {
   const file = out(git, ["rev-parse", "--path-format=absolute", "--git-path", record]);
@@ -145,15 +145,21 @@ const recordOf = (git: Git, record: string) => {
 };
 
 /** The commit recorded as verified, unless the clock now reads earlier than when it was (it was ahead then, or has been set back since). */
-function verifiedHere(git: Git, record: string, now: number): string | null {
+export function verifiedHere(git: Git, record: string, now: number): string | null {
   const file = recordOf(git, record);
   if (!file) return null;
   try {
     const [sha = "", at] = fs.readFileSync(file, "utf8").trim().split(" ");
-    return /^\d+$/.test(at ?? "") && Number(at) <= now ? sha : null;
+    return /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(sha) && /^\d+$/.test(at ?? "") && Number.isSafeInteger(Number(at)) && Number(at) <= now ? sha : null;
   } catch {
     return null;
   }
+}
+
+/** Records only checks made by this verifier; legacy stamps are never read. */
+export function writeVerified(git: Git, record: string, head: string, now: number): void {
+  const file = recordOf(git, record);
+  if (file) fs.writeFileSync(file, `${head} ${Math.floor(now)}\n`, { mode: 0o600 });
 }
 
 /**
@@ -169,10 +175,10 @@ export async function verifyHead({ repo, gates, now, record = RECORD, git = loca
   const recorded = verifiedHere(git, record, now);
   if (recorded === head) return { result: "verified", message: `${short(head)} was verified here` };
   const verdict = await checkTip(git, { tip: head, start: recorded, gates });
-  if (verdict.result === "verified") {
-    const file = recordOf(git, record);
-    if (file) fs.writeFileSync(file, `${head} ${Math.floor(now)}\n`, { mode: 0o600 });
+  if (out(git, ["rev-parse", "--verify", "--quiet", "HEAD^{commit}"]) !== head) {
+    return { result: "refused", message: `HEAD moved while ${short(head)} was checked` };
   }
+  if (verdict.result === "verified") writeVerified(git, record, head, now);
   return { result: verdict.result, message: verdict.message };
 }
 

@@ -282,8 +282,9 @@ test("journals this install wrote still recover, from either staging folder", ()
 
 test("the CLI refuses a crafted rollback journal naming another project, and leaves it alone", () => {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "t3b-app-cli-")));
-  const repo = path.join(dir, "repo");
-  fs.mkdirSync(repo);
+  const repo = path.join(dir, "repo/tooling/blacksand-t3");
+  fs.cpSync(new URL("../../../src/trust", import.meta.url), path.join(dir, "repo/src/trust"), { recursive: true });
+  fs.mkdirSync(repo, { recursive: true });
   for (const part of ["bin", "lib"]) fs.cpSync(path.join(REPO, part), path.join(repo, part), { recursive: true });
   const state = path.join(repo, "state");
   fs.mkdirSync(state, { mode: 0o700 });

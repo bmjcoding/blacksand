@@ -8,7 +8,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { SNAPSHOT_FILE, snapshotArchive, verifySnapshot } from "../lib/builder.mjs";
+import { SNAPSHOT_COMPONENT, SNAPSHOT_FILE, snapshotArchive, verifySnapshot } from "../lib/builder.mjs";
 import { capture, redact, run, trackStageDirs } from "../lib/util.mjs";
 
 const REPO = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -35,7 +35,7 @@ function unpack(archive) {
   const into = fs.mkdtempSync(path.join(os.tmpdir(), "t3b-build-code-"));
   const result = spawnSync("tar", ["-C", into, "-xf", "-"], { input: archive });
   assert.equal(result.status, 0, String(result.stderr));
-  return into;
+  return path.join(into, SNAPSHOT_COMPONENT);
 }
 
 test("the build account's code carries pin.json, bound to the build's commit", () => {
@@ -101,4 +101,22 @@ test("the CLI's root resolves from a clone whose path has a space and a percent 
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout.trim(), fs.realpathSync(parent));
   fs.rmSync(parent, { recursive: true, force: true });
+});
+
+// Real production archive, extracted without access to the owner clone. Import
+// the actual build/verifier graph without executing host-state commands.
+test("the extracted isolated worker loads the production build and TS verifier graph", () => {
+  const code = unpack(snapshotArchive());
+  try {
+    const result = spawnSync(process.execPath, ["--input-type=module", "-e", `await import(${JSON.stringify(pathToFileURL(path.join(code, "lib/selfupdate.mjs")).href)}); const b = await import(${JSON.stringify(pathToFileURL(path.join(code, "lib/builder.mjs")).href)}); await import(${JSON.stringify(pathToFileURL(path.join(code, "lib/build.mjs")).href)}); b.verifySnapshot(); console.log("worker imports verified");`], {
+      encoding: "utf8", timeout: 30_000,
+      env: { ...process.env, BLACKSAND_T3_ROLE: "builder" },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /worker imports verified/);
+    const trust = path.resolve(code, "../../src/trust");
+    for (const name of fs.readdirSync(trust)) {
+      assert.equal(fs.readFileSync(path.join(trust, name), "utf8"), fs.readFileSync(new URL(`../../../src/trust/${name}`, import.meta.url), "utf8"));
+    }
+  } finally { fs.rmSync(path.resolve(code, "../.."), { recursive: true, force: true }); }
 });

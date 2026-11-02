@@ -7,7 +7,7 @@ import * as fs from "node:fs";
 import * as net from "node:net";
 import * as path from "node:path";
 
-import { collectDrift, driftSummary, renderDriftReport } from "./drift.mjs";
+import { collectDrift, driftSummary } from "./drift.mjs";
 import { progress } from "./events.mjs";
 import { featureIndex, skipDependents } from "./features.mjs";
 import { forbiddenInBuild, makeRules } from "./rules.mjs";
@@ -214,7 +214,7 @@ export function strip({ sha, build, skipped = new Map(), baseline = null, versio
     const drift = skipped.size ? describe() : null;
     const rules = makeRules({
       updater: updaterPaths(),
-      build: build && { ...build, sha, skipped: driftSummary(drift), driftReport: drift ? renderDriftReport(drift) : null },
+      build: build && { ...build, sha, skipped: driftSummary(drift) },
     });
     log(skipped.size ? `applying strip rules without: ${[...skipped.keys()].join(", ")}` : "applying strip rules");
     const failures = applyRules(WORK, rules.filter((rule) => !skipped.has(featureOf.get(rule.id))));

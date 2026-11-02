@@ -16,8 +16,8 @@ export const BLACKSAND_INTERFACE = {
   },
   stamp: {
     title: "Version stamp",
-    description: "The build version in the window's bottom-right corner, with what changed and a preview of a waiting update.",
-    searchTerms: "version build stamp corner changes report preview update",
+    description: "The build version in the window's bottom-right corner, with its changes and omitted features.",
+    searchTerms: "version build stamp corner changes omitted features",
   },
   selection: {
     title: "Accent text selection",

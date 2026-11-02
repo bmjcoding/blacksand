@@ -1,0 +1,20 @@
+
+describe("native window opacity at creation", () => {
+  it.effect("reapplies the saved percentage on startup and every new main window", () => Effect.gen(function* () {
+    for (const percent of [100, 73]) {
+      const fake = makeFakeBrowserWindow();
+      const createCount = yield* Ref.make(0);
+      const mainWindow = yield* Ref.make<Option.Option<Electron.BrowserWindow>>(Option.none());
+      const layer = layerTest({ window: fake.window, createCount, mainWindow,
+        desktopSettings: { ...DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS, localEnvironmentEnabled: false, windowOpacity: percent },
+      });
+      yield* Effect.gen(function* () {
+        const desktop = yield* DesktopWindow.DesktopWindow;
+        yield* desktop.createMainIfBackendReady;
+        yield* Ref.set(mainWindow, Option.none());
+        yield* desktop.activate;
+        assert.deepEqual(fake.setOpacity.mock.calls, [[percent / 100], [percent / 100]]);
+      }).pipe(Effect.provide(layer));
+    }
+  }));
+});

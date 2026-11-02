@@ -17,8 +17,9 @@ const tmp = () => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "t3b-cli
 
 function cli() {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "t3b-cli-")));
-  const repo = path.join(dir, "repo");
-  fs.mkdirSync(repo);
+  const repo = path.join(dir, "repo/tooling/blacksand-t3");
+  fs.mkdirSync(repo, { recursive: true });
+  fs.cpSync(new URL("../../../src/trust", import.meta.url), path.join(dir, "repo/src/trust"), { recursive: true });
   for (const part of ["bin", "lib"]) fs.cpSync(path.join(REPO, part), path.join(repo, part), { recursive: true });
   const home = path.join(dir, "home");
   fs.mkdirSync(home, { mode: 0o700 });
@@ -146,7 +147,8 @@ test("configure refuses host roles that move what agent accounts rely on", { ski
 /** A scratch clone (bin/ and lib/) with a built-server fixture, its own TMPDIR, and CI's go-ahead to build as you. */
 function smokeClone() {
   const dir = tmp();
-  const repo = path.join(dir, "repo");
+  const repo = path.join(dir, "repo/tooling/blacksand-t3");
+  fs.cpSync(new URL("../../../src/trust", import.meta.url), path.join(dir, "repo/src/trust"), { recursive: true });
   for (const part of ["bin", "lib"]) fs.cpSync(path.join(REPO, part), path.join(repo, part), { recursive: true });
   const server = path.join(repo, "build", "work", "apps", "server", "dist");
   fs.mkdirSync(server, { recursive: true });

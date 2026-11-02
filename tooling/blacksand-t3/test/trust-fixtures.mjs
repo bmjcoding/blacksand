@@ -18,7 +18,7 @@ const { oracle } = await import("./trust-oracle.mjs");
 const { BOT_PRINCIPAL } = oracle;
 const active = await import("../lib/selfupdate.mjs");
 const { selfUpdate } = active;
-const { checkTip, verifyHead: verifyHeadTs } = await import("../../../src/trust/check.ts");
+const { RECORD, verifiedHere, checkTip, verifyHead: verifyHeadTs } = await import("../../../src/trust/check.ts");
 const { localGit } = await import("../../../src/trust/git.ts");
 const { t3Gates } = await import("../lib/trust-gates.mjs");
 
@@ -156,7 +156,7 @@ const passClosure = async (pin) => ({ ok: true, pin, reasons: [], notes: [] });
 const settle = (promise) => promise.then((value) => ({ value }), (error) => ({ threw: String(error?.message ?? error) }));
 
 /** The file `repo` records its verified HEAD in, and what it holds (null when absent). */
-const recordFile = (repo) => path.resolve(run(repo, ["rev-parse", "--path-format=absolute", "--git-path", "t3blackout-verified"]));
+const recordFile = (repo, record = RECORD) => path.resolve(run(repo, ["rev-parse", "--path-format=absolute", "--git-path", record]));
 const readRecord = (file) => (fs.existsSync(file) ? fs.readFileSync(file, "utf8") : null);
 const putRecord = (file, text) => (text === null ? fs.rmSync(file, { force: true }) : fs.writeFileSync(file, text, { mode: 0o600 }));
 
@@ -218,14 +218,17 @@ const gatesOf = (options, now, report) => t3Gates({ ...options, now, report });
  * left as the old verifier left it.
  */
 export async function verifyBoth({ verifier = oracle, repo, report = () => {}, now = Date.now(), ...options }) {
-  const file = recordFile(repo);
+  // Frozen differential cases intentionally give TS a legacy-named TEST record.
+  // Production adapters always use the new default, tested separately.
+  const record = verifier === oracle ? "t3blackout-verified" : RECORD;
+  const file = recordFile(repo, record);
   const before = readRecord(file);
   const heard = { new: [], old: [] };
   const calls = tape(options);
   const old = await calls.record((recorded) => settle(verifier.verifyHead({ repo, now, ...options, ...recorded, report: (line) => (heard.old.push(line), report(line)) })));
   const left = readRecord(file);
   putRecord(file, before);
-  const fresh = await calls.replay((replayed) => settle(verifyHeadTs({ repo, now, gates: gatesOf({ ...options, ...replayed }, now, (line) => heard.new.push(line)) })));
+  const fresh = await calls.replay((replayed) => settle(verifyHeadTs({ repo, now, record, gates: gatesOf({ ...options, ...replayed }, now, (line) => heard.new.push(line)) })));
   const theirs = { ...fresh, record: readRecord(file), reports: heard.new, unplayed: calls.unplayed() };
   putRecord(file, left);
   return { old: { ...old, record: left, reports: heard.old, unplayed: [] }, new: theirs };
@@ -251,6 +254,7 @@ const BEFORE_CHECK = /^self-update (?:skipped: (?:not on main|uncommitted change
 export async function bothUpdate({ repo, report = () => {}, now = Date.now(), ...options }) {
   const rev = (at, name) => spawnSync("git", ["-C", at, "rev-parse", "--verify", "--quiet", `${name}^{commit}`], { encoding: "utf8" }).stdout.trim() || null;
   const head = rev(repo, "HEAD");
+  const start = verifiedHere(localGit(repo), RECORD, now);
   const tip = options.remote ? rev(options.remote, "main") : null;
   const heard = [];
   const calls = tape(options);
@@ -259,7 +263,7 @@ export async function bothUpdate({ repo, report = () => {}, now = Date.now(), ..
   const checked = result === "updated" ? { result: "verified" } : /^self-update (refused|held|skipped): /.test(last) && !BEFORE_CHECK.test(last) ? { result: last.split(" ")[1].slice(0, -1), message: last.slice(last.indexOf(": ") + 2) } : null;
   if (checked && tip) {
     const notes = [];
-    const fresh = await calls.replay((replayed) => checkTip(localGit(repo), { tip, start: head, gates: gatesOf({ ...options, ...replayed }, now, (line) => notes.push(line)) }));
+    const fresh = await calls.replay((replayed) => checkTip(localGit(repo), { tip, start, gates: gatesOf({ ...options, ...replayed }, now, (line) => notes.push(line)) }));
     const verdict = fresh.result === "verified" ? { result: "verified" } : fresh;
     assert.deepEqual({ ...verdict, reports: notes, unplayed: calls.unplayed() }, { ...checked, reports: heard.slice(0, -1), unplayed: [] }, `the new verifier's check disagrees with self-update's on ${repo}`);
   }
@@ -269,7 +273,7 @@ export async function bothUpdate({ repo, report = () => {}, now = Date.now(), ..
 /** The commit recorded as verified in `repo` (the record is "<sha> <when>"), or null. */
 export function recorded(repo) {
   try {
-    return fs.readFileSync(path.join(repo, ".git", "t3blackout-verified"), "utf8").split(" ")[0];
+    return fs.readFileSync(path.join(repo, ".git", RECORD), "utf8").split(" ")[0];
   } catch {
     return null;
   }

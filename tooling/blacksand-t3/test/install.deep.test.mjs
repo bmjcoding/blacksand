@@ -179,8 +179,9 @@ test("builds may run as you only by an explicit choice: a saved --unisolated-bui
  */
 function clone(extraEnv = {}) {
   const dir = tmp();
-  const repo = path.join(dir, "repo");
-  fs.mkdirSync(repo);
+  const repo = path.join(dir, "repo/tooling/blacksand-t3");
+  fs.mkdirSync(repo, { recursive: true });
+  fs.cpSync(new URL("../../../src/trust", import.meta.url), path.join(dir, "repo/src/trust"), { recursive: true });
   for (const part of ["bin", "lib"]) fs.cpSync(path.join(ROOT, part), path.join(repo, part), { recursive: true });
   const home = path.join(dir, "home");
   fs.mkdirSync(home, { mode: 0o700 });
@@ -473,7 +474,8 @@ test("the fixture's folder really is one another account couldn't open (positive
 test("lib/builder.mjs starts every command as the build account in /, wherever the update runs from", () => {
   const l = layout();
   // A copy of bin/ and lib/, so nothing here writes the repository's state/.
-  const repo = path.join(l.dir, "repo");
+  const repo = path.join(l.dir, "repo/tooling/blacksand-t3");
+  fs.cpSync(new URL("../../../src/trust", import.meta.url), path.join(l.dir, "repo/src/trust"), { recursive: true });
   for (const part of ["bin", "lib"]) fs.cpSync(path.join(ROOT, part), path.join(repo, part), { recursive: true });
   const helper = path.join(l.dir, "helper.mjs");
   fs.writeFileSync(

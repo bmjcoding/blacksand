@@ -4,8 +4,8 @@
 // "<you> ALL=(_blacksand-build) NOPASSWD: ALL", which only lets you act as the
 // less-privileged account, never the reverse.
 //
-// The account can't read your clone, so each run gets a fresh copy of bin/, lib/
-// and pin.json. What comes back is an unsigned app in OUT, which you sign and install.
+// The account can't read your clone. Each run gets the component and its TS
+// trust modules; an unsigned app comes back in OUT for local signing/install.
 
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -13,6 +13,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as readline from "node:readline";
+import { fileURLToPath } from "node:url";
 
 import { parseEvent } from "./events.mjs";
 import { HANDOFF_WRITER_SCRIPT, githubTokenHandoff } from "./github-token.mjs";
@@ -61,12 +62,14 @@ function asBuilder(command, opts = {}) {
 
 /** Beside the copied code: the upstream commit it was copied to build, and the pin.json it carries. */
 export const SNAPSHOT_FILE = "snapshot.json";
+export const SNAPSHOT_COMPONENT = "tooling/blacksand-t3";
 
 const digest = (text) => createHash("sha256").update(text).digest("hex");
 
 /**
- * What the build account unpacks as its code: bin/, lib/ and pin.json, whose
- * device tool approvals its build checks upstream's pins against. pin.json is
+ * What the build account unpacks: tooling/blacksand-t3/{bin,lib,pin.json}
+ * and src/trust, preserving the runtime import paths. The build checks upstream's
+ * device tools against the approvals in pin.json. That file is
  * read once and validated, and those bytes are what ship, named (sha-256) in
  * snapshot.json with `sha`, the upstream commit chosen for this build.
  */
@@ -77,10 +80,21 @@ export function snapshotArchive({ root = ROOT, sha = null } = {}) {
   const pinnedBy = (sha && Object.entries(parsed?.channels ?? {}).find(([, entry]) => entry.sha === sha)?.[0]) || null;
   const extra = fs.mkdtempSync(path.join(os.tmpdir(), "blacksand-snapshot-"));
   try {
-    if (pin !== null) fs.writeFileSync(path.join(extra, PIN_FILE), pin);
-    fs.writeFileSync(path.join(extra, SNAPSHOT_FILE), `${JSON.stringify({ sha, pin: pin === null ? null : digest(pin), pinnedBy })}\n`);
-    const files = [...(pin === null ? [] : [PIN_FILE]), SNAPSHOT_FILE];
-    const tar = spawnSync("tar", ["-C", root, "-cf", "-", "bin", "lib", "-C", extra, ...files], { maxBuffer: 64 << 20 });
+    // Preserve repository-relative imports, including the one authoritative TS
+    // verifier. Never copy the owner clone's .git, state, dependencies or secrets.
+    const component = path.join(extra, SNAPSHOT_COMPONENT);
+    fs.mkdirSync(component, { recursive: true });
+    for (const dir of ["bin", "lib"]) fs.cpSync(path.join(root, dir), path.join(component, dir), { recursive: true });
+    const trust = path.join(extra, "src/trust");
+    fs.mkdirSync(trust, { recursive: true });
+    const source = fileURLToPath(new URL("../../../src/trust/", import.meta.url));
+    for (const name of fs.readdirSync(source).filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts"))) {
+      fs.copyFileSync(path.join(source, name), path.join(trust, name));
+    }
+    fs.writeFileSync(path.join(extra, "package.json"), '{"type":"module"}\n');
+    if (pin !== null) fs.writeFileSync(path.join(component, PIN_FILE), pin);
+    fs.writeFileSync(path.join(component, SNAPSHOT_FILE), `${JSON.stringify({ sha, pin: pin === null ? null : digest(pin), pinnedBy })}\n`);
+    const tar = spawnSync("tar", ["-C", extra, "-cf", "-", "."], { maxBuffer: 64 << 20 });
     if (tar.status !== 0) throw new Error(`couldn't package bin/, lib/ and pin.json: ${tar.stderr}`);
     return tar.stdout;
   } finally {
@@ -169,7 +183,7 @@ export function runAsBuilder(args, { onEvent = () => {} } = {}) {
   const command = [
     "sudo", "-n", "-u", BUILDER_USER, "-H",
     "/usr/bin/env", ...Object.entries(env).map(([key, value]) => `${key}=${value}`),
-    builderNode(), path.join(BUILDER_HOME, "code", "bin", "t3"), ...args, "--json",
+    builderNode(), path.join(BUILDER_HOME, "code", SNAPSHOT_COMPONENT, "bin", "t3"), ...args, "--json",
   ];
   const logFile = path.join(STATE, "blacksand-t3.log");
   return new Promise((resolve, reject) => {

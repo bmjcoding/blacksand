@@ -6,7 +6,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { test } from "node:test";
 
-import { checkHistory, checkTip } from "../../../src/trust/check.ts";
+import { RECORD, checkHistory, checkTip } from "../../../src/trust/check.ts";
 import { localGit } from "../../../src/trust/git.ts";
 import { ambiguous } from "../../../src/trust/layout.ts";
 import * as active from "../lib/selfupdate.mjs";
@@ -41,7 +41,7 @@ const optionsOf = (w, now = Date.now()) => ({ upstream: w.upstream, now, clock: 
 const tsVerdict = (w, tip, now) => checkTip(w.git, { tip, start: null, gates: t3Gates(optionsOf(w, now)) });
 async function mjsVerdict(w, tip, verifier = active, now) {
   run(w.repo, ["update-ref", "refs/heads/main", tip]);
-  fs.rmSync(path.join(w.repo, ".git", "t3blackout-verified"), { force: true });
+  fs.rmSync(path.join(w.repo, ".git", "blacksand-trust-v1-verified"), { force: true });
   return verifier.verifyHead({ repo: w.repo, ...optionsOf(w, now) });
 }
 
@@ -64,8 +64,7 @@ test("owner label migration preserves historical parent lists and both evaluator
     const expected = `${short(tip)} verified here (2 evaluator commit(s) since ${short(root)})`;
     assert.equal((await tsVerdict(w, tip)).message, expected);
     const updater = await mjsVerdict(w, tip);
-    if (!folder) assert.deepEqual(updater, { result: "verified", message: expected });
-    else assert.deepEqual(updater, { result: "refused", message: `evaluator commit ${short(before)} changes ${folder}pin.json, not just pin.json` }, "root-only updater remains blocked on moved pins");
+    assert.deepEqual(updater, { result: "verified", message: expected });
     // Renaming the current list cannot relabel old signatures during verification.
     assert.equal(run(w.repo, ["show", `${root}:.allowed_signers`]), files[".allowed_signers"].trim());
   }
@@ -156,7 +155,7 @@ test("both labels keep the pin gates after renaming; the new layout holds a youn
   const name = "naming-young";
   const w = world({ locks: [OLD_DEPS, { ...OLD_DEPS, [`${name}@1.0.0`]: YOUNG }, OLD_DEPS] });
   mockFetch(npmRoutes({ [name]: { "1.0.0": { publishedAt: new Date(now - 3_600_000).toISOString(), integrity: YOUNG } } }));
-  for (const folder of ["", CURRENT]) for (const label of LABELS) {
+  for (const folder of FOLDERS) for (const label of LABELS) {
     const files = w.files(folder, label);
     const root = w.commit(files);
     const tip = w.commit({ ...files, [`${folder}pin.json`]: pin(NIGHTLY(3917), w.shas[1]) }, w.bot, [root]);
@@ -164,16 +163,16 @@ test("both labels keep the pin gates after renaming; the new layout holds a youn
     assert.equal(held.result, "held");
     assert.match(held.message, /adds dependencies under 3 days old .*naming-young@1\.0\.0/);
     assert.equal((await tsVerdict(w, tip, later)).result, "verified");
-    if (!folder) {
+    {
       assert.deepEqual(await mjsVerdict(w, tip, active, now), { result: held.result, message: held.message });
       assert.equal((await mjsVerdict(w, tip, active, later)).result, "verified");
-      if (label === LABELS[1]) assert.deepEqual(await mjsVerdict(w, tip, oracle, now), { result: "verified", message: `${short(tip)} verified here` }, "frozen oracle treats the new label as owner; active verifiers must not");
+      if (!folder && label === LABELS[1]) assert.deepEqual(await mjsVerdict(w, tip, oracle, now), { result: "verified", message: `${short(tip)} verified here` }, "frozen oracle treats the new label as owner; active verifiers must not");
     }
     const bad = w.commit({ ...files, [`${folder}pin.json`]: pin(NIGHTLY(3999), w.shas[1]) }, w.bot, [root]);
     const refused = await tsVerdict(w, bad, now);
     assert.equal(refused.result, "refused");
     assert.match(refused.message, /pins nightly to .*3999.*missing/);
-    if (!folder) assert.deepEqual(await mjsVerdict(w, bad), { result: refused.result, message: refused.message });
+    assert.deepEqual(await mjsVerdict(w, bad), { result: refused.result, message: refused.message });
   }
   // An owner move that leaves pin bytes untouched must not erase the earlier evaluator's age gate.
   const files = w.files("tooling/t3code/", LABELS[1]);
@@ -184,6 +183,7 @@ test("both labels keep the pin gates after renaming; the new layout holds a youn
   const history = checkHistory(w.git, { tip: moved, start: null });
   assert.deepEqual({ trusted: history.trusted, bot: history.bot }, { trusted: root, bot: [pinned] });
   assert.equal((await tsVerdict(w, moved, now)).result, "held");
+  assert.equal((await mjsVerdict(w, moved, active, now)).result, "held");
 });
 
 test("the new layout reads owner tool approvals from its own folder through the third move", async () => {
@@ -266,4 +266,50 @@ test("the active updater counts both labels as evaluator commits through an owne
   const reports = [];
   assert.equal(await active.selfUpdate({ repo: f.clone, remote: f.origin, ...optionsOf(f), report: (line) => reports.push(line) }), "updated");
   assert.match(reports.at(-1), /3 signed commit\(s\), 2 from the evaluator/);
+});
+
+// These call production entry points against real clones, rather than comparing
+// two adapters of the same implementation. Expected decisions come from the
+// fixture's age/tag/role facts; the frozen oracle is only a negative control.
+test("legacy stamps never bypass current gates across every move and signer transition", async () => {
+  const now = Date.now();
+  const name = "delivery-young";
+  const w = world({ locks: [OLD_DEPS, { ...OLD_DEPS, [`${name}@1.0.0`]: YOUNG }, OLD_DEPS] });
+  const routes = npmRoutes({ [name]: { "1.0.0": { publishedAt: new Date(now - 3_600_000).toISOString(), integrity: YOUNG } } });
+  for (let i = 0; i < FOLDERS.length - 1; i++) for (const label of LABELS) {
+    mockFetch(routes);
+    const from = FOLDERS[i], to = FOLDERS[i + 1];
+    const files = w.files(from, label);
+    const root = w.commit(files);
+    const pinned = w.commit({ ...files, [`${from}pin.json`]: pin(NIGHTLY(3917), w.shas[1]) }, w.bot, [root]);
+    const movedFiles = { ...w.files(to, LABELS[1]), [`${to}pin.json`]: pin(NIGHTLY(3917), w.shas[1]) };
+    const moved = w.commit(movedFiles, w.owner, [pinned]);
+    run(w.repo, ["update-ref", "refs/heads/main", pinned]);
+    const clone = path.join(w.dir, `delivery-${i}-${label}`);
+    run(w.dir, ["clone", "-q", w.repo, clone]);
+    const legacy = path.join(clone, ".git/t3blackout-verified");
+    const current = path.join(clone, ".git", RECORD);
+    for (const timestamp of [now - 60_000, now + 86400000, ""]) {
+      const stamp = `${pinned} ${timestamp}\n`;
+      fs.writeFileSync(legacy, stamp);
+      assert.equal((await active.verifyHead({ repo: clone, ...optionsOf(w, now) })).result, "held", `${from} ${label} ${timestamp}`);
+      assert.equal(fs.existsSync(current), false);
+      assert.equal(fs.readFileSync(legacy, "utf8"), stamp, "legacy record untouched");
+    }
+    // An unreachable upstream must postpone verification, never honor the old
+    // identical-HEAD stamp. A local absent repository cannot contact the network.
+    assert.equal((await active.verifyHead({ repo: clone, ...optionsOf(w, now), upstream: path.join(w.dir, "missing-upstream") })).result, "skipped");
+    run(w.repo, ["update-ref", "refs/heads/main", moved]);
+    assert.equal(await active.selfUpdate({ repo: clone, remote: w.repo, ...optionsOf(w, now) }), "held", "unchanged pin move cannot erase the evaluator basis");
+    assert.equal(run(clone, ["rev-parse", "HEAD"]), pinned);
+    const bad = w.commit({ ...movedFiles, [`${to}pin.json`]: pin(NIGHTLY(3999), w.shas[1]) }, w.bot, [moved]);
+    run(w.repo, ["update-ref", "refs/heads/main", bad]);
+    assert.equal(await active.selfUpdate({ repo: clone, remote: w.repo, ...optionsOf(w, now) }), "refused");
+    assert.equal(run(clone, ["rev-parse", "HEAD"]), pinned);
+    run(clone, ["fetch", "-q", w.repo, "main"]);
+    run(clone, ["reset", "-q", "--hard", bad]);
+    fs.writeFileSync(legacy, `${bad} ${now - 60_000}\n`);
+    assert.equal((await active.verifyHead({ repo: clone, ...optionsOf(w, now) })).result, "refused");
+    assert.equal(fs.existsSync(current), false);
+  }
 });

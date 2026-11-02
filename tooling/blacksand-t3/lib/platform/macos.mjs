@@ -127,15 +127,13 @@ function signingIdentity() {
   const pass = fs.readFileSync(SIGNING_KEYCHAIN_PASS, "utf8").trim();
   securityWithPassword(["unlock-keychain", "-p", pass, SIGNING_KEYCHAIN], pass, { check: false });
   const apple = listIdentities(SIGNING_KEYCHAIN, { validOnly: false }).find((id) => APPLE_IDENTITY.test(id.name) && chainsToApple(id));
-  return apple ?? listIdentities(SIGNING_KEYCHAIN).find((id) => id.name === SIGNING_CN) ?? null;
+  return apple ?? listIdentities(SIGNING_KEYCHAIN).find((id) => (id.name === SIGNING_CN || id.name === "T3 Blackout Local Signing")) ?? null;
 }
 
 function sign(appPath) {
   const identity = signingIdentity();
   if (!identity) {
-    log("no signing identity (run `blacksand t3 signing adopt` or `signing import`); signing ad-hoc, Keychain will re-prompt after this update");
-    childProcess.spawnSync("codesign", ["--force", "--deep", "--sign", "-", appPath], { stdio: "ignore" });
-    return;
+    throw new Error("no configured signing identity; run `blacksand t3 signing adopt` or `signing import` before staging the app");
   }
   // codesign only resolves identities (and Apple's intermediate) from keychains
   // on the user search list, even with --keychain. Add ours for this one call.
@@ -318,7 +316,7 @@ async function cmdSigning(opts, sub) {
   try {
     if (sub === "status") {
       const identity = signingIdentity();
-      console.log(identity ? `signing: ${identity.name} (${identity.hash})` : "signing: not set up (ad-hoc)");
+      console.log(identity ? `signing: ${identity.name} (${identity.hash})` : "signing: not set up (signing required)");
       return;
     }
     requireOp();
@@ -523,7 +521,7 @@ export default {
 
   statusLines() {
     const identity = signingIdentity();
-    if (!identity) return ["signing:   ad-hoc (run `blacksand t3 signing adopt` or `signing import`)"];
+    if (!identity) return ["signing:   required (run `blacksand t3 signing adopt` or `signing import`)"];
     const note = APPLE_IDENTITY.test(identity.name) ? "" : " (self-signed: Keychain prompts after each update)";
     return [`signing:   ${identity.name} (${identity.hash.slice(0, 10)})${note}`];
   },

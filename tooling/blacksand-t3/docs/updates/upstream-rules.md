@@ -68,7 +68,8 @@ the rule hooked into. If upstream moved those lines, it also shows where they ar
 A strict failure gets its own report. That report lists which strict rules stopped the
 update, and how to get updates going again.
 
-Open the report from the version stamp's hover card, or with `blacksand t3 drift`. Next
+Open the CLI diagnostic report with `blacksand t3 drift`. The app keeps only a
+lightweight version stamp and change list. Next
 to it are the report's data and screenshots as files (`<version>.json` and
 `<version>/`). `blacksand t3 review` gathers those files for an agent to read.
 

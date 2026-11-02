@@ -232,8 +232,9 @@ test("only the lock file's own descriptor is adopted; a stale variable adopts no
 /** A scratch clone and its state folder, as test/cli-state.test.mjs makes them. */
 function cli() {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "t3b-lock-cli-")));
-  const repo = path.join(dir, "repo");
-  fs.mkdirSync(repo);
+  const repo = path.join(dir, "repo/tooling/blacksand-t3");
+  fs.mkdirSync(repo, { recursive: true });
+  fs.cpSync(new URL("../../../src/trust", import.meta.url), path.join(dir, "repo/src/trust"), { recursive: true });
   for (const part of ["bin", "lib"]) fs.cpSync(path.join(REPO, part), path.join(repo, part), { recursive: true });
   const home = path.join(dir, "home");
   fs.mkdirSync(home, { mode: 0o700 });

@@ -15,8 +15,9 @@ const REPO = fs.realpathSync(path.dirname(path.dirname(new URL(import.meta.url).
 /** A scratch clone (bin/ and lib/), a home, and every location in the scratch folder. */
 function clone() {
   const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "t3b-config-")));
-  const repo = path.join(dir, "repo");
-  fs.mkdirSync(repo);
+  const repo = path.join(dir, "repo/tooling/blacksand-t3");
+  fs.mkdirSync(repo, { recursive: true });
+  fs.cpSync(new URL("../../../src/trust", import.meta.url), path.join(dir, "repo/src/trust"), { recursive: true });
   for (const part of ["bin", "lib"]) fs.cpSync(path.join(REPO, part), path.join(repo, part), { recursive: true });
   const home = path.join(dir, "home");
   fs.mkdirSync(home, { mode: 0o700 });
@@ -63,7 +64,7 @@ test("a shim path that leads to the CLI is replaced, never written through", () 
   assert.ok(link.intact(), "the CLI is untouched");
   const shim = path.join(t3bHome, "bin", "t3");
   assert.equal(fs.lstatSync(shim).isSymbolicLink(), false);
-  assert.match(fs.readFileSync(shim, "utf8"), /exec .*'\S*\/repo\/bin\/t3' "\$@"/);
+  assert.match(fs.readFileSync(shim, "utf8"), /exec .*'\S*\/repo\/tooling\/blacksand-t3\/bin\/t3' "\$@"/);
   // The shim's folder is the clone's bin/ by another path: left alone.
   const folder = clone();
   const other = path.join(folder.home, ".blacksand/t3");
