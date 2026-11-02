@@ -20,7 +20,7 @@ import assert from "node:assert/strict";
 import { DEADLINES, checkRepoTransport, gitConfigArgs, gitEnv, gitFailure, ownConfig, publicGit, releaseSnapshot, transportOf } from "../lib/git.mjs";
 import { upstreamTagCommit } from "../lib/pin.mjs";
 import { githubOrigin } from "../lib/selfupdate.mjs";
-import { mirrorGit, mirrorOut } from "../lib/util.mjs";
+import { USE_BUILDER, mirrorGit, mirrorOut } from "../lib/util.mjs";
 import { NIGHTLY, fixture, run } from "./trust-fixtures.mjs";
 
 // The real path: includeIf "gitdir:" compares against it (/var vs /private/var on macOS).
@@ -170,8 +170,11 @@ test("reading a poisoned mirror runs no transport, lazily or through a rewrite",
   assert.notEqual(read.status, 0, "the object is missing and isn't fetched");
   assert.throws(() => mirrorOut(["rev-parse", `${sha}^{commit}`], { dir: mirror }), /failed/);
   assert.ok(!ran(), "no lazy fetch ran the mirror's transport");
-  // Reading file contents fetches, so it checks where the mirror sends that first.
-  assert.throws(() => mirrorGit(["show", `${sha}:file`], { dir: mirror, fetch: true }), /refusing to reach https:\/\/github\.com\/pingdotgg\/t3code\.git from .*sets protocol\.ext\.allow.*sends origin to ext::/);
+  // Reads that fetch are builder-only on an installed host; the builder's
+  // repository check still refuses this transport before fetching anything.
+  const refused = /refusing to reach https:\/\/github\.com\/pingdotgg\/t3code\.git from .*sets protocol\.ext\.allow.*sends origin to ext::/;
+  assert.throws(() => checkRepoTransport(mirror, { url: UPSTREAM, remote: "origin", config: [`safe.directory=${mirror}`] }), refused);
+  assert.throws(() => mirrorGit(["show", `${sha}:file`], { dir: mirror, fetch: true }), USE_BUILDER ? /needs the build account/ : refused);
   assert.ok(!ran());
   // Even without that check, a repository's protocol.ext.allow=always is overridden.
   const rewritten = path.join(dir, "rewrite-to-ext");

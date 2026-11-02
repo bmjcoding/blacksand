@@ -30,6 +30,39 @@ export const WORK = path.join(DATA, "work");
 /** The finished, unsigned app the build hands over for signing and install. */
 export const OUT = path.join(DATA, "out");
 export const STATE = IS_BUILDER ? path.join(BUILDER_HOME, "state") : path.join(ROOT, "state");
+
+/** The build account's tools and shared tools outside the owner's home. */
+export function builderPath() {
+  const own = ["node/bin", ".local/bin", ".cargo/bin"].map((dir) => path.join(BUILDER_HOME, dir));
+  const shared = (process.env.PATH ?? "").split(":").filter((dir) => dir && !dir.startsWith(os.homedir()));
+  return [...own, ...shared, "/usr/bin", "/bin", "/usr/sbin", "/sbin"].join(":");
+}
+
+// Only git's executable and argument vector cross this boundary. No worker
+// snapshot, shell, owner environment or token handoff is needed, even on the
+// first offline poll. Concurrent readers never replace a worker's code.
+function builderMetadataGit(command, args, opts) {
+  return childProcess.spawnSync("/usr/bin/sudo", ["-n", "-u", BUILDER_USER, "-H", "/usr/bin/env", "-i",
+    ...Object.entries(opts.env).map(([key, value]) => `${key}=${value}`), command, ...args], {
+    ...opts, cwd: "/", env: { PATH: "/usr/bin:/bin" },
+  });
+}
+
+/** Only the metadata forms used by upstream.mjs; no blobs, output files or mutations. */
+function isMirrorMetadata(args) {
+  if (!Array.isArray(args) || args.some((arg) => typeof arg !== "string" || arg.includes("\0"))) return false;
+  if (args.join("\0") === "rev-parse\0--is-inside-work-tree") return true;
+  const ref = args.at(-1);
+  if (!ref || ref.startsWith("-")) return false;
+  const form = args.slice(0, -1).join("\0");
+  return (form === "rev-parse\0--verify\0--end-of-options" && ref.endsWith("^{commit}")) ||
+    form === "describe\0--tags\0--abbrev=0\0--always" ||
+    (form === "for-each-ref\0--format=%(refname) %(creatordate:unix)" && ref === "refs/tags") ||
+    form === "log\0-1\0--format=%ct" ||
+    form === "log\0--reverse\0--no-merges\0--format=- %s" ||
+    /^log\x00--no-merges\x00--max-count=\d+\x00--format=%H%x09%s$/.test(form) ||
+    /^log\x00--reverse\x00--no-merges\x00--max-count=\d+\x00--name-only\x00--format=%x1e%H%x1f%s%x1f%b%x1f$/.test(form);
+}
 /**
  * Where a blacksand-t3 server on this machine drops a marker to ask for an update
  * (rule server/self-update-requests-host-build): "Update everything" from a
@@ -198,10 +231,10 @@ export function findPaths(roots, match, { maxDepth = 7 } = {}) {
 /**
  * git against the upstream mirror, or `dir`, a checkout of it, as lib/git.mjs
  * runs git against upstream: no global or system configuration, nothing from
- * the environment, HTTPS only, a deadline. safe.directory: when the build
- * account owns the mirror, you only read it (tags, versions, commit titles),
- * never write. The mirror is blobless, so reading a file's contents (`fetch`)
- * fetches it from upstream: only the mirror's owner does that, after checking
+ * the environment, HTTPS only, a deadline. Metadata in the private builder
+ * mirror is read as its owner, with a fresh minimal environment. safe.directory
+ * is a Git ownership check, not filesystem access. The mirror is blobless, so
+ * reading a file's contents (`fetch`) fetches it from upstream: only the mirror's owner does that, after checking
  * the mirror's own configuration still sends it to upstream (lib/git.mjs
  * checkRepoTransport). Every other read has lazy fetching off, so a mirror the
  * build account controls never makes you run or reach anything.
@@ -209,6 +242,17 @@ export function findPaths(roots, match, { maxDepth = 7 } = {}) {
  */
 export function mirrorGit(args, { fetch = false, dir = MIRROR, timeout = DEADLINES.read, ...opts } = {}) {
   if (fetch && USE_BUILDER) throw new Error(`reading upstream's files from ${dir} needs the build account ${BUILDER_USER}, which owns it`);
+  const inBuilderHome = !path.relative(BUILDER_HOME, path.resolve(dir)).startsWith("..") && path.isAbsolute(dir);
+  if (USE_BUILDER && inBuilderHome) {
+    if (dir !== MIRROR || !isMirrorMetadata(args)) throw new Error(`reading upstream's files from ${dir} needs the build account ${BUILDER_USER}; only mirror metadata can be read here`);
+    // Deliberately do not pass caller env/config/exec options across identities.
+    return publicGit(["--no-lazy-fetch", "-C", MIRROR, ...args], {
+      url: UPSTREAM_URL, config: [`safe.directory=${MIRROR}`], timeout,
+      maxBuffer: opts.maxBuffer ?? 256 << 20,
+      env: { PATH: builderPath(), HOME: BUILDER_HOME, LANG: "C" },
+      execGit: builderMetadataGit,
+    });
+  }
   const base = { url: UPSTREAM_URL, timeout, config: [`safe.directory=${dir}`], ...opts };
   if (!fetch) return publicGit(["--no-lazy-fetch", "-C", dir, ...args], base);
   return publicGit(args, { ...base, repo: dir, remote: "origin" });
@@ -218,7 +262,7 @@ export function mirrorGit(args, { fetch = false, dir = MIRROR, timeout = DEADLIN
 export function mirrorOut(args, opts = {}, what = `git ${args[0]} in the upstream mirror`) {
   const timeout = opts.timeout ?? DEADLINES.read;
   const result = mirrorGit(args, { ...opts, timeout });
-  if (result.status !== 0) throw new Error(`${what} failed: ${gitFailure(result, timeout)}`);
+  if (result.error || result.signal || result.status !== 0) throw new Error(`${what} failed: ${gitFailure(result, timeout)}`);
   return (result.stdout ?? "").trim();
 }
 

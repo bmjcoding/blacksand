@@ -95,26 +95,30 @@ export function gitVersionProblem(output) {
   return versionKey(version) < versionKey(GIT_MIN) ? `git ${version} is too old: blacksand-t3 needs ${GIT_MIN} or later, for security fixes (CVE-2024-52005)` : null;
 }
 
-/** gitVersionProblem for the git `PATH` finds, asked once per PATH. */
-const checkedGit = new Map();
-function gitOnPathProblem(env) {
+/** gitVersionProblem for the git `PATH` finds, once per execution identity and PATH. */
+const checkedGit = new WeakMap();
+function gitOnPathProblem(env, execGit) {
+  if (!checkedGit.has(execGit)) checkedGit.set(execGit, new Map());
+  const checked = checkedGit.get(execGit);
   const key = env.PATH ?? "";
-  if (!checkedGit.has(key)) {
-    const result = spawnSync("git", ["--version"], { encoding: "utf8", cwd: "/", timeout: DEADLINES.list, env: gitEnv(env, "file") });
-    checkedGit.set(key, result.status === 0 ? gitVersionProblem(result.stdout) : "no git found");
+  if (!checked.has(key)) {
+    const result = execGit("git", ["--version"], { encoding: "utf8", cwd: "/", timeout: DEADLINES.list, env: gitEnv(env, "file") });
+    // A denied/unavailable execution may be temporary; don't cache it as a version.
+    if (result.error || result.signal || result.status !== 0) return `couldn't check git: ${gitFailure(result, DEADLINES.list)}`;
+    checked.set(key, gitVersionProblem(result.stdout));
   }
-  return checkedGit.get(key);
+  return checked.get(key);
 }
 
 /** spawnSync of `git args` under the rules above for remote `url`; no repository's configuration checked. */
-function isolatedGit(args, { url, timeout = DEADLINES.fetch, config = [], env = process.env, ...opts } = {}) {
+function isolatedGit(args, { url, timeout = DEADLINES.fetch, config = [], env = process.env, execGit = spawnSync, ...opts } = {}) {
   if (!Number.isFinite(timeout) || timeout <= 0) throw new Error("publicGit needs a deadline");
   // As git fails (fatal, exit 128), so every caller reports it the way it reports git's own errors.
-  const problem = gitOnPathProblem(env);
+  const problem = gitOnPathProblem(env, execGit);
   if (problem) return { status: 128, signal: null, stdout: "", stderr: `fatal: ${problem}; install a newer git (macOS: brew install git, with Homebrew first on PATH)\n`, output: [], pid: 0 };
   const transport = transportOf(url);
   const extra = config.flatMap((option) => ["-c", option]);
-  return spawnSync("git", [...gitConfigArgs(transport), ...extra, ...args], {
+  return execGit("git", [...gitConfigArgs(transport), ...extra, ...args], {
     encoding: "utf8",
     maxBuffer: 256 << 20,
     // Not inside a repository whose own configuration git would read (ls-remote, clone).
@@ -171,6 +175,8 @@ export function checkRepoTransport(repo, { url, remote = null, config = [] }) {
  * in (-C), whose own configuration must leave `remote` (or `url`, when the
  * arguments name it) alone first; checkRepoTransport throws otherwise.
  * `config`: extra `-c` options, after ours (a credential helper the caller chose).
+ * `execGit`: synchronous execution transport (the private mirror's read-only
+ * builder adapter); version checks use that same identity, with a separate cache.
  */
 export function publicGit(args, { repo = null, remote = null, ...opts } = {}) {
   if (repo === null) return isolatedGit(args, opts);

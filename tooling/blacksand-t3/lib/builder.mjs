@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 import { parseEvent } from "./events.mjs";
 import { HANDOFF_WRITER_SCRIPT, githubTokenHandoff } from "./github-token.mjs";
 import { PIN_FILE, validatePin } from "./pin.mjs";
-import { BUILDER_HOME, BUILDER_USER, LAUNCHER, ROOT, STATE, log, readJson, stableNodePath } from "./util.mjs";
+import { BUILDER_HOME, BUILDER_USER, LAUNCHER, ROOT, STATE, builderPath, log, readJson, stableNodePath } from "./util.mjs";
 
 // Every command as the build account starts in /: the folder this one runs in
 // (your clone, in your home) is one it can't open, and Node, pnpm and shells
@@ -42,13 +42,6 @@ export function builderHomeProblem(mode = null, platform = process.platform) {
     return null;
   }
   return bits & 0o077 ? `${BUILDER_HOME} is open to other accounts (mode ${(bits & 0o777).toString(8)}); rerun ./install.sh` : null;
-}
-
-/** Node, pnpm and Rust the account can run: its own (Linux), or shared ones outside your home (Homebrew). */
-function builderPath() {
-  const own = ["node/bin", ".local/bin", ".cargo/bin"].map((dir) => path.join(BUILDER_HOME, dir));
-  const shared = (process.env.PATH ?? "").split(":").filter((dir) => dir && !dir.startsWith(os.homedir()));
-  return [...own, ...shared, "/usr/bin", "/bin", "/usr/sbin", "/sbin"].join(":");
 }
 
 function builderNode() {

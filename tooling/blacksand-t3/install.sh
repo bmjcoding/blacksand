@@ -591,7 +591,7 @@ builder_user_linux() {
 
 # The build account's home. On macOS, mode 700 with one ACL entry, on the folder
 # itself, letting you list and pass through it: you read the builds it hands
-# back and its upstream mirror (both readable inside), and nobody else, agent
+# back; private mirror metadata is read as the builder. Nobody else, agent
 # accounts included, can open it at all. (Linux has no agent accounts: there it
 # stays 755.)
 builder_home() {

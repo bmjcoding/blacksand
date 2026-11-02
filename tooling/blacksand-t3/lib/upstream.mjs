@@ -5,7 +5,7 @@ import * as path from "node:path";
 
 import { DEADLINES, UPSTREAM_URL, publicGitOrThrow } from "./git.mjs";
 import { compareRefs, isReleaseTag } from "./pin.mjs";
-import { MIRROR, mirrorGit, mirrorOut } from "./util.mjs";
+import { MIRROR, USE_BUILDER, mirrorOut } from "./util.mjs";
 
 export { UPSTREAM_URL };
 
@@ -15,7 +15,11 @@ export { UPSTREAM_URL };
  */
 export const SOAK_HOURS = Number(process.env.BLACKSAND_T3_SOAK_HOURS ?? 48);
 
-export const hasMirror = () => fs.existsSync(path.join(MIRROR, ".git"));
+export const hasMirror = () => {
+  if (!USE_BUILDER) return fs.existsSync(path.join(MIRROR, ".git"));
+  if (mirrorOut(["rev-parse", "--is-inside-work-tree"]) !== "true") throw new Error("upstream mirror isn't a work tree");
+  return true;
+};
 
 /**
  * Clones or updates the mirror. Blobless and without a checkout of its own:
@@ -70,29 +74,36 @@ export function soakedTags(name, { soakHours = SOAK_HOURS } = {}) {
 /** Newest release tag on a channel that has soaked. */
 export const resolveRef = (name, options) => soakedTags(name, options)[0];
 
-export const revParse = (ref) => mirrorOut(["rev-parse", `${ref}^{commit}`]);
+export function revParse(ref) {
+  const sha = mirrorOut(["rev-parse", "--verify", "--end-of-options", `${ref}^{commit}`]);
+  if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error(`upstream didn't resolve ${ref} to a commit`);
+  return sha;
+}
 
-export const commitTime = (sha) => Number(mirrorOut(["log", "-1", "--format=%ct", sha]));
+export function commitTime(sha) {
+  const time = mirrorOut(["log", "-1", "--format=%ct", sha]);
+  if (!/^\d+$/.test(time)) throw new Error(`upstream didn't give a commit time for ${sha}`);
+  return Number(time);
+}
 
 /** App version for a ref: the tag itself, or the nearest tag for a branch or sha. */
 export function versionOf(ref, sha) {
   if (/^v\d/.test(ref)) return ref.slice(1);
-  const tag = mirrorGit(["describe", "--tags", "--abbrev=0", sha]).stdout?.trim();
-  return tag ? tag.replace(/^v/, "") : "0.0.0";
+  const tag = mirrorOut(["describe", "--tags", "--abbrev=0", "--always", sha]);
+  if (!tag || /^[0-9a-f]{7,40}$/.test(tag)) throw new Error(`upstream has no version tag for ${sha}`);
+  return tag.replace(/^v/, "");
 }
 
 /** Upstream commit titles since the installed build, in electron-updater's release-notes shape. */
 export function releaseNotes(fromSha, toSha, version) {
   if (!fromSha) return [];
-  const result = mirrorGit(["log", "--reverse", "--no-merges", "--format=- %s", `${fromSha}..${toSha}`]);
-  const note = result.status === 0 ? result.stdout.trim() : "";
+  const note = mirrorOut(["log", "--reverse", "--no-merges", "--format=- %s", `${fromSha}..${toSha}`]);
   return note ? [{ version, note }] : [];
 }
 
 /** Commits in the upstream mirror for `fromSha..toSha`, newest first, merges skipped. */
 export function upstreamCommits(fromSha, toSha, limit = 40) {
-  const result = mirrorGit(["log", "--no-merges", `--max-count=${limit}`, "--format=%H%x09%s", `${fromSha}..${toSha}`]);
-  return result.status === 0 ? parseCommitLines(result.stdout) : [];
+  return parseCommitLines(mirrorOut(["log", "--no-merges", `--max-count=${limit}`, "--format=%H%x09%s", `${fromSha}..${toSha}`]));
 }
 
 /**
@@ -100,9 +111,7 @@ export function upstreamCommits(fromSha, toSha, limit = 40) {
  * reviewer needs: [{ sha, title, pr, body (trimmed), files (the first 25), fileCount }].
  */
 export function commitDetails(fromSha, toSha, limit = 600) {
-  const result = mirrorGit(["log", "--reverse", "--no-merges", `--max-count=${limit}`, "--name-only", "--format=%x1e%H%x1f%s%x1f%b%x1f", `${fromSha}..${toSha}`]);
-  if (result.status !== 0) return [];
-  return result.stdout
+  return mirrorOut(["log", "--reverse", "--no-merges", `--max-count=${limit}`, "--name-only", "--format=%x1e%H%x1f%s%x1f%b%x1f", `${fromSha}..${toSha}`])
     .split("\x1e")
     .filter((record) => record.trim())
     .map((record) => {
@@ -146,7 +155,7 @@ export const upstreamWebUrl = () => githubWebUrl(UPSTREAM_URL);
 
 /** The nearest release tag before `sha`, e.g. v0.1.1-nightly.20261016.3201, or null. */
 export function previousTag(sha) {
-  const result = mirrorGit(["describe", "--tags", "--abbrev=0", `${sha}^`]);
-  return result.status === 0 ? result.stdout.trim() || null : null;
+  const tag = mirrorOut(["describe", "--tags", "--abbrev=0", "--always", `${sha}^`]);
+  return /^[0-9a-f]{7,40}$/.test(tag) ? null : tag || null;
 }
 
