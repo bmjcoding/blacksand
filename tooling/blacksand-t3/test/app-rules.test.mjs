@@ -138,6 +138,26 @@ test("the sidebar logo is upstream's T3 Code with a muted, smaller blacksand aft
   assert.doesNotMatch(file("blacksandInterface.ts"), /wordmark|redact/i);
 });
 
+test("nightly's stage art is the desert night, behind its own switch, with the mark as it is", () => {
+  assert.equal(index.get("web/blacksand-night-sky-file"), "night-sky");
+  assert.equal(index.get("web/blacksand-night-sky"), "night-sky");
+  assert.ok(featureByName("night-sky").requires.includes("styles"), "its switch and its mask override load with the styles");
+  assert.equal(byId.get("web/blacksand-night-sky-file").file, "apps/web/src/components/BlacksandNightSky.tsx");
+  const edits = byId.get("web/blacksand-night-sky").edits;
+  assert.equal(edits.length, 3, "the import, the header art and the send button's art");
+  for (const edit of edits.slice(1)) assert.match(edit.replace, /<BlacksandNightSky (compact )?upstream=\{<NightlySkyArt( compact)? \/>\} \/>/, "upstream's art stays, for the switch's off position");
+  assert.ok(edits.every((edit) => !/DevBlueprintArt/.test(edit.replace) || /<DevBlueprintArt( compact)? \/>/.test(edit.replace)), "dev keeps upstream's blueprint");
+  // the mark is docs/assets/blacksand.svg's shapes, unaltered
+  const sky = file("BlacksandNightSky.tsx");
+  const logo = file("blacksand.svg");
+  for (const [, d] of logo.matchAll(/ d="([^"]+)"/g)) assert.ok(sky.includes(`d="${d}"`), `the mark keeps ${d.slice(0, 24)}…`);
+  assert.match(sky, /<circle cx="512\.0" cy="623\.4" r="197\.6" fill="none" stroke="#fff" strokeWidth="34" \/>/);
+  assert.match(sky, /useBlacksandInterface\("sky"\)/);
+  assert.doesNotMatch(sky, /<animate|@keyframes|requestAnimationFrame|feGaussianBlur/, "static, and nothing soft enough to fringe");
+  assert.match(file("blacksandInterface.ts"), /\n {2}sky: \{\n {4}title: "Desert night sky",/);
+  assert.match(file("blacksand.css"), /\.sidebar-stage-backdrop:has\(> \[data-stage-art="blacksand"\]\) \{\n {2}mask-image: none;/);
+});
+
 test("the app icon is upstream's with the blacksand badge in front", () => {
   assert.equal(file("blacksand.svg"), fs.readFileSync(new URL("../../../docs/assets/blacksand.svg", import.meta.url), "utf8"), "the badge's logo is docs/assets/blacksand.svg");
   const badge = byId.get("desktop/app-icon-badge");

@@ -42,10 +42,15 @@ its own name, bundle ID and data directory. The name is T3 Code (blacksand). The
 is upstream's, with a small blacksand badge in the corner. The sidebar logo is
 upstream's too, with a muted "blacksand" after it. A few touches follow whichever
 theme you pick: a ringed send button, a version stamp and accent text selection.
-Each has its own switch in **Settings → Appearance → Interface**. Blacksand adds no
-themes of its own. Use upstream's themes, or add a custom theme to change the accent.
+On nightly builds, a monochrome desert night replaces upstream's starry sky behind
+the sidebar header: dunes along the bottom, and the blacksand mark pressed faintly
+into the sky under the sidebar's "blacksand". It is static, and it stays put when
+you resize the sidebar. Each of these has its own switch in **Settings → Appearance
+→ Interface**; with the desert night switched off, nightly shows upstream's sky.
+Blacksand adds no themes of its own. Use upstream's themes, or add a custom theme to
+change the accent.
 
-The badge's logo is [`docs/assets/blacksand.svg`](../../../../docs/assets/blacksand.svg).
+The badge's logo, and the mark in the desert night, is [`docs/assets/blacksand.svg`](../../../../docs/assets/blacksand.svg).
 `tooling/blacksand-t3/lib/files/blacksand.svg` is a copy, so the T3 component builds on its
 own. A test keeps the two the same. The badge PNGs in `tooling/blacksand-t3/lib/files/` are
 upstream's icons with the badge drawn on. When upstream changes its icons, remake them

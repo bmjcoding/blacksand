@@ -19,6 +19,11 @@ export const BLACKSAND_INTERFACE = {
     description: "The build version in the window's bottom-right corner, with its changes and omitted features.",
     searchTerms: "version build stamp corner changes omitted features",
   },
+  sky: {
+    title: "Desert night sky",
+    description: "On nightly builds, a monochrome desert night with the blacksand mark replaces the starry sky behind the sidebar header.",
+    searchTerms: "desert night sky nightly sidebar header backdrop stars dunes mark",
+  },
   selection: {
     title: "Accent text selection",
     description: "Selected text highlights in the theme's accent instead of the system color.",

@@ -39,6 +39,20 @@ html[data-t3b-send="on"] [data-t3b-send][data-stage-art="nightly"] > :first-chil
   display: none;
 }
 
+/* ------------------------------------------------------------ night sky -- */
+
+/* BlacksandNightSky.tsx's desert night ends in the chrome by itself (its nearest
+   dune is the chrome colour), so it drops upstream's mask and fade: they would
+   veil the dunes and band over them. Upstream's own art keeps both. */
+.sidebar-stage-backdrop:has(> [data-stage-art="blacksand"]) {
+  mask-image: none;
+  -webkit-mask-image: none;
+}
+
+.sidebar-stage-backdrop:has(> [data-stage-art="blacksand"])::after {
+  display: none;
+}
+
 /* ------------------------------------------------------------- composer -- */
 
 /* Only while the chat box has focus: warm its outline and top highlight (both

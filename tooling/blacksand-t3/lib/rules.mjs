@@ -1756,6 +1756,33 @@ export const makeRules = ({ updater, build }) => [
     ],
   },
   {
+    id: "web/blacksand-night-sky-file",
+    why: "The nightly stage art: a monochrome desert night with the blacksand mark imprinted in the sky",
+    kind: "write",
+    file: "apps/web/src/components/BlacksandNightSky.tsx",
+    content: readFile("BlacksandNightSky.tsx"),
+  },
+  {
+    id: "web/blacksand-night-sky",
+    why: "Nightly's sidebar header and send button use the desert night while its switch is on, upstream's starry sky otherwise",
+    file: "apps/web/src/components/SidebarStageBackdrop.tsx",
+    edits: [
+      {
+        find: 'import { primaryServerConfigAtom } from "../state/server";\n',
+        replace: 'import { primaryServerConfigAtom } from "../state/server";\nimport { BlacksandNightSky } from "./BlacksandNightSky";\n',
+      },
+      {
+        find: '  return variant === "nightly" ? <NightlySkyArt /> : <DevBlueprintArt />;\n',
+        replace: '  return variant === "nightly" ? <BlacksandNightSky upstream={<NightlySkyArt />} /> : <DevBlueprintArt />;\n',
+      },
+      {
+        find: '  return variant === "nightly" ? <NightlySkyArt compact /> : <DevBlueprintArt compact />;\n',
+        replace:
+          '  return variant === "nightly" ? (\n    <BlacksandNightSky compact upstream={<NightlySkyArt compact />} />\n  ) : (\n    <DevBlueprintArt compact />\n  );\n',
+      },
+    ],
+  },
+  {
     id: "web/blacksand-send-button",
     why: "Lets blacksand.css find the send button, and the composer around it, and the stage they are drawn for",
     file: "apps/web/src/components/chat/ComposerPrimaryActions.tsx",

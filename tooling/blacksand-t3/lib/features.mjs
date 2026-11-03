@@ -48,6 +48,14 @@ export const features = [
     rules: ["web/blacksand-sidebar-name"],
   },
   {
+    name: "night-sky",
+    label: "Desert night sky",
+    description: "On nightly builds, a monochrome desert night with the blacksand mark behind the sidebar header, with its switch in Settings → Appearance → Interface",
+    rules: ["web/blacksand-night-sky-file", "web/blacksand-night-sky"],
+    // Its switch is in the interface file, and blacksand.css drops upstream's mask for it.
+    requires: ["styles"],
+  },
+  {
     name: "version-stamp",
     label: "Version stamp",
     description: "The build version in the window's corner, with its changes and omitted features on hover",
