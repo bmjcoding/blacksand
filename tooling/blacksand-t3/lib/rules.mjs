@@ -1803,6 +1803,12 @@ export const makeRules = ({ updater, build }) => [
     ],
   },
   {
+    id: "web/blacksand-send-button",
+    why: "Marks upstream's send button (unstyled) so the version card opens clear of it",
+    file: "apps/web/src/components/chat/ComposerPrimaryActions.tsx",
+    edits: [{ find: 'type={showResume ? "button" : "submit"}', replace: 'type={showResume ? "button" : "submit"}\n      data-t3b-send=""' }],
+  },
+  {
     id: "web/blacksand-artwork-label",
     why: "Environment identification names the nightly art for what it shows: Blacksand artwork",
     file: "apps/web/src/components/settings/AppearanceSettingsPanel.tsx",

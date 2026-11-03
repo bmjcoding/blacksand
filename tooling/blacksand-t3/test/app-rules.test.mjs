@@ -162,10 +162,13 @@ test("nightly's stage art is the desert night, called Blacksand artwork, with th
   assert.match(css, /mask-image: var\(--t3b-sky-fade\);\n {2}-webkit-mask-image: var\(--t3b-sky-fade\);/);
 });
 
-test("the send button is upstream's: no ring, no composer glow", () => {
-  assert.ok(!byId.has("web/blacksand-send-button"));
+test("the send button is upstream's: no ring, no composer glow, only a marker the version card avoids", () => {
+  assert.deepEqual(byId.get("web/blacksand-send-button").edits, [{ find: 'type={showResume ? "button" : "submit"}', replace: 'type={showResume ? "button" : "submit"}\n      data-t3b-send=""' }]);
+  assert.equal(index.get("web/blacksand-send-button"), "send-button-marker");
   assert.equal(featureByName("send-button"), undefined);
-  assert.doesNotMatch(file("blacksand.css"), /t3b-send|composer/);
+  assert.match(file("BlacksandBrand.tsx"), /\[data-t3b-send\]/, "what the marker is for");
+  const css = file("blacksand.css");
+  assert.doesNotMatch(css, /t3b-send|composer-shell|--chat-composer-outline/);
   assert.doesNotMatch(file("blacksandInterface.ts"), /\n {2}(send|sky): \{/);
 });
 

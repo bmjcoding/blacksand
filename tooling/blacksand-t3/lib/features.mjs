@@ -56,6 +56,12 @@ export const features = [
     requires: ["styles"],
   },
   {
+    name: "send-button-marker",
+    label: "Version card clears the send button",
+    description: "Marks upstream's send button so the version card opens clear of it; without it the card can open over the button",
+    rules: ["web/blacksand-send-button"],
+  },
+  {
     name: "version-stamp",
     label: "Version stamp",
     description: "The build version in the window's corner, with its changes and omitted features on hover",
