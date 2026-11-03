@@ -63,8 +63,9 @@ One logo runs through all of it: blacksand-mark's glow logo. The icon uses its m
 `tooling/blacksand-t3/lib/files/blacksand-mark-glow.svg`. The sidebar's sky uses its small
 cut, `tooling/blacksand-t3/lib/files/blacksand-mark-glow-small.svg`, at half strength with
 its stream at 30% so it doesn't seam through the label. A test checks the two cuts are the
-same logo. The README's header, `docs/assets/blacksand-lockup-dark.svg` and `blacksand-lockup-light.svg`,
-is the same family's lockup (default and light marks with the Geist wordmark). All are copies of what blacksand-mark's
+same logo. The README's header, `docs/assets/blacksand-lockup-glow.svg` (dark) and
+`blacksand-lockup-light.svg`, is the same family's lockup: the glow and light marks with the
+Geist wordmark. All are copies of what blacksand-mark's
 `tools/build-static.mjs` builds; when that changes, copy them again. The browser tab's icon
 is the app icon scaled down, like upstream's.
 
