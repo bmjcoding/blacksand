@@ -9,10 +9,43 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { SNAPSHOT_COMPONENT, SNAPSHOT_FILE, snapshotArchive, verifySnapshot } from "../lib/builder.mjs";
+import { prepareOutputForHandoff } from "../lib/build.mjs";
 import { capture, redact, run, trackStageDirs } from "../lib/util.mjs";
 
 const REPO = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SHA = "97e35bcf23e4dcf34c2dcffadd37c08db0e01e52";
+
+test("the finished export is readable across accounts without opening private sibling paths or symlink targets", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "blacksand-handoff-"));
+  try {
+    const output = path.join(root, "out");
+    const cache = path.join(output, "app", "cache");
+    const mirror = path.join(root, "upstream");
+    fs.mkdirSync(cache, { recursive: true, mode: 0o700 });
+    fs.mkdirSync(mirror, { mode: 0o700 });
+    const cachedFile = path.join(cache, "bytecode");
+    const executable = path.join(output, "app", "server");
+    const privateFile = path.join(mirror, "private");
+    fs.writeFileSync(cachedFile, "warm bytecode", { mode: 0o600 });
+    fs.writeFileSync(executable, "fixture executable", { mode: 0o700 });
+    fs.writeFileSync(privateFile, "private metadata", { mode: 0o600 });
+    fs.symlinkSync(mirror, path.join(output, "private-link"));
+    const mode = (file) => fs.statSync(file).mode & 0o777;
+    const privateModes = [mode(root), mode(mirror), mode(privateFile)];
+
+    prepareOutputForHandoff(output);
+
+    for (const directory of [output, path.join(output, "app"), cache]) assert.equal(mode(directory), 0o755);
+    assert.equal(mode(cachedFile), 0o644);
+    assert.equal(mode(executable), 0o755);
+    assert.equal(fs.readFileSync(cachedFile, "utf8"), "warm bytecode");
+    assert.equal(fs.readFileSync(executable, "utf8"), "fixture executable");
+    assert.deepEqual([mode(root), mode(mirror), mode(privateFile)], privateModes);
+    assert.equal(fs.readlinkSync(path.join(output, "private-link")), mirror);
+    assert.throws(() => prepareOutputForHandoff(path.join(output, "private-link")), /isn't an output directory/);
+    assert.throws(() => prepareOutputForHandoff(cachedFile), /isn't an output directory/);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
 
 /** A stand-in clone: bin/, lib/ and a pin.json pinning SHA with two device tools. */
 function fakeClone({ pin = true } = {}) {

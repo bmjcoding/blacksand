@@ -528,6 +528,21 @@ export function scanArtifact(platform, artifact) {
   if (hits.length) throw new Error(`forbidden endpoints found in the packaged app:\n${hits.map((h) => `  - ${h}`).join("\n")}`);
 }
 
+/** Export only OUT; Node can create mode-600 caches even under umask 022. */
+export function prepareOutputForHandoff(root = OUT) {
+  const visit = (file) => {
+    const stat = fs.lstatSync(file);
+    if (stat.isSymbolicLink()) return;
+    if (stat.isDirectory()) {
+      fs.chmodSync(file, stat.mode | 0o555);
+      for (const name of fs.readdirSync(file)) visit(path.join(file, name));
+    } else if (stat.isFile()) fs.chmodSync(file, stat.mode | (stat.mode & 0o111 ? 0o555 : 0o444));
+    else throw new Error(`unsupported build output: ${file}`);
+  };
+  if (!fs.lstatSync(root).isDirectory()) throw new Error(`${root} isn't an output directory`);
+  visit(root);
+}
+
 /** Copies the packaged app out of upstream's temporary stage into OUT. */
 function collect(found) {
   fs.rmSync(OUT, { recursive: true, force: true });
@@ -598,6 +613,7 @@ export async function buildArtifact({ sha, version, platform, changes, baseline 
     await smokeTest();
     progress(90);
     pruneStore();
+    if (IS_BUILDER) prepareOutputForHandoff();
     return { artifact, skipped: [...stripped.skipped.keys()], stageLocks };
   } finally {
     await releaseTools();

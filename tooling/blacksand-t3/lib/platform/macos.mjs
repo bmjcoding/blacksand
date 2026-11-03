@@ -438,7 +438,8 @@ export default {
   stage(appPath) {
     fs.mkdirSync(APPS, { recursive: true });
     fs.rmSync(APP_STAGED, { recursive: true, force: true });
-    run("ditto", [appPath, APP_STAGED]);
+    const copied = run("ditto", [appPath, APP_STAGED], { encoding: "utf8", stdio: ["ignore", "inherit", "pipe"] });
+    if (copied.stderr?.trim()) throw new Error(`ditto reported an incomplete app copy: ${copied.stderr.trim().split("\n")[0]}`);
     // Our own artifact; make sure Gatekeeper doesn't treat it as downloaded.
     childProcess.spawnSync("xattr", ["-dr", "com.apple.quarantine", APP_STAGED]);
     sign(APP_STAGED);
