@@ -39,7 +39,8 @@ machine stays on the installed build and says why.
 
 The rules remove what [privacy](../security/privacy.md) lists. They also give the app
 its own name, bundle ID and data directory. The name is T3 Code (blacksand). The icon
-is upstream's, with a small blacksand badge in the corner. The sidebar logo is
+is upstream's T3, with a blacksand backdrop behind it: a night sky, one low dune, and
+the blacksand static logo, its centre line through the gap between the T and the 3. The sidebar logo is
 upstream's too, with a muted "blacksand" after it. Two touches follow whichever
 theme you pick: a version stamp and accent text selection. Each has its own switch
 in **Settings → Appearance → Interface**. The send button is upstream's.
@@ -56,11 +57,20 @@ Version pill and None.
 Blacksand adds no themes of its own. Use upstream's themes, or add a custom theme to
 change the accent.
 
-The badge's logo, and the mark in the desert night, is [`docs/assets/blacksand.svg`](../../../../docs/assets/blacksand.svg).
+The sidebar's mark is [`docs/assets/blacksand.svg`](../../../../docs/assets/blacksand.svg).
 `tooling/blacksand-t3/lib/files/blacksand.svg` is a copy, so the T3 component builds on its
-own. A test keeps the two the same. The badge PNGs in `tooling/blacksand-t3/lib/files/` are
-upstream's icons with the badge drawn on. When upstream changes its icons, remake them
-with `tooling/blacksand-t3/scripts/badge-icons.swift`; its first lines say how.
+own. A test keeps the two the same. The icon's logo is the static logo,
+`tooling/blacksand-t3/lib/files/blacksand-mark.svg`, with its sand line dimmed from
+#8e8e8e to #555555 so it doesn't read as a seam through the T at Dock sizes.
+`tooling/blacksand-t3/lib/icon-backdrop.mjs` draws the backdrop. The build adds its
+parts to upstream's Icon Composer bundle as layers behind the T3, so with Xcode 26 the
+icon is Liquid Glass. Only the sky is glass. The logo and the dune are flat layers,
+so no glass edge rims them, and with a system tint they become faint white shapes.
+The flat PNGs, `tooling/blacksand-t3/lib/files/backdrop-*.png`, cover a build without
+Xcode 26, DMG volumes, Linux and the startup splash. They are upstream's icons with the
+same backdrop drawn behind the T3. When upstream changes its icons, or the backdrop
+changes, remake them with `tooling/blacksand-t3/scripts/backdrop-icons.mjs`. It runs
+anywhere Chrome or Chromium does, and its first lines say how.
 
 ## The build report
 

@@ -269,7 +269,7 @@ function stopMessage({ strict, hosts, tools, locks = [], pnpm = null }) {
 }
 
 /**
- * macOS: the app icon is upstream's Icon Composer bundle with the blacksand badge
+ * macOS: the app icon is upstream's Icon Composer bundle with the blacksand backdrop
  * added (rules desktop/app-icon-*), so it renders as Liquid Glass and
  * follows the system's light, dark, clear and tinted icon styles. electron-builder
  * compiles it with actool, which needs Xcode 26 or newer; Command Line Tools don't
@@ -286,7 +286,7 @@ function liquidGlassIconEnv() {
 function findLiquidGlassIcon() {
   if (process.platform !== "darwin") return {};
   const icon = path.join(WORK, "assets", "prod", "app-icon.icon");
-  if (!fs.existsSync(path.join(icon, "Assets", "blacksand-badge.svg"))) return {};
+  if (!fs.existsSync(path.join(icon, "Assets", "blacksand-logo.svg"))) return {};
   const actoolMajor = (developerDir) => {
     const env = { ...process.env };
     if (developerDir) env.DEVELOPER_DIR = developerDir;

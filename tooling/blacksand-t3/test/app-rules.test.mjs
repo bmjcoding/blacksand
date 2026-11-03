@@ -172,20 +172,32 @@ test("the send button is upstream's: no ring, no composer glow, only a marker th
   assert.doesNotMatch(file("blacksandInterface.ts"), /\n {2}(send|sky): \{/);
 });
 
-test("the app icon is upstream's with the blacksand badge in front", () => {
-  assert.equal(file("blacksand.svg"), fs.readFileSync(new URL("../../../docs/assets/blacksand.svg", import.meta.url), "utf8"), "the badge's logo is docs/assets/blacksand.svg");
-  const badge = byId.get("desktop/app-icon-badge");
-  assert.equal(badge.file, "assets/prod/app-icon.icon/Assets/blacksand-badge.svg");
-  assert.ok(badge.content.includes(file("blacksand.svg").trim()), "the logo as it is, coloured by its group");
-  assert.match(badge.content, /<g color="#ffffff" fill="#ffffff"/);
-  // Upstream's icon.json at v0.1.7-nightly.20261031.3991, abridged.
-  const upstream = { fill: { solid: "display-p3:0.00000,0.00000,0.00000,1.00000" }, groups: [{ layers: [{ "image-name": "text.svg", name: "Text" }] }], "supported-platforms": { squares: "shared" } };
-  const icon = JSON.parse(byId.get("desktop/app-icon-badge-layer").transform(JSON.stringify(upstream, null, 2)));
-  assert.deepEqual(icon.groups.slice(1), upstream.groups, "upstream's layers stay, behind the badge");
-  assert.deepEqual(icon.groups[0].layers.map((layer) => layer["image-name"]), ["blacksand-badge.svg"]);
-  assert.equal(icon.groups[0].layers[0].position.scale, 0.42, "42% of the icon's width");
-  assert.deepEqual({ ...icon, groups: upstream.groups }, upstream);
-  assert.throws(() => byId.get("desktop/app-icon-badge-layer").transform("{}"), /no groups/);
+test("the app icon is upstream's T3 with the blacksand backdrop behind it", () => {
+  assert.equal(file("blacksand.svg"), fs.readFileSync(new URL("../../../docs/assets/blacksand.svg", import.meta.url), "utf8"), "the sidebar's mark is docs/assets/blacksand.svg");
+  for (const id of ["desktop/app-icon-badge", "desktop/app-icon-badge-layer"]) assert.ok(!byId.has(id), `${id} is gone`);
+  const assets = rules.filter((rule) => rule.id.startsWith("desktop/app-icon-backdrop-") && rule.kind === "write");
+  assert.deepEqual(assets.map((rule) => rule.file).sort(), ["dune", "logo", "sky"].map((part) => `assets/prod/app-icon.icon/Assets/blacksand-${part}.svg`));
+  // the static logo as it is, but for its sand line, which is dimmed
+  const logo = byId.get("desktop/app-icon-backdrop-logo").content;
+  const mark = file("blacksand-mark.svg");
+  for (const [, d] of mark.matchAll(/<path d="([^"]{40,})"/g)) assert.ok(logo.includes(d), "the static logo's geometry");
+  assert.doesNotMatch(logo, /#8e8e8e/i);
+  assert.match(logo, /#555555/);
+  // its centre line runs through the gap between upstream's T and 3, not the icon's centre
+  assert.match(logo, /<g transform="translate\((\S+) /);
+  const [, tx] = logo.match(/<g transform="translate\((\S+) (\S+)\) scale\((\S+)\)"/);
+  const scale = Number(logo.match(/scale\((\S+)\)"/)[1]);
+  assert.ok(Math.abs(Number(tx) + 512 * scale - (512 + 2.25 * 8.5)) < 0.05, "x 531: the middle of 64.33..68.17 in text.svg at scale 8.5");
+  for (const { content } of assets) assert.doesNotMatch(content, /<filter|feGaussianBlur|<animate/, "flat: nothing soft enough to fringe");
+  // Upstream's icon.json at v0.1.7-nightly.20261102.4093, abridged.
+  const upstream = { fill: { solid: "display-p3:0.00000,0.00000,0.00000,1.00000" }, groups: [{ layers: [{ "image-name": "text.svg", name: "Text" }], translucency: { enabled: true, value: 0.5 } }], "supported-platforms": { squares: "shared" } };
+  const icon = JSON.parse(byId.get("desktop/app-icon-backdrop-layers").transform(JSON.stringify(upstream, null, 2)));
+  assert.equal(icon.groups.length, 1, "one group, as upstream's nightly icon does it");
+  assert.deepEqual(icon.groups[0].layers.map((layer) => layer["image-name"]), ["text.svg", "blacksand-dune.svg", "blacksand-logo.svg", "blacksand-sky.svg"], "front to back: the T3 first");
+  assert.deepEqual(icon.groups[0].layers[0], upstream.groups[0].layers[0], "upstream's T3 as it is");
+  assert.deepEqual(icon.groups[0].layers.slice(1).map((layer) => layer.glass), [false, false, true], "only the sky is glass: no rim on the logo");
+  assert.deepEqual({ ...icon, groups: upstream.groups }, upstream, "the fill and everything else stays upstream's");
+  assert.throws(() => byId.get("desktop/app-icon-backdrop-layers").transform("{}"), /no group with text\.svg/);
   const writes = rules.filter((rule) => rule.id.startsWith("desktop/app-icon-") && rule.kind === "write" && rule.overwrite).map((rule) => rule.file).sort();
   assert.deepEqual(writes, [
     "assets/nightly/nightly-macos-1024.png",

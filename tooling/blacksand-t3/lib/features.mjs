@@ -83,8 +83,8 @@ export const features = [
   },
   {
     name: "app-icon",
-    label: "blacksand badge on the app icon",
-    description: "Upstream's T3 Code icon with the blacksand badge in the Dock, Finder, launcher and splash, layered for Liquid Glass",
+    label: "blacksand backdrop on the app icon",
+    description: "Upstream's T3 with a night sky, a dune and the blacksand static logo behind it, in the Dock, Finder, launcher and splash, layered for Liquid Glass",
     rules: ["desktop/app-icon-*"],
   },
   {
