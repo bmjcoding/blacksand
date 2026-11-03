@@ -28,7 +28,7 @@ Codex, or agents you build yourself.
 
 ## How it works
 
-- **A fresh sandbox for every run.** Each run starts in a new gVisor sandbox with an empty
+- **A fresh sandbox for every run.** Each run starts in a new, isolated sandbox with an empty
   workspace and only the files you give it, and it's torn down when the run ends.
 - **One way out.** The sandbox's only route out is a proxy that reaches just the hosts you
   allowed for that run. The proxy logs every request, including the ones it refuses.
@@ -54,6 +54,8 @@ cd blacksand
 latest commit.
 
 ## Quick start
+
+The first substrate runs agents on a Kubernetes node:
 
 ```sh
 ./blacksand k8s setup
