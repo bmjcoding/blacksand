@@ -84,7 +84,7 @@ const RESOLVER_COMMON =
   ["vp", "bun", "yarn", "volta"]
     .map(
       (exe) =>
-        `    return makeProviderMaintenanceCapabilities({\n      provider: definition.provider,\n      packageName,\n      updateExecutable: "${exe}",\n      updateArgs: ["i", "-g", packageName],\n      updateLockKey: "${{ vp: "vite-plus-global", bun: "bun-global", yarn: "yarn-global", volta: "volta" }[exe]}",\n    });\n`,
+        `    return makeProviderMaintenanceCapabilities({\n      provider: definition.provider,\n      packageName,\n      updateExecutable: "${exe}",\n      updateArgs: ${{ vp: '["i", "-g", packageName]', bun: '["i", "-g", `${packageName}@latest`]', yarn: '["global", "add", `${packageName}@latest`]', volta: '["install", `${packageName}@latest`]' }[exe]},\n      updateLockKey: "${{ vp: "vite-plus-global", bun: "bun-global", yarn: "yarn-global", volta: "volta" }[exe]}",\n    });\n`,
     )
     .join("") +
   "function manualUpdateMessage(latestVersion: string, installPath: string | undefined): string {\n" +
@@ -353,7 +353,7 @@ test("`t3 service install` and its repair route say what blacksand-t3 does inste
 });
 
 test("the server never writes Tailscale Serve itself; `--tailscale-serve` says the admin does", () => {
-  const server = applies("server/no-tailscale-serve-config", 'import { disableTailscaleServe, ensureTailscaleServe } from "@t3tools/tailscale";\n              return yield* ensureTailscaleServe({\n');
+  const server = applies("server/no-tailscale-serve-config", 'import { disableTailscaleServe, ensureTailscaleServe } from "@t3tools/tailscale";\n        host: config.host ?? "127.0.0.1",\n              return yield* ensureTailscaleServe({\n');
   assert.match(server, /import \{ disableTailscaleServe, ensureTailscaleServe as upstreamEnsureTailscaleServe \} from "@t3tools\/tailscale";\n/);
   assert.match(server, /const ensureTailscaleServe = \(_input: Parameters<typeof upstreamEnsureTailscaleServe>\[0\]\) =>\n {2}Effect\.fail\(new Error\("blacksand-t3 leaves Tailscale Serve to the host's admin: [^"]*sudo scripts\/add-phone-service\.sh <agent account>[^"]*without --tailscale-serve\."\)\);\n/);
   assert.doesNotMatch(server.slice(server.indexOf("const ensureTailscaleServe")), /upstreamEnsureTailscaleServe\(/, "upstream's writer is never called");
@@ -530,5 +530,25 @@ test("every shaped edit is text in, text out, and none writes stock T3 guidance"
       assert.equal(typeof shape.replace, "string", id);
       assert.ok(!shape.replace.split("\n").some(matchesStock), `${id} writes stock text: ${shape.replace}`);
     }
+  }
+});
+
+test("each ungated installer is manual with or without its provider environment, and changed commands stop", () => {
+  const id = "provider/updates-minimum-age";
+  for (const environment of ["", "      env: context.env,\n"]) {
+    const common = RESOLVER_COMMON.replace(/(      updateLockKey: "(?:vite-plus-global|bun-global|yarn-global|volta)",\n)/g, `$1${environment}`);
+    const source = RESOLVER_HEAD + common + FETCH_3956 + NPM_VIEW_3956;
+    const out = applies(id, source);
+    for (const label of ["Vite+", "bun", "yarn", "Volta"]) assert.ok(out.includes(`return blacksandUngatedInstall(manual, "${label}");`));
+    assert.doesNotMatch(out, /updateExecutable: "(?:vp|bun|yarn|volta)"/);
+    for (const executable of ["vp", "bun", "yarn", "volta"]) {
+      drifts(id, source.replace(`updateExecutable: "${executable}"`, 'updateExecutable: "unknown"'));
+    }
+    drifts(id, source.replace('updateLockKey: "bun-global"', 'updateLockKey: "yarn-global"'));
+    drifts(id, source.replace('updateArgs: ["install", `${packageName}@latest`]', 'updateArgs: ["install", "--new", `${packageName}@latest`]'));
+    if (environment) drifts(id, source.replace("env: context.env,", "env: unknown.env,"));
+    const bun = /    return makeProviderMaintenanceCapabilities\(\{\n      provider: definition\.provider,\n      packageName,\n      updateExecutable: "bun",[^]*?    \}\);\n/.exec(source)[0];
+    drifts(id, source + bun);
+    drifts(id, source.replace(bun, ""));
   }
 });
