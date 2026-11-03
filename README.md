@@ -44,14 +44,14 @@ cd blacksand
 ./blacksand verify
 ```
 
-`verify` reports whether every commit in the clone is signed by a listed key, and whether
-the files on disk match the latest commit. Until your machine has applied a configuration, it
-ends with "not verified" (exit 4).
+`verify` checks that every commit in the clone is signed by a listed key, and that the files
+on disk match the latest commit. Blacksand doesn't apply configuration yet, so for now it
+always ends with `not verified` (exit 4). That's expected.
 
 ## Quick start
 
-Blacksand runs sandboxes in pluggable environments. The first is Kubernetes: prepare a node
-with its [setup guide](substrates/kubernetes/README.md#setup), then:
+Blacksand runs sandboxes in pluggable environments. The first is Kubernetes, on a single k3s
+node: prepare it with the [setup guide](substrates/kubernetes/README.md#setup), then:
 
 ```sh
 ./blacksand k8s setup
