@@ -11,15 +11,19 @@
 
 import { useId } from "react";
 
+import { BLACKSAND_GLOW_MARK } from "./blacksandGlowMark";
+
 const VIEW_BOX = "0 0 8192 96";
 const U = 96 / 80; // svg units per css px
 
-// The mark: docs/assets/blacksand.svg as it is (1024 viewBox; triangle 56..968 x 138..878).
-// 42px tall, its left edge 190px in, its top 5px down: under the sidebar's "blacksand",
-// with its base resting on the far ridge.
-const MARK_TRIANGLE = "M512.0 138.0 L968.0 878.0 L56.0 878.0Z";
-const MARK_TRANSFORM = `translate(${190 * U} ${5 * U}) scale(${(42 * U) / 740}) translate(-56 -138)`;
-const MARK_OPACITY = 0.09;
+// The mark: the blacksand glow logo, the app icon's mark, in its small cut (blacksandGlowMark.ts,
+// generated from blacksand-mark's logo/blacksand-mark-glow-small.svg). Its units: triangle
+// 56..968 x 138..878. 42px tall, its left edge 131px in, its top 5px down: centred behind the
+// sidebar's two-line "T3 Code / blacksand" label as one lockup, its base on the far ridge.
+// At half strength its black face reads as the icon's dark pyramid in the sky.
+const MARK_TRIANGLE = "M512 138L968 878L56 878Z";
+const MARK_TRANSFORM = `translate(${131 * U} ${5 * U}) scale(${(42 * U) / 740}) translate(-56 -138)`;
+const MARK_OPACITY = 0.5;
 
 const mulberry32 = (seed: number) => () => {
   seed = (seed + 0x6d2b79f5) >>> 0;
@@ -159,36 +163,18 @@ function DesertNightArt({ compact = false }: { compact?: boolean }) {
       <rect width="100%" height="96" fill={`url(#${stars})`} mask={compact ? undefined : `url(#${clear})`} />
       {compact ? null : (
         <>
-          <g transform={MARK_TRANSFORM} fill="#fff" opacity={MARK_OPACITY}>
-            <BlacksandMark />
-          </g>
+          <g
+            transform={MARK_TRANSFORM}
+            opacity={MARK_OPACITY}
+            // ids made unique per instance, like the art's own
+            dangerouslySetInnerHTML={{ __html: BLACKSAND_GLOW_MARK.replaceAll('id="bs-', `id="${id}-bs-`).replaceAll("url(#bs-", `url(#${id}-bs-`) }}
+          />
           <rect width="100%" height="96" fill={`url(#${far})`} />
           <rect width="100%" height="96" fill={`url(#${middle})`} />
           <rect width="100%" height="96" fill={`url(#${near})`} />
         </>
       )}
     </svg>
-  );
-}
-
-/** docs/assets/blacksand.svg's shapes, unaltered (a test keeps them the same). */
-function BlacksandMark() {
-  return (
-    <>
-      <path fillRule="evenodd" d="M512.0 138.0 L968.0 878.0 L56.0 878.0Z M512.0 214.2 L896.4 838.0 L127.6 838.0Z" />
-      <circle cx="512.0" cy="623.4" r="197.6" fill="none" stroke="#fff" strokeWidth="34" />
-      <path d="M512.0 694.5L610.2 726.1L639.0 774.8A197.6 197.6 0 0 1 385.0 774.8L413.8 726.1Z" />
-      <path
-        d="M385.0 472.0L474.6 623.4L385.0 774.8M639.0 472.0L549.4 623.4L639.0 774.8"
-        fill="none"
-        stroke="#fff"
-        strokeWidth="22"
-        strokeLinejoin="miter"
-        strokeMiterlimit="10"
-      />
-      <path d="M439.5 564.1L512.0 579.9L584.5 564.1L549.4 623.4L474.6 623.4Z" />
-      <path d="M501.0 210.2H523.0V425.7H518.6V696.5H505.4V425.7H501.0Z" />
-    </>
   );
 }
 

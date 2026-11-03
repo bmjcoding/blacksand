@@ -2,6 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
+import { inflateSync } from "node:zlib";
 
 import { featureByName, featureIndex } from "../lib/features.mjs";
 import { makeRules } from "../lib/rules.mjs";
@@ -132,11 +133,12 @@ test("the app is called T3 Code (blacksand) everywhere it shows its name, with n
   assert.equal(replaces("web/branding-display-name"), "  return input.baseName;\n");
 });
 
-test("the sidebar logo is upstream's T3 Code with a muted, smaller blacksand after it", () => {
+test("the sidebar logo is upstream's T3 Code with a muted, smaller blacksand centred under it", () => {
   for (const id of ["web/blacksand-wordmark", "web/blacksand-stage-art"]) assert.ok(!byId.has(id), `${id} is gone`);
-  const [edit] = byId.get("web/blacksand-sidebar-name").edits;
-  assert.equal(edit.find, "        Code\n      </span>\n    </span>\n", "after upstream's muted Code, inside its mark");
-  assert.match(edit.replace, /^ {8}Code\n {6}<\/span>\n {6}<span className=\{cn\("shrink-0 text-xs font-normal", onBackdrop \? "text-white\/50" : "text-muted-foreground\/70"\)\}>\n {8}blacksand\n {6}<\/span>\n {4}<\/span>\n$/);
+  const [column, name] = byId.get("web/blacksand-sidebar-name").edits;
+  assert.match(column.replace, /^ {4}<span className="inline-flex min-w-0 flex-col items-center">\n {4}<span className="inline-flex min-w-0 items-baseline gap-1 text-sm font-medium tracking-tight">\n$/, "upstream's mark, in a centred column");
+  assert.equal(name.find, "        Code\n      </span>\n    </span>\n", "after upstream's muted Code, under its mark");
+  assert.match(name.replace, /text-\[10px\] leading-none font-normal tracking-\[0\.1em\]", onBackdrop \? "text-white\/55" : "text-muted-foreground\/70"\)\}>\n {8}blacksand\n {6}<\/span>\n {4}<\/span>\n$/);
   assert.equal(index.get("web/blacksand-sidebar-name"), "wordmark");
   assert.doesNotMatch(file("BlacksandBrand.tsx"), /Wordmark|Redacted|BLACKOUT/);
   assert.doesNotMatch(file("blacksand.css"), /t3b-wordmark|t3b-redacted/);
@@ -151,10 +153,20 @@ test("nightly's stage art is the desert night, called Blacksand artwork, with th
   assert.equal(header.replace, '  return variant === "nightly" ? <BlacksandNightSky /> : <DevBlueprintArt />;\n', "dev keeps upstream's blueprint");
   assert.equal(button.replace, '  return variant === "nightly" ? <BlacksandNightSky compact /> : <DevBlueprintArt compact />;\n', "the send button's fill too");
   assert.deepEqual(byId.get("web/blacksand-artwork-label").edits, [{ find: '"Nightly artwork"', replace: '"Blacksand artwork"', count: 4 }], "every place the dropdown names it");
-  // the mark is docs/assets/blacksand.svg's shapes, unaltered
+  // the mark is the app icon's glow logo, in its small cut, generated from blacksand-mark's file
   const sky = file("BlacksandNightSky.tsx");
-  for (const [, d] of file("blacksand.svg").matchAll(/ d="([^"]+)"/g)) assert.ok(sky.includes(`d="${d}"`), `the mark keeps ${d.slice(0, 24)}…`);
-  assert.match(sky, /<circle cx="512\.0" cy="623\.4" r="197\.6" fill="none" stroke="#fff" strokeWidth="34" \/>/);
+  const mark = byId.get("web/blacksand-night-sky-mark");
+  assert.equal(index.get("web/blacksand-night-sky-mark"), "night-sky");
+  assert.equal(mark.file, "apps/web/src/components/blacksandGlowMark.ts");
+  const glowSmall = file("blacksand-mark-glow-small.svg");
+  const markup = JSON.parse(mark.content.match(/export const BLACKSAND_GLOW_MARK = (".*");\n$/)[1]);
+  for (const [, d] of glowSmall.matchAll(/ d="([^"]{40,})"/g)) assert.ok(markup.includes(`d="${d}"`), "the glow logo's geometry, unaltered");
+  assert.match(markup, /<g style="mix-blend-mode:lighten;opacity:0\.3">/, "its stream at 30%, so it doesn't seam through the label");
+  assert.match(sky, /const MARK_OPACITY = 0\.5;/);
+  assert.match(sky, /import \{ BLACKSAND_GLOW_MARK \} from "\.\/blacksandGlowMark";/);
+  // one logo: the sidebar's small cut and the icon's master come from the same build
+  const strip = (svg) => svg.replace(/stroke-width="[\d.]+"/g, "").replace(/stdDeviation="[\d.]+"/g, "").replace(/<rect [^>]*\/>/g, "");
+  assert.equal(strip(glowSmall).replace(/<path d="M512 138V726\.77"[^>]*\/>/g, ""), strip(file("blacksand-mark-glow.svg")).replace(/<path d="M512 138V726\.77"[^>]*\/>/g, ""), "the small cut differs from the master only in its line and glow widths");
   assert.doesNotMatch(sky, /<animate|@keyframes|requestAnimationFrame|feGaussianBlur/, "static, and nothing soft enough to fringe");
   assert.doesNotMatch(sky, /--stage-fade|--app-chrome-background|useBlacksandInterface/, "night in every theme; the dropdown is its only switch");
   const css = file("blacksand.css");
@@ -172,40 +184,92 @@ test("the send button is upstream's: no ring, no composer glow, only a marker th
   assert.doesNotMatch(file("blacksandInterface.ts"), /\n {2}(send|sky): \{/);
 });
 
-test("the app icon is upstream's T3 with the blacksand backdrop behind it", () => {
-  assert.equal(file("blacksand.svg"), fs.readFileSync(new URL("../../../docs/assets/blacksand.svg", import.meta.url), "utf8"), "the sidebar's mark is docs/assets/blacksand.svg");
-  for (const id of ["desktop/app-icon-badge", "desktop/app-icon-badge-layer"]) assert.ok(!byId.has(id), `${id} is gone`);
+test("the stream tint mask leaves the distant ring and sand transparent", () => {
+  const png = fs.readFileSync(new URL("../lib/files/icon-stream.png", import.meta.url));
+  const width = png.readUInt32BE(16), height = png.readUInt32BE(20);
+  assert.equal(width, 1024);
+  assert.equal(height, 1024);
+  assert.equal(png[24], 8);
+  assert.equal(png[25], 6, "RGBA");
+  const chunks = [];
+  for (let p = 8; p < png.length;) {
+    const n = png.readUInt32BE(p);
+    if (png.toString("ascii", p + 4, p + 8) === "IDAT") chunks.push(png.subarray(p + 8, p + 8 + n));
+    p += n + 12;
+  }
+  const raw = inflateSync(Buffer.concat(chunks)), stride = width * 4;
+  let previous = Buffer.alloc(stride), occupied = 0;
+  for (let y = 0; y < height; y++) {
+    const filter = raw[y * (stride + 1)], row = Buffer.from(raw.subarray(y * (stride + 1) + 1, (y + 1) * (stride + 1)));
+    assert.ok(filter <= 4);
+    for (let x = 0; x < stride; x++) {
+      const a = x >= 4 ? row[x - 4] : 0, b = previous[x], c = x >= 4 ? previous[x - 4] : 0;
+      const p = a + b - c, da = Math.abs(p - a), db = Math.abs(p - b), dc = Math.abs(p - c);
+      const predictor = filter === 1 ? a : filter === 2 ? b : filter === 3 ? Math.floor((a + b) / 2) : filter === 4 ? (da <= db && da <= dc ? a : db <= dc ? b : c) : 0;
+      row[x] = (row[x] + predictor) & 255;
+    }
+    for (let x = 0; x < width; x++) {
+      if (row[x * 4 + 3] === 0) continue;
+      occupied++;
+      assert.ok(Math.abs(x - 531.125) <= 40, `stray stream tint at ${x},${y}`);
+    }
+    previous = row;
+  }
+  assert.ok(occupied > 1000, "the actual illuminated stream remains present");
+});
+
+test("the app icon is upstream's T3 with the blacksand backdrop behind it", async () => {
+  const backdrop = await import("../lib/icon-backdrop.mjs");
+  for (const id of ["desktop/app-icon-badge", "desktop/app-icon-badge-layer", "desktop/app-icon-backdrop-logo"]) assert.ok(!byId.has(id), `${id} is gone`);
   const assets = rules.filter((rule) => rule.id.startsWith("desktop/app-icon-backdrop-") && rule.kind === "write");
-  assert.deepEqual(assets.map((rule) => rule.file).sort(), ["dune", "logo", "sky"].map((part) => `assets/prod/app-icon.icon/Assets/blacksand-${part}.svg`));
-  // the static logo as it is, but for its sand line, which is dimmed
-  const logo = byId.get("desktop/app-icon-backdrop-logo").content;
-  const mark = file("blacksand-mark.svg");
-  for (const [, d] of mark.matchAll(/<path d="([^"]{40,})"/g)) assert.ok(logo.includes(d), "the static logo's geometry");
-  assert.doesNotMatch(logo, /#8e8e8e/i);
-  assert.match(logo, /#555555/);
-  // its centre line runs through the gap between upstream's T and 3, not the icon's centre
-  assert.match(logo, /<g transform="translate\((\S+) /);
-  const [, tx] = logo.match(/<g transform="translate\((\S+) (\S+)\) scale\((\S+)\)"/);
-  const scale = Number(logo.match(/scale\((\S+)\)"/)[1]);
-  assert.ok(Math.abs(Number(tx) + 512 * scale - (512 + 2.25 * 8.5)) < 0.05, "x 531: the middle of 64.33..68.17 in text.svg at scale 8.5");
-  for (const { content } of assets) assert.doesNotMatch(content, /<filter|feGaussianBlur|<animate/, "flat: nothing soft enough to fringe");
+  assert.deepEqual(assets.map((rule) => rule.file.replace("assets/prod/app-icon.icon/Assets/", "")).sort(),
+    ["blacksand-dune.svg", "blacksand-etch.png", "blacksand-face.png", "blacksand-rim.png", "blacksand-sand.png", "blacksand-sky.svg", "blacksand-stream.png"]);
+  for (const name of ["rim", "face", "sand", "etch", "stream"]) {
+    const png = byId.get(`desktop/app-icon-backdrop-${name}`).content;
+    assert.ok(Buffer.isBuffer(png) && png.subarray(1, 4).toString() === "PNG", `${name}: the rendered PNG from lib/files (scripts/backdrop-icons.mjs)`);
+  }
+  // the glow logo as blacksand-mark builds it: rim 40%, a glowing stream drawn as a fixed light
+  const glow = file("blacksand-mark-glow.svg");
+  assert.match(glow, /stroke-opacity="0\.4" stroke-width="10" stroke-linejoin="round" filter="url\(#bs-rim\)"/);
+  assert.match(glow, /<g style="mix-blend-mode:lighten">/);
+  // in the icon: the stream's tight halo only (no haze reaching the T3), its core lifted to keep the logo's brightness
+  assert.doesNotMatch(backdrop.LOGO_SOURCES.whole, /bs-haze\)"/);
+  assert.match(backdrop.LOGO_SOURCES.whole, /stroke-opacity="0\.34" stroke-width="8" stroke-linecap="butt"/);
+  // the stream runs through the gap between upstream's T and 3, not the icon's centre
+  const [, tx, scale] = backdrop.LOGO_TRANSFORM.match(/^translate\((\S+) \S+\) scale\((\S+)\)$/);
+  assert.ok(Math.abs(Number(tx) + 512 * Number(scale) - (512 + 2.25 * 8.5)) < 0.05, "x 531: the middle of 64.33..68.17 in text.svg at scale 8.5");
+  for (const part of [backdrop.BACKDROP_ASSETS["blacksand-sky.svg"].svg, backdrop.BACKDROP_ASSETS["blacksand-dune.svg"].svg]) assert.doesNotMatch(part, /<filter|<animate/);
   // Upstream's icon.json at v0.1.7-nightly.20261102.4093, abridged.
   const upstream = { fill: { solid: "display-p3:0.00000,0.00000,0.00000,1.00000" }, groups: [{ layers: [{ "image-name": "text.svg", name: "Text" }], translucency: { enabled: true, value: 0.5 } }], "supported-platforms": { squares: "shared" } };
   const icon = JSON.parse(byId.get("desktop/app-icon-backdrop-layers").transform(JSON.stringify(upstream, null, 2)));
   assert.equal(icon.groups.length, 1, "one group, as upstream's nightly icon does it");
-  assert.deepEqual(icon.groups[0].layers.map((layer) => layer["image-name"]), ["text.svg", "blacksand-dune.svg", "blacksand-logo.svg", "blacksand-sky.svg"], "front to back: the T3 first");
-  assert.deepEqual(icon.groups[0].layers[0], upstream.groups[0].layers[0], "upstream's T3 as it is");
-  assert.deepEqual(icon.groups[0].layers.slice(1).map((layer) => layer.glass), [false, false, true], "only the sky is glass: no rim on the logo");
+  const layers = icon.groups[0].layers;
+  assert.deepEqual(layers.map((layer) => layer["image-name"]), ["text.svg", "blacksand-stream.png", "blacksand-etch.png", "blacksand-sand.png", "blacksand-face.png", "blacksand-rim.png", "blacksand-dune.svg", "blacksand-sky.svg"], "front to back: the T3 first");
+  assert.deepEqual(layers[0], upstream.groups[0].layers[0], "upstream's T3 as it is");
+  assert.deepEqual(layers.slice(1).map((layer) => layer.glass), [false, false, false, false, false, false, true], "only the sky is glass: no rim on the logo");
+  const tint = (layer) => layer["fill-specializations"]?.find((s) => s.appearance === "tinted")?.value.solid ?? null;
+  assert.equal(tint(layers.find((l) => l.name === "Blacksand face")), null, "the face is never painted: a tint keeps the mark, not a triangle");
+  assert.ok(["stream", "ring and walls", "sand", "rim"].every((n) => tint(layers.find((l) => l.name === `Blacksand ${n}`))), "every other part of the mark has its own tint strength");
   assert.deepEqual({ ...icon, groups: upstream.groups }, upstream, "the fill and everything else stays upstream's");
   assert.throws(() => byId.get("desktop/app-icon-backdrop-layers").transform("{}"), /no group with text\.svg/);
   const writes = rules.filter((rule) => rule.id.startsWith("desktop/app-icon-") && rule.kind === "write" && rule.overwrite).map((rule) => rule.file).sort();
   assert.deepEqual(writes, [
+    "apps/web/public/apple-touch-icon.png",
+    "apps/web/public/favicon-16x16.png",
+    "apps/web/public/favicon-32x32.png",
+    "apps/web/public/favicon.ico",
     "assets/nightly/nightly-macos-1024.png",
     "assets/nightly/nightly-universal-1024.png",
     "assets/nightly/nightly-web-apple-touch-180.png",
+    "assets/nightly/nightly-web-favicon-16x16.png",
+    "assets/nightly/nightly-web-favicon-32x32.png",
+    "assets/nightly/nightly-web-favicon.ico",
     "assets/prod/black-macos-1024.png",
     "assets/prod/black-universal-1024.png",
     "assets/prod/t3-black-web-apple-touch-180.png",
-  ]);
+    "assets/prod/t3-black-web-favicon-16x16.png",
+    "assets/prod/t3-black-web-favicon-32x32.png",
+    "assets/prod/t3-black-web-favicon.ico",
+  ], "every icon a blacksand build shows: Dock, DMG, Linux, splash, browser tab");
   assert.ok(rules.filter((rule) => rule.id.startsWith("desktop/app-icon-")).every((rule) => index.get(rule.id) === "app-icon"), "looks only: one feature");
 });

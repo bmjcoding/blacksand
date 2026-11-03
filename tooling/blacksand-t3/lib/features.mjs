@@ -44,14 +44,14 @@ export const features = [
   {
     name: "wordmark",
     label: "blacksand in the sidebar logo",
-    description: "A muted blacksand after upstream's T3 Code at the top of the sidebar",
+    description: "A muted blacksand centred under upstream's T3 Code at the top of the sidebar",
     rules: ["web/blacksand-sidebar-name"],
   },
   {
     name: "night-sky",
     label: "Desert night sky",
     description: "On nightly builds, a monochrome desert night with the blacksand mark behind the sidebar header and in the send button, called Blacksand artwork in Settings → Appearance",
-    rules: ["web/blacksand-night-sky-file", "web/blacksand-night-sky", "web/blacksand-artwork-label"],
+    rules: ["web/blacksand-night-sky-file", "web/blacksand-night-sky-mark", "web/blacksand-night-sky", "web/blacksand-artwork-label"],
     // blacksand.css carries its fade.
     requires: ["styles"],
   },
@@ -84,7 +84,7 @@ export const features = [
   {
     name: "app-icon",
     label: "blacksand backdrop on the app icon",
-    description: "Upstream's T3 with a night sky, a dune and the blacksand static logo behind it, in the Dock, Finder, launcher and splash, layered for Liquid Glass",
+    description: "Upstream's T3 with a night sky, a silver dune and the blacksand glow logo behind it, in the Dock, Finder, launcher and splash, layered for Liquid Glass",
     rules: ["desktop/app-icon-*"],
   },
   {
