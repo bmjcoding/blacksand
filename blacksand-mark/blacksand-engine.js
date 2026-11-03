@@ -290,23 +290,18 @@ export const smoothstep = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u))
 // The backlight breathes continuously (design panel consensus, replacing the flash on the
 // flip): a raised cosine over exactly one cycle, cresting at phase 0.40, just after the glass
 // settles, so the flip rides the rising swell and the light blooms as the sand lands. Its
-// trough is the approved static look exactly. A hidden source behind the triangle leans
-// sideways with the glass; the halo is brightest on the side it leans toward.
+// trough is the approved static look exactly. The light comes from a source hidden behind the
+// triangle, slightly below centre.
 export const BREATH = { crest: 0.40 };
 export const breathAt = (t) => {
   const { ph } = wrap(t);
   return 0.5 + 0.5 * Math.cos((2 * Math.PI * (ph - BREATH.crest)) / TIMING.cycle);
 };
-// light-source offset in units of the triangle's side, in the triangle's (world) frame,
-// y down: 0.04 below the centroid at rest, swinging 0.04 sideways once per flip. The swing
-// follows linear flip progress u (not the eased rotation, whose peak speed would whip it):
-// sin(2 pi u) is 0 at both ends of the flip, and u does not wrap, so it is continuous.
-export const SOURCE = { down: 0.04, swing: 0.04 };
-export const sourceAt = (t) => {
-  const { ph } = wrap(t);
-  const u = turningAt(ph) ? Math.min(1, Math.max(0, sinceFlip(ph) / TIMING.flip)) : 0;
-  return [SOURCE.swing * Math.sin(2 * Math.PI * u), SOURCE.down];
-};
+// light-source offset in units of the triangle's side, in the triangle's (world) frame, y down:
+// fixed 0.04 below the centroid (the base runs warmer). The light never moves on its own (design
+// panel: any autonomous lean competes with the breath); only the opt-in pointer light moves it.
+export const SOURCE = { down: 0.04 };
+export const sourceAt = () => [0, SOURCE.down];
 
 // ------------------------------------------------------------------- PRNG ---
 
@@ -728,7 +723,17 @@ export function createSim(G, C, seed = 7) {
   return { stateAt, get t() { return t; }, DT };
 }
 
-// the static logo / poster / reduced-motion frame: part-way through a pour, stream in front
+// The static logo's line (design panel): one solid flat line from the apex to the base, in front
+// of everything, clipped to the triangle, butt caps. In the static logo it replaces the grain
+// stream, its core, the neck column and the splash: a still logo, not a frame of the pour.
+// Widths in mark units: master (marks >= 128 px) and the small cut (24-127 px).
+export const STATIC_LINE = { tone: '#8e8e8e', toneLight: '#b8b8b8', master: 8, small: 16,
+  // the line runs to the apex in every variant. In the no-glow mark its inner edge band (#3a3a3a)
+  // is drawn over it, so the band stays continuous across the tip and the line runs up under it;
+  // the glow and light marks have no band, so the line runs into the tip, clipped by the triangle.
+  // Band: 8 units (master), 12 (small cuts)
+  bandMaster: 8, bandSmall: 12 };
+// the static logo / reduced-motion frame: part-way through a pour, with the static line
 export const STATIC_PHASE = 2.5;
 // playback opens upright with the pour already under way
 export const OPEN_PHASE = 0.6;

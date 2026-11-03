@@ -1,8 +1,10 @@
 // Renders the preview video and the still from the standalone demo (file://).
 //   node tools/preview.mjs video [outdir]   1920x1080 @ 60 fps, two full cycles (703 frames),
 //                                           opening at phase 0.6, mark 480 px; libx264 -tune grain CRF 14, full range.
-//   node tools/preview.mjs still [outdir]   1600x1000 @ 2x, mark 440 px, phase 2.5, stream in front.
-//   node tools/preview.mjs mark  [outdir]   blacksand_mark@2x.png from blacksand_mark_on_black.svg.
+//   node tools/preview.mjs still [outdir]   1600x1000 @ 2x, mark 440 px: the static logo frame (the
+//                                           still / reduced-motion look: static line, glow at rest).
+//   node tools/preview.mjs poster [outdir]  1600x1000 @ 2x, mark 440 px: the first played frame.
+//   node tools/preview.mjs mark  [outdir]   blacksand_mark@2x.png: the default mark, transparent, 1024 px wide.
 // Frames are written to a scratch directory (FRAMES env var, default /tmp/blacksand-frames).
 import fs from 'node:fs';
 import os from 'node:os';
@@ -37,19 +39,26 @@ if (what === 'video') {
   console.log(mp4, fs.statSync(mp4).size, 'bytes,', n, 'frames');
 } else if (what === 'still') {
   const dir = path.join(FRAMES, 'still');
-  // the poster is the static logo frame: stream in front, the glow at rest (breath off)
+  // the static logo frame (the still / reduced-motion look): static line, the glow at rest
   await capture({ out: dir, times: [STATIC_PHASE], w: 1600, h: 1000, dpr: 2, mark: 440, layer: 'front', debug: 'breath' });
   fs.copyFileSync(path.join(dir, 'f00000.png'), path.join(out, 'blacksand_hero_still@2x.png'));
   console.log('blacksand_hero_still@2x.png');
+} else if (what === 'poster') {
+  // the hero's poster: exactly the first frame the animation plays (no pop on play)
+  const dir = path.join(FRAMES, 'poster');
+  await capture({ out: dir, times: [OPEN_PHASE], w: 1600, h: 1000, dpr: 2, mark: 440 });
+  fs.copyFileSync(path.join(dir, 'f00000.png'), path.join(out, 'blacksand_hero_poster@2x.png'));
+  console.log('blacksand_hero_poster@2x.png');
 } else if (what === 'mark') {
   const b = await chromium.launch({ args: ['--no-sandbox'] });
   const html = path.join(FRAMES, 'mark.html');
   fs.mkdirSync(FRAMES, { recursive: true });
-  fs.writeFileSync(html, `<body style="margin:0;background:#000"><img src="file://${PKG}/blacksand_mark_on_black.svg" style="width:1324px;height:1200px;display:block"></body>`);
-  const p = await b.newPage({ viewport: { width: 1324, height: 1200 }, deviceScaleFactor: 2 });
+  // the default mark (no glow), transparent background, 1024 px wide at 2x
+  fs.writeFileSync(html, `<body style="margin:0;background:transparent"><img src="file://${PKG}/blacksand_mark.svg" style="width:512px;display:block"></body>`);
+  const p = await b.newPage({ viewport: { width: 512, height: Math.round(512 * 772 / 944) }, deviceScaleFactor: 2 });
   await p.goto('file://' + html);
   await p.waitForTimeout(500);
-  await p.screenshot({ path: path.join(out, 'blacksand_mark@2x.png') });
+  await p.screenshot({ path: path.join(out, 'blacksand_mark@2x.png'), omitBackground: true });
   await b.close();
   console.log('blacksand_mark@2x.png');
 }

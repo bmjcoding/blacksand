@@ -86,11 +86,11 @@ Agreed spec, implemented:
    the halo toward the source offset o.
 4. Breath b = ½ + ½·cos(2π(ph − 0.40)/cycle), cresting at phase 0.40, after the glass settles at 0.392.
    The rim gains 15%·b and the pool 10%·b. The old flare is deleted, and there is no dead time.
-5. The source sits 0.04 S below the centroid and swings 0.04 S·sin(2πu) sideways, u being linear flip
-   progress. It is continuous across the wrap.
+5. The source sits 0.04 S below the centroid. A sideways swing was shipped first and removed after the
+   owner's review (see below).
 6. Pointer light: opt-in, fine pointer only. It reaches 0.10 S, within ±100° of straight down, and its reach
    fades to nothing past that arc (so the light never swings round the base). It rides critically damped
-   springs (0.6 s settle) and lets go on leave or after 2.5 s idle. The halo factor is h = b + 0.5·a·(1 − b),
+   springs (0.6 s settle, slowed to 1.2 s after review 2) and lets go on leave or after 2.5 s idle. The halo factor is h = b + 0.5·a·(1 − b),
    and the rim also gains ×(1 + 0.25·a·max(0, w − 1)).
 7. Grain: the fixed per-pixel dither only.
 8. MP4: `-tune grain`, CRF 14, full-range 8-bit (see "Preview video and still").
@@ -114,6 +114,66 @@ Changes after implementation, agreed by both designers:
 - Swing profile. sin(2·rot) whipped the source at the easing's peak, giving 4 levels per frame at the edge.
   Linear flip progress halves its peak rate: 2.0 levels per frame, with the lean ratio still 1.87.
 
+## Owner review 2: the swing was too quick; a true static logo
+
+Owner: "that left right glow is very harsh - way too quick. not sure how the design reviewers signed off on
+that fast animation … the still logo needs work … make the line more of a line and less of the sand stream,
+that way we have an actual static logo and then an animated one."
+
+The panel's miss: the swing (±0.04 S, out and back within the 0.85 s flip, about 0.4 s each way) was checked
+only against per-frame pixel limits and lean visibility, never tempo. The new criterion is K5: the angular
+rate of the light's lean, measured from the source offset. It must be at most 20°/s for anything autonomous
+and at most 60°/s for the pointer.
+
+Agreed and implemented:
+
+- **Glow.** No autonomous lean: the source is fixed 0.04 S below centre, and the flip swing is deleted.
+  A slow two-cycle drift was proposed and rejected, because it competes with the breath and is a gentler
+  version of the motion the owner rejected. The pointer light now settles in 1.2 s (was 0.6 s), and its lean
+  turns at most 60°/s. Live test with fast mouse flicks: the maximum was 60.0°/s, and it lets go fully when
+  idle.
+- **Static logo.** First proposal: one flat line from the apex to the base, replacing the grain stream. The owner
+  had not approved it; it was revised over three more reviews (below).
+
+## Owner reviews 3–5: the static logo
+
+Owner, review 3: the line "should just stop at the sand mound like it did before … I see blur here in the
+sand … the bottom glow is throwing me off … there's a halo around the entire triangle yet [only] the bottom
+glow … how we would style the static logo for a light background … [and] a version that doesn't have the outer
+glow." Review 4: "the line overlapping the edge at the apex doesn't look good … a few px in the apex [on white]
+look off … tone down the brightness of the line … a few hues darker." The panel's first apex fix started the
+line below the tip; the owner rejected the gap ("the line should still go to the apex"). Review 5: the default
+was right; on the light and glow marks the line should reach the apex too. The owner approved the result and
+the renames.
+
+Agreed and implemented (panel consensus each round; the owner's instructions taken as given):
+
+- **Line.** From the apex at x 512 down into the bottom mound. It ends 6 units under the mound's peak and the
+  pile covers its end. Tone #8e8e8e (#b8b8b8 on the light mark), 12 levels darker than first proposed.
+  8 units in the masters, 16 in the small cuts.
+- **Apex.** On the no-glow mark the #3a3a3a inner edge band (8 units in the master, 12 in the cut) is drawn
+  over the line, so the band runs unbroken across the tip and the line runs up under it. On the glow and light
+  marks the line runs into the tip, clipped by the triangle. At 40–64 px on white the tip's top pixels take the
+  line's grey: the line is wider than the tip there (flagged to the owner, who approved).
+- **Sand.** Flat, in the approved world-space gradient (#363636 to #5e5e5e). The feTurbulence grain the owner
+  saw as blur is gone from every static file.
+- **Lighting.** The pool is removed from the static files; a rim on all edges with a floor light only beneath
+  was inconsistent. The animated hero keeps its own lighting (rim, pool, breath).
+- **Variants.** `blacksand_mark` is the no-glow default; `_glow` (even rim, no pool) is for black key art;
+  `_light` is for white surfaces. There are lockups for each surface, a black small cut, and the old names
+  kept as aliases (see the README's "Which file" table).
+- **The hero's reduced-motion frame.** The logo's interior (line into the mound, flat sand) under the hero's
+  rest lighting. The poster is the first played frame.
+
+Measured (1x screenshots, triangle height as the size):
+
+- **Light mark at 40 px.** The ring is about 1.8 px. Ring #5c5c5c is 92 levels over black, sand is 46 levels
+  from the ring, and the line is 46 from the sand.
+- **The 16-unit line at 40 px.** Nominal 0.86 px, just under the panel's 1 px floor.
+- **No-glow cut at 64 px.** The edge is 1.04 px and 58 levels over black. The gap from edge to ring is
+  28 units, 2.4 px.
+- **Files.** The default mark is 31 KB, against 108 KB for the old grain-stream file.
+
 ## QA suite (`python3 tools/qa.py <dpr>`), 1200x900 viewport, mark 420 px
 
 All checks passed at 1x and at 2x (device pixel ratio 2, the same viewport), re-run on the final code
@@ -131,10 +191,10 @@ Raw logs: `tools/qa-logs/`.
 | F: neck negative space beside the column pure black | 0 dirty frames over 439 |
 | H1: at rest, blur on == blur off | pixel-identical at 4 instants |
 | H2: blur onset / release, 240 fps difference series | 0 steps (max 0.029 / 0.017) |
-| J: glow smoothness through a whole cycle (outside the mark) | mean per-frame change 0.029 (≤ 0.05), max 0.123 (≤ 0.35), no frame > 3× its neighbours |
+| J: glow smoothness through a whole cycle (outside the mark) | mean per-frame change 0.022 (≤ 0.05), max 0.035 (≤ 0.35), no frame > 3× its neighbours |
 | K1: breath trough is the static rest look | pixel-identical |
-| K2: rim change between 60 fps frames | 99.9th percentile ≤ 2.0 levels, the largest at the flip start |
-| K3: lean at the swing's peak (rot 42.6°) | halo 0.1 S out: 13.0 vs 6.9 levels (ratio 1.87, need ≥ 1.3) |
+| K2: rim change between 60 fps frames | 99.9th percentile 1.0 level (≤ 2.0) |
+| K5: autonomous lean | source offset constant over the cycle (K3, the swing's lean, retired with the swing) |
 | K4: breath visible with the pointer off | +30.1 levels near the base edge, crest vs trough |
 
 Rasteriser noise: two frames 2 µs apart at an ordinary instant differ on 50–60 pixels at 1x, at most 1–2 of
@@ -207,6 +267,6 @@ frames measured in its capture runs took 130–165 ms median with WebGL, the sam
 - Strobing at low refresh rates (30 Hz throttled tabs) cannot be judged from stills; the shutter is fixed at
   1/120 s, a full shutter at 120 Hz and a half shutter at 60 Hz.
 - The glow is the panel's design from screenshots; Vercel's actual implementation could not be inspected.
-- The 2D fallback (no WebGL2) has the breath but not the lean or the pointer light.
+- The 2D fallback (no WebGL2) has the breath but not the pointer light.
 - With the breath, the glow is recomposed every frame. In software rasterisation that full-screen pass dominates the frame
   time (see the performance table); on a GPU it is negligible.

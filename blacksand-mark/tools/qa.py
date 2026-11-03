@@ -323,15 +323,11 @@ def main():
             if q > worst: worst, at = q, mJ[i]['t']
         prev = im
     report(worst <= 2.0, f'K2 rim change between 60 fps frames: 99.9th percentile max {worst:.1f} levels (at t={at})')
-    # K3: at rot 45 deg (the swing's peak) the halo 0.1 side out from the left and right edges
-    #     differs by at least 30% (halo = frame minus the rest render)
-    import math as _m
-    # at the swing's peak (a quarter of the way through the flip)
-    t45 = TM['flow'] + 0.25 * TM['flip']
-    dA, mR = capture('K3', [t45], 'particles,blur'); best = 0
-    dB, _ = capture('K3r', [t45], 'particles,blur,breath')
-    A = load(dA, 0).astype(float); B = load(dB, 0).astype(float)
-    T_ = G['T']; side = G['side']
+    # K5 (tempo): the light never moves on its own: the source offset is constant over the
+    # whole cycle (the pointer light, opt-in and live only, is rate-capped at 60 deg/s in code)
+    xs = [m['source'][0] for m in mJ]; ys = [m['source'][1] for m in mJ]
+    report(max(map(abs, xs)) == 0 and max(ys) == min(ys), f'K5 autonomous lean: source offset constant over the cycle (x range {min(xs)}..{max(xs)})')
+    T_ = G['T']; side = G['side']; import math as _m
     def out_pt(P, Q, frac):
         mx, my = (P[0] + Q[0]) / 2, (P[1] + Q[1]) / 2
         dx, dy = Q[0] - P[0], Q[1] - P[1]; n = _m.hypot(dx, dy); nx, ny = dy / n, -dx / n
@@ -342,10 +338,6 @@ def main():
     def sample(img, pt):
         x = int(ox_ + pt[0] * s0); y = int(oy_ + pt[1] * s0)
         return float(img[y - 3:y + 4, x - 3:x + 4].mean())
-    Lpt = out_pt(T_[0], T_[2], 0.1); Rpt = out_pt(T_[0], T_[1], 0.1)
-    hl = sample(A, Lpt) - sample(B, Lpt); hr = sample(A, Rpt) - sample(B, Rpt)
-    ratio = max(hl, hr) / max(1e-6, min(hl, hr))
-    report(ratio >= 1.3, f'K3 swing peak (u = 0.25), rot {mR[best]["rot"] * 57.2958:.1f} deg the halo 0.1 side out: left {hl:.1f}, right {hr:.1f} levels (ratio {ratio:.2f}, need >= 1.3)')
     # K4: the pulse is visible with the pointer off: crest vs trough, near the base edge
     crest = G['breathCrest']
     dC, _ = capture('K4', [crest, trough], 'particles')

@@ -8,7 +8,7 @@
 //
 // The canvas fills its CSS box. The page behind it should be #000.
 
-import { createGeometry, createChambers, createSim, TIMING, STATIC_PHASE, OPEN_PHASE, STREAM, rotAt, smoothstep, SOURCE } from './blacksand-engine.js';
+import { createGeometry, createChambers, createSim, TIMING, STATIC_PHASE, OPEN_PHASE, STREAM, rotAt, smoothstep, SOURCE, STATIC_LINE } from './blacksand-engine.js';
 
 export const PALETTE = {
   bg: '#000',
@@ -22,8 +22,9 @@ export const PALETTE = {
 export const GLOW = { rim: 0.35, rimBreath: 0.15, poolBreath: 0.10 };
 // pointer light (opt-in): the source follows a fine pointer within this offset (units of the
 // side), confined to the lower arc (within +/-100 deg of straight down), on a critically
-// damped spring; it lets go after the pointer leaves or idles
-export const POINTER = { reach: 0.10, arc: 100, settle: 0.6, idle: 2.5 };
+// damped spring, and its lean (direction from the centroid) turns at most maxLeanRate deg/s;
+// it lets go after the pointer leaves or idles
+export const POINTER = { reach: 0.10, arc: 100, settle: 1.2, idle: 2.5, maxLeanRate: 60 };
 // motion blur: eight samples over a half-frame shutter centred on the frame time, blended
 // with the sharp render by w = smoothstep((travel_px - onset) / width), travel measured at
 // the ring's outer edge. At rest the frame is exactly the sharp render.
@@ -337,7 +338,7 @@ void main() {
     if (surfaceFn) { base(c, L.x0, L.y0); surfacePath(surfaceFn, true, c); c.clip(); }
     base(c, L.x0, L.y0); c.fillStyle = sandGradient(c); c.fillRect(ix - R - 40, iy - R - 40, 2 * R + 80, 2 * R + 80);
     rotate(texRot, c, L.x0, L.y0);
-    c.drawImage(tex, ix - R - 1 / s, iy - R - 1 / s, tex.width / s, tex.height / s);
+    if (streamLayer !== 'front') c.drawImage(tex, ix - R - 1 / s, iy - R - 1 / s, tex.width / s, tex.height / s);   // the still frame's sand is flat
     c.restore();
     if (!surfaceFn || edge <= 0) return;
     // lit surface edge
@@ -356,7 +357,7 @@ void main() {
     if (st.fTop < 1) drawSandBody(L, 'top', topSurface(st), rot, texRot, edgeT);
     if (st.fBot > 0) drawSandBody(L, 'bot', botSurface(st), rot, texRot, edgeB);
     // splash + rolling grains: they live on the mound, ride with the glass, and fade as it turns
-    if (dbg.particles && st.flipFade > 0 && (st.splash.length || st.rollers.length)) {
+    if (dbg.particles && st.flipFade > 0 && streamLayer !== 'front' && (st.splash.length || st.rollers.length)) {
       const c = L.c;
       c.save();
       rotate(rot, c, L.x0, L.y0); chamberPath('bot', c); c.clip();
@@ -577,8 +578,21 @@ void main() {
     for (let k = 0; k < n; k++) {
       const h = dt / n;
       [pointer.a, pointer.va] = spring(pointer.a, pointer.va, pointer.ta, h);
+      const px0 = pointer.x, py0 = pointer.y;
       [pointer.x, pointer.vx] = spring(pointer.x, pointer.vx, pointer.tx, h);
       [pointer.y, pointer.vy] = spring(pointer.y, pointer.vy, pointer.ty, h);
+      // cap how fast the light's direction turns (radius is free)
+      const r0 = Math.hypot(px0, py0), r1 = Math.hypot(pointer.x, pointer.y);
+      if (r0 > 1e-4 && r1 > 1e-4) {
+        const a0 = Math.atan2(px0, py0), a1 = Math.atan2(pointer.x, pointer.y);
+        let da = a1 - a0; da -= 2 * Math.PI * Math.round(da / (2 * Math.PI));
+        const cap = POINTER.maxLeanRate * Math.PI / 180 * h;
+        if (Math.abs(da) > cap) {
+          const a = a0 + Math.sign(da) * cap;
+          pointer.x = r1 * Math.sin(a); pointer.y = r1 * Math.cos(a);
+          pointer.vx = (pointer.x - px0) / h; pointer.vy = (pointer.y - py0) / h;
+        }
+      }
     }
     if (pointer.ta === 0 && pointer.a < 1e-3 && Math.abs(pointer.va) < 1e-3) { pointer.a = 0; pointer.va = 0; }
     pointer.a = Math.max(0, Math.min(1, pointer.a));
@@ -632,7 +646,8 @@ void main() {
 
     // the column goes under both sand bodies: the pile covers its top, the mound its foot,
     // each with its own clean edge, so there is no seam where sand meets stream
-    if (dbg.particles && st.column) drawColumn(st);
+    // the still frame (stream in front) is the static logo: the line replaces the pour
+    if (dbg.particles && st.column && streamLayer !== 'front') drawColumn(st);
     tick('column');
 
     // sand, attached to the glass while it turns
@@ -653,7 +668,7 @@ void main() {
     // While the glass turns it ends where it first meets a wall (the engine's first-hit
     // contact), so a wall never hides part of it: it lands on the wall instead.
     if (showStream && streamLayer !== 'behind') {
-      if (streamLayer === 'front') drawStream(MAIN, st);
+      if (streamLayer === 'front') { /* the static line is drawn last, over the walls */ }
       else {
         const mc = mark.c.getContext('2d');
         clear(mark.c);
@@ -681,6 +696,19 @@ void main() {
       ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(X, box.x0, box.y0);
     }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    // the static logo's line (the still frame only): over the walls, under the bottom mound
+    if (streamLayer === 'front' && dbg.particles) {
+      const triPx = (T[1][1] - T[0][1]) * s;                    // the triangle's height in device px
+      const lw = triPx * 1024 / 740 >= 128 ? STATIC_LINE.master : STATIC_LINE.small;
+      ctx.save();
+      base(); ctx.beginPath(); ctx.moveTo(...T[0]); ctx.lineTo(...T[1]); ctx.lineTo(...T[2]); ctx.closePath(); ctx.clip();
+      // it runs from the apex down into the bottom mound: clipped above the mound's surface
+      // (6 units past the peak, so the pile covers its end)
+      surfacePath((x) => C.mound(st.peak, x), false); ctx.lineTo(ix + R + 24, 0); ctx.lineTo(ix - R - 24, 0); ctx.closePath(); ctx.clip();
+      ctx.beginPath(); ctx.moveTo(ix, T[0][1]); ctx.lineTo(ix, st.peak + 6);
+      ctx.strokeStyle = STATIC_LINE.tone; ctx.lineWidth = lw; ctx.lineCap = 'butt'; ctx.stroke();
+      ctx.restore(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
     tick('walls');
   }
 
@@ -753,5 +781,6 @@ void main() {
     destroy() { stop(); ro.disconnect(); io && io.disconnect(); document.removeEventListener('visibilitychange', onVis); canvas.removeEventListener('pointerenter', onPointer); canvas.removeEventListener('pointermove', onPointer); canvas.removeEventListener('pointerleave', onLeave); if (gl) { const ext = gl.getExtension('WEBGL_lose_context'); ext && ext.loseContext(); } },
     timing: TIMING,
     get glow() { return gl ? 'webgl' : 'canvas2d'; },
+    get pointerState() { return { a: pointer.a, x: pointer.x, y: pointer.y }; },
   };
 }
