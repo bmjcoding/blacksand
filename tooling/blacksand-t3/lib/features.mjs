@@ -51,7 +51,7 @@ export const features = [
     name: "night-sky",
     label: "Desert night sky",
     description: "On nightly builds, a monochrome desert night with the blacksand mark behind the sidebar header and in the send button, called Blacksand artwork in Settings → Appearance",
-    rules: ["web/blacksand-night-sky-file", "web/blacksand-night-sky", "web/blacksand-artwork-label"],
+    rules: ["web/blacksand-night-sky-file", "web/blacksand-night-sky-mark", "web/blacksand-night-sky", "web/blacksand-artwork-label"],
     // blacksand.css carries its fade.
     requires: ["styles"],
   },

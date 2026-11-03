@@ -152,10 +152,20 @@ test("nightly's stage art is the desert night, called Blacksand artwork, with th
   assert.equal(header.replace, '  return variant === "nightly" ? <BlacksandNightSky /> : <DevBlueprintArt />;\n', "dev keeps upstream's blueprint");
   assert.equal(button.replace, '  return variant === "nightly" ? <BlacksandNightSky compact /> : <DevBlueprintArt compact />;\n', "the send button's fill too");
   assert.deepEqual(byId.get("web/blacksand-artwork-label").edits, [{ find: '"Nightly artwork"', replace: '"Blacksand artwork"', count: 4 }], "every place the dropdown names it");
-  // the mark is docs/assets/blacksand.svg's shapes, unaltered
+  // the mark is the app icon's glow logo, in its small cut, generated from blacksand-mark's file
   const sky = file("BlacksandNightSky.tsx");
-  for (const [, d] of file("blacksand.svg").matchAll(/ d="([^"]+)"/g)) assert.ok(sky.includes(`d="${d}"`), `the mark keeps ${d.slice(0, 24)}…`);
-  assert.match(sky, /<circle cx="512\.0" cy="623\.4" r="197\.6" fill="none" stroke="#fff" strokeWidth="34" \/>/);
+  const mark = byId.get("web/blacksand-night-sky-mark");
+  assert.equal(index.get("web/blacksand-night-sky-mark"), "night-sky");
+  assert.equal(mark.file, "apps/web/src/components/blacksandGlowMark.ts");
+  const glowSmall = file("blacksand-mark-glow-small.svg");
+  const markup = JSON.parse(mark.content.match(/export const BLACKSAND_GLOW_MARK = (".*");\n$/)[1]);
+  for (const [, d] of glowSmall.matchAll(/ d="([^"]{40,})"/g)) assert.ok(markup.includes(`d="${d}"`), "the glow logo's geometry, unaltered");
+  assert.match(markup, /<g style="mix-blend-mode:lighten;opacity:0\.3">/, "its stream at 30%, so it doesn't seam through the label");
+  assert.match(sky, /const MARK_OPACITY = 0\.5;/);
+  assert.match(sky, /import \{ BLACKSAND_GLOW_MARK \} from "\.\/blacksandGlowMark";/);
+  // one logo: the sidebar's small cut and the icon's master come from the same build
+  const strip = (svg) => svg.replace(/stroke-width="[\d.]+"/g, "").replace(/stdDeviation="[\d.]+"/g, "").replace(/<rect [^>]*\/>/g, "");
+  assert.equal(strip(glowSmall).replace(/<path d="M512 138V726\.77"[^>]*\/>/g, ""), strip(file("blacksand-mark-glow.svg")).replace(/<path d="M512 138V726\.77"[^>]*\/>/g, ""), "the small cut differs from the master only in its line and glow widths");
   assert.doesNotMatch(sky, /<animate|@keyframes|requestAnimationFrame|feGaussianBlur/, "static, and nothing soft enough to fringe");
   assert.doesNotMatch(sky, /--stage-fade|--app-chrome-background|useBlacksandInterface/, "night in every theme; the dropdown is its only switch");
   const css = file("blacksand.css");
@@ -175,7 +185,6 @@ test("the send button is upstream's: no ring, no composer glow, only a marker th
 
 test("the app icon is upstream's T3 with the blacksand backdrop behind it", async () => {
   const backdrop = await import("../lib/icon-backdrop.mjs");
-  assert.equal(file("blacksand.svg"), fs.readFileSync(new URL("../../../docs/assets/blacksand.svg", import.meta.url), "utf8"), "the sidebar's mark is docs/assets/blacksand.svg");
   for (const id of ["desktop/app-icon-badge", "desktop/app-icon-badge-layer", "desktop/app-icon-backdrop-logo"]) assert.ok(!byId.has(id), `${id} is gone`);
   const assets = rules.filter((rule) => rule.id.startsWith("desktop/app-icon-backdrop-") && rule.kind === "write");
   assert.deepEqual(assets.map((rule) => rule.file.replace("assets/prod/app-icon.icon/Assets/", "")).sort(),
@@ -210,12 +219,22 @@ test("the app icon is upstream's T3 with the blacksand backdrop behind it", asyn
   assert.throws(() => byId.get("desktop/app-icon-backdrop-layers").transform("{}"), /no group with text\.svg/);
   const writes = rules.filter((rule) => rule.id.startsWith("desktop/app-icon-") && rule.kind === "write" && rule.overwrite).map((rule) => rule.file).sort();
   assert.deepEqual(writes, [
+    "apps/web/public/apple-touch-icon.png",
+    "apps/web/public/favicon-16x16.png",
+    "apps/web/public/favicon-32x32.png",
+    "apps/web/public/favicon.ico",
     "assets/nightly/nightly-macos-1024.png",
     "assets/nightly/nightly-universal-1024.png",
     "assets/nightly/nightly-web-apple-touch-180.png",
+    "assets/nightly/nightly-web-favicon-16x16.png",
+    "assets/nightly/nightly-web-favicon-32x32.png",
+    "assets/nightly/nightly-web-favicon.ico",
     "assets/prod/black-macos-1024.png",
     "assets/prod/black-universal-1024.png",
     "assets/prod/t3-black-web-apple-touch-180.png",
-  ]);
+    "assets/prod/t3-black-web-favicon-16x16.png",
+    "assets/prod/t3-black-web-favicon-32x32.png",
+    "assets/prod/t3-black-web-favicon.ico",
+  ], "every icon a blacksand build shows: Dock, DMG, Linux, splash, browser tab");
   assert.ok(rules.filter((rule) => rule.id.startsWith("desktop/app-icon-")).every((rule) => index.get(rule.id) === "app-icon"), "looks only: one feature");
 });

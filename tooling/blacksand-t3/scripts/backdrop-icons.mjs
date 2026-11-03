@@ -7,6 +7,9 @@
 //   shows and clear elsewhere.
 // - lib/files/backdrop-{macos-1024,universal-1024,180}.png: upstream's flat icons with the
 //   whole backdrop drawn behind their T3.
+// - lib/files/backdrop-favicon-{16,32}.png and backdrop-favicon.ico: the browser tab's icon,
+//   the full-bleed icon scaled down as upstream's favicons are (the .ico holds the same seven
+//   sizes as upstream's, each a PNG).
 //
 // Rerun it when upstream changes those icons, or the backdrop or the glow logo changes. Any
 // platform with Chrome or Chromium:
@@ -70,9 +73,66 @@ try {
     const base = pngUrl(path.join(checkout, icon.from));
     save(icon.to, await evaluate(`(${compose})(${JSON.stringify(base)}, ${JSON.stringify(backdrop)}, ${icon.inset})`));
   }
+
+  // 3. favicons, from the full-bleed icon
+  const full = pngUrl(path.join(outDir, "backdrop-universal-1024.png"));
+  const sizes = [16, 24, 32, 48, 64, 128, 256];
+  const scaled = await evaluate(`(${downscale})(${JSON.stringify(full)}, ${JSON.stringify(sizes)})`);
+  const png = (size) => Buffer.from(scaled[size].split(",")[1], "base64");
+  save("backdrop-favicon-16.png", scaled[16]);
+  save("backdrop-favicon-32.png", scaled[32]);
+  fs.writeFileSync(path.join(outDir, "backdrop-favicon.ico"), ico(sizes.map((size) => [size, png(size)])));
+  console.log("backdrop-favicon.ico");
 } finally {
   await chrome.close();
   fs.rmSync(profile, { recursive: true, force: true });
+}
+
+/** An .ico of PNG images (the Vista format every browser reads). */
+function ico(images) {
+  const header = Buffer.alloc(6 + 16 * images.length);
+  header.writeUInt16LE(0, 0);
+  header.writeUInt16LE(1, 2);
+  header.writeUInt16LE(images.length, 4);
+  let offset = header.length;
+  images.forEach(([size, data], i) => {
+    const e = 6 + 16 * i;
+    header.writeUInt8(size >= 256 ? 0 : size, e);
+    header.writeUInt8(size >= 256 ? 0 : size, e + 1);
+    header.writeUInt16LE(1, e + 4);
+    header.writeUInt16LE(32, e + 6);
+    header.writeUInt32LE(data.length, e + 8);
+    header.writeUInt32LE(offset, e + 12);
+    offset += data.length;
+  });
+  return Buffer.concat([header, ...images.map(([, data]) => data)]);
+}
+
+// Runs in the page: the image at each size, halved step by step for a clean small result.
+async function downscale(url, sizes) {
+  const image = new Image();
+  image.src = url;
+  await image.decode();
+  const out = {};
+  for (const size of sizes) {
+    let src = image, w = image.naturalWidth;
+    while (w / 2 >= size) {
+      const c = document.createElement("canvas");
+      c.width = c.height = Math.round(w / 2);
+      const ctx = c.getContext("2d");
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(src, 0, 0, c.width, c.height);
+      src = c;
+      w = c.width;
+    }
+    const c = document.createElement("canvas");
+    c.width = c.height = size;
+    const ctx = c.getContext("2d");
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(src, 0, 0, size, size);
+    out[size] = c.toDataURL("image/png");
+  }
+  return out;
 }
 
 // Runs in the page. Each part as a 1024 PNG; the stream as `whole` where it differs from `under`.

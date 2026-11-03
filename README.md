@@ -2,7 +2,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/blacksand-dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="docs/assets/blacksand-light.svg">
-    <img src="docs/assets/blacksand-light.svg" alt="Blacksand logo" width="120" height="120">
+    <img src="docs/assets/blacksand-light.svg" alt="Blacksand logo" width="120" height="98">
   </picture>
 </p>
 

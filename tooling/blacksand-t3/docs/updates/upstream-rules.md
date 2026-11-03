@@ -59,12 +59,16 @@ Version pill and None.
 Blacksand adds no themes of its own. Use upstream's themes, or add a custom theme to
 change the accent.
 
-The sidebar's mark is [`docs/assets/blacksand.svg`](../../../../docs/assets/blacksand.svg).
-`tooling/blacksand-t3/lib/files/blacksand.svg` is a copy, so the T3 component builds on its
-own. A test keeps the two the same. The icon's logo is the glow logo,
-`tooling/blacksand-t3/lib/files/blacksand-mark-glow.svg`, a copy of what blacksand-mark's
-`tools/build-static.mjs` builds: an even rim of light, and a sand stream that glows from the
-same light. In the icon the stream keeps only its tight halo, so no light reaches the T3.
+One logo runs through all of it: blacksand-mark's glow logo. The icon uses its master,
+`tooling/blacksand-t3/lib/files/blacksand-mark-glow.svg`. The sidebar's sky uses its small
+cut, `tooling/blacksand-t3/lib/files/blacksand-mark-glow-small.svg`, at half strength with
+its stream at 30% so it doesn't seam through the label. A test checks the two cuts are the
+same logo. The README's logo, `docs/assets/blacksand-dark.svg` and `blacksand-light.svg`, is
+the same family's default and light marks. All are copies of what blacksand-mark's
+`tools/build-static.mjs` builds; when that changes, copy them again. The browser tab's icon
+is the app icon scaled down, like upstream's.
+
+The glow logo has an even rim of light, and a sand stream that glows from the same light. In the icon the stream keeps only its tight halo, so no light reaches the T3.
 `tooling/blacksand-t3/lib/icon-backdrop.mjs` lays out the backdrop. The build adds its parts
 to upstream's Icon Composer bundle as layers behind the T3, so with Xcode 26 the icon is
 Liquid Glass. Only the sky is glass. The logo is five flat layers (rim, face, sand, ring
@@ -74,8 +78,8 @@ The rim and the stream are images (`tooling/blacksand-t3/lib/files/icon-*.png`):
 glow is a blur, and the stream is a light that only brightens what's behind it, and Icon
 Composer layers can't be trusted to draw either from SVG. The flat PNGs,
 `tooling/blacksand-t3/lib/files/backdrop-*.png`, cover a build without Xcode 26, DMG
-volumes, Linux and the startup splash: upstream's icons with the same backdrop drawn behind
-the T3. When upstream changes its icons, or the backdrop or the glow logo changes, remake
+volumes, Linux, the startup splash and the browser tab: upstream's icons with the same
+backdrop drawn behind the T3. When upstream changes its icons, or the backdrop or the glow logo changes, remake
 all of them with `tooling/blacksand-t3/scripts/backdrop-icons.mjs`. It runs anywhere Chrome
 or Chromium does, and its first lines say how.
 
