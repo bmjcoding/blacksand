@@ -6,25 +6,19 @@
   </picture>
 </p>
 
-<p align="center"><strong>The secure ground your AI agents run on.</strong></p>
+<h3 align="center">The secure ground your AI agents run on.</h3>
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/badge-alpha-dark.svg">
-    <img src="docs/assets/badge-alpha-light.svg" alt="Alpha" height="20">
+    <img src="docs/assets/badge-alpha-light.svg" alt="Alpha" height="20" align="absmiddle">
   </picture>
+  &nbsp;&nbsp;
+  <a href="#quick-start">Quick start</a>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="docs/security/threat-model.md">Threat model</a>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="docs/README.md">Docs</a>
 </p>
 
-<p align="center">
-  <a href="#quick-start">Quick start</a> ·
-  <a href="docs/security/threat-model.md">Threat model</a> ·
-  <a href="docs/README.md">Docs</a> ·
-  <a href="SECURITY.md">Report a vulnerability</a>
-</p>
-
-Blacksand runs every AI agent in a disposable sandbox. The agent reaches only the hosts you
-allow, never holds your credentials, and every run leaves a record. Use it with Claude Code,
-Codex, or agents you build yourself.
+Blacksand runs AI agents in disposable sandboxes, so they reach only what you allow and never
+hold your keys. It works with Claude Code, Codex, or your own agents.
 
 ## How it works
 
@@ -37,12 +31,12 @@ Codex, or agents you build yourself.
   holds only a token for its own proxy, which expires with the run.
 - **A record of every run.** What ran, where, under which policy, and what changed. Failed
   and cancelled runs get one too.
-- **Signed updates.** Machines take changes only from commits signed by a key you trust,
-  checked locally, so access to the GitHub account alone can't change them.
+- **Signed commits.** Machines update only to commits signed by the owner's key, checked
+  locally, so access to the GitHub account alone can't change them.
 
 ## Install
 
-You need Node.js 24 or later and git.
+You need Node.js 24 or later and git. Run Blacksand as your own user; it refuses root.
 
 ```sh
 git clone https://github.com/bmjcoding/blacksand.git
@@ -50,12 +44,14 @@ cd blacksand
 ./blacksand verify
 ```
 
-`verify` checks the commit signatures in your clone, and that the files on disk match the
-latest commit.
+`verify` reports whether every commit in the clone is signed by a listed key, and whether
+the files on disk match the latest commit. Until your machine has applied a configuration, it
+ends with "not verified" (exit 4).
 
 ## Quick start
 
-The first substrate runs agents on a Kubernetes node:
+Blacksand runs sandboxes in pluggable environments. The first is Kubernetes: prepare a node
+with its [setup guide](substrates/kubernetes/README.md#setup), then:
 
 ```sh
 ./blacksand k8s setup
@@ -66,8 +62,6 @@ The first substrate runs agents on a Kubernetes node:
   --out runs/first-task
 ```
 
-When the run ends, you get the agent's changes as a patch, and the run's record. Setting up a
-machine for the first time? The [Kubernetes guide](substrates/kubernetes/README.md) walks
-through it.
+When the run ends, you get the agent's changes as a patch, and the run's record.
 
 <sub>MIT licensed. To report a vulnerability, see [SECURITY.md](SECURITY.md).</sub>
