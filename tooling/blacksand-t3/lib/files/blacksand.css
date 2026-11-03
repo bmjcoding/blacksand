@@ -41,12 +41,26 @@ html[data-t3b-send="on"] [data-t3b-send][data-stage-art="nightly"] > :first-chil
 
 /* ------------------------------------------------------------ night sky -- */
 
-/* BlacksandNightSky.tsx's desert night ends in the chrome by itself (its nearest
-   dune is the chrome colour), so it drops upstream's mask and fade: they would
-   veil the dunes and band over them. Upstream's own art keeps both. */
+/* BlacksandNightSky.tsx's desert night fades into the chrome, light or dark, like
+   upstream's art, but the fade starts under the far ridge (63% of the 80px box)
+   and eases out to the bottom, so the dunes keep their shape. Upstream's mask
+   starts at 55% and its ::after veil at 28%: they would dim the ridge in dark
+   mode, where the night already meets a black chrome. Upstream's own art keeps
+   both. */
 .sidebar-stage-backdrop:has(> [data-stage-art="blacksand"]) {
-  mask-image: none;
-  -webkit-mask-image: none;
+  --t3b-sky-fade: linear-gradient(
+    to bottom,
+    black 0%,
+    black 63%,
+    rgb(0 0 0 / 86%) 69%,
+    rgb(0 0 0 / 62%) 76%,
+    rgb(0 0 0 / 36%) 83%,
+    rgb(0 0 0 / 15%) 90%,
+    rgb(0 0 0 / 4%) 96%,
+    transparent 100%
+  );
+  mask-image: var(--t3b-sky-fade);
+  -webkit-mask-image: var(--t3b-sky-fade);
 }
 
 .sidebar-stage-backdrop:has(> [data-stage-art="blacksand"])::after {

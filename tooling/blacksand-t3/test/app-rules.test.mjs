@@ -155,7 +155,10 @@ test("nightly's stage art is the desert night, behind its own switch, with the m
   assert.match(sky, /useBlacksandInterface\("sky"\)/);
   assert.doesNotMatch(sky, /<animate|@keyframes|requestAnimationFrame|feGaussianBlur/, "static, and nothing soft enough to fringe");
   assert.match(file("blacksandInterface.ts"), /\n {2}sky: \{\n {4}title: "Desert night sky",/);
-  assert.match(file("blacksand.css"), /\.sidebar-stage-backdrop:has\(> \[data-stage-art="blacksand"\]\) \{\n {2}mask-image: none;/);
+  const css = file("blacksand.css");
+  assert.match(css, /\.sidebar-stage-backdrop:has\(> \[data-stage-art="blacksand"\]\) \{\n {2}--t3b-sky-fade: linear-gradient\(\n {4}to bottom,\n {4}black 0%,\n {4}black 63%,/, "it fades into the chrome, from under the far ridge");
+  assert.match(css, /mask-image: var\(--t3b-sky-fade\);\n {2}-webkit-mask-image: var\(--t3b-sky-fade\);/);
+  assert.doesNotMatch(sky, /--stage-fade|--app-chrome-background/, "the scene itself is night in every theme; only the fade meets the chrome");
 });
 
 test("the app icon is upstream's with the blacksand badge in front", () => {

@@ -44,8 +44,9 @@ upstream's too, with a muted "blacksand" after it. A few touches follow whicheve
 theme you pick: a ringed send button, a version stamp and accent text selection.
 On nightly builds, a monochrome desert night replaces upstream's starry sky behind
 the sidebar header: dunes along the bottom, and the blacksand mark pressed faintly
-into the sky under the sidebar's "blacksand". It is static, and it stays put when
-you resize the sidebar. Each of these has its own switch in **Settings → Appearance
+into the sky under the sidebar's "blacksand". It fades into the sidebar like
+upstream's art, in light mode and dark. It is static, and it stays put when you
+resize the sidebar. Each of these has its own switch in **Settings → Appearance
 → Interface**; with the desert night switched off, nightly shows upstream's sky.
 Blacksand adds no themes of its own. Use upstream's themes, or add a custom theme to
 change the accent.

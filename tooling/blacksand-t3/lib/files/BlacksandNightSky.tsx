@@ -5,9 +5,8 @@
 //
 // Same frame as upstream's art: a 96-unit-tall viewBox, left-anchored and sliced, so a
 // unit is 80/96 css px in the sidebar's 80px header box. Everything is placed in sky
-// coordinates and never moves when the sidebar is resized. blacksand.css drops
-// upstream's mask and fade for this art: its nearest dune is the chrome colour, so it
-// ends in the chrome by itself.
+// coordinates and never moves when the sidebar is resized. The scene is night in every
+// theme; blacksand.css fades it into the chrome, light or dark, from under the far ridge.
 
 import { useId, type ReactElement } from "react";
 
@@ -83,7 +82,8 @@ const FAR_PATH = ridgePath(FAR);
 const MIDDLE_PATH = ridgePath(MIDDLE);
 const NEAR_PATH = ridgePath(NEAR);
 
-const fade = "var(--stage-fade, var(--app-chrome-background))";
+// the night is night in every theme; the backdrop fades it into the chrome, light or dark
+const NIGHT = "#0d0d0e";
 
 function DesertNightArt({ compact = false }: { compact?: boolean }) {
   const id = useId().replaceAll(":", "");
@@ -138,9 +138,9 @@ function DesertNightArt({ compact = false }: { compact?: boolean }) {
               <path d={MIDDLE_PATH} fill={`url(#${middleFill})`} />
             </pattern>
             <linearGradient id={nearFill} x1="0" y1={round((NEAR.base - NEAR.amp * 1.4) * U)} x2="0" y2={round((NEAR.base + 7) * U)} gradientUnits="userSpaceOnUse">
-              <stop style={{ stopColor: `color-mix(in srgb, ${fade} 80%, #4a4a50)` }} />
-              <stop offset="0.55" style={{ stopColor: fade }} />
-              <stop offset="1" style={{ stopColor: fade }} />
+              <stop style={{ stopColor: `color-mix(in srgb, ${NIGHT} 80%, #4a4a50)` }} />
+              <stop offset="0.55" style={{ stopColor: NIGHT }} />
+              <stop offset="1" style={{ stopColor: NIGHT }} />
             </linearGradient>
             <pattern id={far} width={FAR.period} height="96" x={FAR.offset} patternUnits="userSpaceOnUse">
               <path d={FAR_PATH} fill={`url(#${farFill})`} />
