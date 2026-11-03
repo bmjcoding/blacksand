@@ -1,0 +1,1559 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>blacksand</title>
+<style>
+  html,body{margin:0;height:100%;background:#000}
+  .hero{position:relative;height:100vh;background:#000}
+  .hero canvas{display:block;width:100%;height:100%}
+</style>
+</head>
+<body>
+<section class="hero"><canvas id="blacksand" aria-label="blacksand" role="img"></canvas></section>
+<script>
+(() => {
+// blacksand-engine.js
+// Pure geometry + sand simulation for the blacksand mark. No DOM. Shared by the
+// canvas hero renderer (browser) and the static SVG builder (node), so the static
+// logo and the animation come from identical state.
+//
+// Coordinate space: the 1024x1024 mark space of blacksand_v3.svg (y down).
+
+const DEG = Math.PI / 180;
+
+// ---------------------------------------------------------------- geometry ---
+
+function insetTri(T, d) {
+  const n = T.length;
+  const cx = T.reduce((s, p) => s + p[0], 0) / n;
+  const cy = T.reduce((s, p) => s + p[1], 0) / n;
+  const lines = T.map((p, i) => {
+    const q = T[(i + 1) % n];
+    const dx = q[0] - p[0], dy = q[1] - p[1], len = Math.hypot(dx, dy);
+    let nx = -dy / len, ny = dx / len;
+    const mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2;
+    if ((cx - mx) * nx + (cy - my) * ny < 0) { nx = -nx; ny = -ny; }
+    return { p: [p[0] + nx * d, p[1] + ny * d], r: [dx, dy] };
+  });
+  return lines.map((_, i) => {
+    const a = lines[(i + n - 1) % n], b = lines[i];
+    const den = a.r[0] * b.r[1] - a.r[1] * b.r[0];
+    const t = ((b.p[0] - a.p[0]) * b.r[1] - (b.p[1] - a.p[1]) * b.r[0]) / den;
+    return [a.p[0] + t * a.r[0], a.p[1] + t * a.r[1]];
+  });
+}
+
+function incircle([[ax, ay], [bx, by], [cx, cy]]) {
+  const a = Math.hypot(bx - cx, by - cy), b = Math.hypot(ax - cx, ay - cy), c = Math.hypot(ax - bx, ay - by);
+  const p = a + b + c;
+  const area = Math.abs((bx - ax) * (cy - ay) - (cx - ax) * (by - ay)) / 2;
+  return [(a * ax + b * bx + c * cx) / p, (a * ay + b * by + c * cy) / p, (2 * area) / p];
+}
+
+function createGeometry(opts = {}) {
+  const T = [[512, 138], [968, 878], [56, 878]];   // triangle face (solid black in the backlit treatment)
+  const Ti = insetTri(T, 40);                      // inner contour of the white-outline version; fixes the ring
+  const [ix, iy, ir] = incircle(Ti);
+  const H = 34;                                    // ring stroke
+  const L = 22;                                    // wall stroke
+  const R = ir - H / 2;                            // ring centreline radius
+  const Rin = R - H / 2;                           // visible chamber radius (inner edge of ring)
+  const th = 40 * DEG;
+  const rim = (a) => [ix + R * Math.sin(a), iy - R * Math.cos(a)];
+  const tl = rim(-th), tr = rim(th), bl = rim(Math.PI + th), br = rim(Math.PI - th);
+  // The walls pinch to an opening of 2a between their inner faces. Solve for the centreline
+  // half-width nk so the inner faces meet exactly at x = ix +/- a (the wall angle depends on nk).
+  const a = opts.opening ?? 5;
+  let nk = opts.neck ?? a + L;
+  if (opts.neck == null) {
+    for (let k = 0; k < 60; k++) {
+      const sl = (br[1] - iy) / (br[0] - (ix + nk));
+      nk = a + (L / 2) / Math.sin(Math.atan(sl));
+    }
+  }
+  const NL = [ix - nk, iy], NR = [ix + nk, iy];
+  // right bottom wall: NR -> br. slope dy/dx, and vertical offset of its inner face
+  const slope = (br[1] - iy) / (br[0] - NR[0]);
+  const alpha = Math.atan(slope);
+  const wallV = (L / 2) / Math.cos(alpha);
+  const hx = (L / 2) / Math.sin(alpha);            // horizontal half-thickness of a wall
+  return { T, Ti, ix, iy, R, Rin, H, L, tl, tr, bl, br, nk, NL, NR, slope, wallV, hx, a: nk - hx, apex: T[0] };
+}
+
+// ---------------------------------------------------- chamber column model ---
+// Volume conservation: the top chamber loses exactly the area the bottom gains.
+// Each chamber is integrated column by column over its visible interior.
+
+const K_BOT = Math.tan(33 * DEG);   // mound flank: angle of repose
+const K_TOP = Math.tan(24 * DEG);   // crater walls in the draining chamber
+const RHO = 7;                      // tip rounding of mound / crater
+const CRATER_W = 0.25;              // centre zone of the crater (fraction of Rin) whose slope eases
+const CRATER_KMIN = 0.5;            // its slope factor while only the thinned stream lands
+
+const smoothAbs = (dx) => Math.sqrt(dx * dx + RHO * RHO) - RHO;
+
+function createChambers(G) {
+  const { ix, iy, Rin, nk, slope, wallV } = G;
+  const xs = [], loB = [], hiB = [];
+  for (let x = ix - Rin + 0.5; x < ix + Rin; x += 1) {
+    const dx = x - ix;
+    const lineR = iy + (x - (ix + nk)) * slope;
+    const lineL = iy + ((ix - nk) - x) * slope;
+    xs.push(x);
+    loB.push(Math.max(iy, lineR + wallV, lineL + wallV));
+    hiB.push(iy + Math.sqrt(Rin * Rin - dx * dx));
+  }
+  // top chamber is the point reflection of the bottom one through (ix, iy)
+  const n = xs.length;
+  const loT = new Array(n), hiT = new Array(n);
+  for (let i = 0; i < n; i++) { loT[i] = 2 * iy - hiB[n - 1 - i]; hiT[i] = 2 * iy - loB[n - 1 - i]; }
+
+  let full = 0;
+  for (let i = 0; i < n; i++) full += Math.max(0, hiB[i] - loB[i]);
+
+  const mound = (p, x) => p + K_BOT * smoothAbs(x - ix);
+  // crater profile; within CRATER_W of the centre its slope is scaled by k (k = 1: the plain
+  // crater; k < 1 while only a thin stream lands on it, so it does not look drilled)
+  const CW = CRATER_W * Rin, saW = smoothAbs(CW);
+  const shapeTop = (dx, k) => { const d = Math.abs(dx); return d < CW ? k * smoothAbs(d) : k * saW + (smoothAbs(d) - saW); };
+  const crater = (c, x, k = 1) => c - K_TOP * shapeTop(x - ix, k);
+
+  const sa = xs.map((x) => smoothAbs(x - ix));
+  const areaBot = (p) => { let a = 0; for (let i = 0; i < n; i++) { const d = hiB[i] - Math.max(loB[i], p + K_BOT * sa[i]); if (d > 0) a += d; } return a; };
+  const areaTopK = (k) => { const sh = xs.map((x) => shapeTop(x - ix, k)); return (c) => { let a = 0; for (let i = 0; i < n; i++) { const d = hiT[i] - Math.max(loT[i], c - K_TOP * sh[i]); if (d > 0) a += d; } return a; }; };
+
+  // search ranges that bracket "full" and "empty"
+  const pFull = iy - K_BOT * Rin - 20, pEmpty = iy + Rin + 2;
+  // "full" sits wholly under the ring stroke, so a full chamber shows no surface line at all
+  const cFull = iy - G.R - G.H / 2 - 4, cEmpty = iy + K_TOP * Rin * 1.2 + 40;
+
+  function solve(fn, lo, hi, target) {           // fn decreasing in its argument
+    while (hi - lo > 1e-5) { const m = (lo + hi) / 2; if (fn(m) > target) lo = m; else hi = m; }
+    return (lo + hi) / 2;
+  }
+  // f = fraction of sand that has left the top / landed in the bottom. Both levels are
+  // solved once on a fine grid (the sim asks 240 times a second) and read back linearly;
+  // the grid is fine enough that the error is well under a tenth of a unit.
+  // The grid is square-spaced (dense near empty, where a level rises like sqrt(f)).
+  const NT = 512;
+  const peakTab = new Float64Array(NT + 1);
+  const KS = [CRATER_KMIN, (CRATER_KMIN + 1) / 2, 1];        // crater tables for these slope factors
+  const craterTabs = KS.map(() => new Float64Array(NT + 1));
+  const areaTops = KS.map(areaTopK);
+  peakTab[0] = pEmpty; craterTabs.forEach((tb) => { tb[0] = cFull; });
+  for (let i = 1; i <= NT; i++) {
+    const f = Math.min(1 - 1e-7, (i / NT) * (i / NT));   // the last cell stops just short of full
+    peakTab[i] = solve(areaBot, pFull, peakTab[i - 1], f * full);
+    KS.forEach((_, j) => { craterTabs[j][i] = solve(areaTops[j], craterTabs[j][i - 1], cEmpty, (1 - f) * full); });
+  }
+  const lookup = (tab, f, endVal) => {
+    if (f <= 0) return tab[0];
+    if (f >= 1) return endVal;                             // full / empty: no surface at all
+    const x = Math.sqrt(f) * NT, i = Math.min(NT - 1, Math.floor(x)), u = x - i;
+    return tab[i] + (tab[i + 1] - tab[i]) * u;
+  };
+  const peakFor = (f) => lookup(peakTab, f, pFull);
+  // level for a fraction drained and a crater slope factor k (linear between the tables)
+  const craterFor = (f, k = 1) => {
+    const kk = Math.min(1, Math.max(CRATER_KMIN, k));
+    const j = kk <= KS[1] ? 0 : 1, u = (kk - KS[j]) / (KS[j + 1] - KS[j]);
+    const a = lookup(craterTabs[j], f, cEmpty), b = lookup(craterTabs[j + 1], f, cEmpty);
+    return a + (b - a) * u;
+  };
+
+  // where a falling grain stops: visible floor, or the sand surface, whichever is higher.
+  // The floor is a circle about the pivot, so for the world-vertical column through the
+  // pivot this is also right while the glass is still turning (the mound is negligible then).
+  function impactY(p, x) {
+    const dx = x - ix;
+    if (Math.abs(dx) >= Rin) return iy + 0;
+    const floor = iy + Math.sqrt(Rin * Rin - dx * dx);
+    const lineR = iy + (x - (ix + nk)) * slope + wallV;
+    const lineL = iy + ((ix - nk) - x) * slope + wallV;
+    const lo = Math.max(iy, lineR, lineL);
+    return Math.min(floor, Math.max(mound(p, x), lo));
+  }
+  return { full, peakFor, craterFor, mound, crater, impactY, K_BOT, K_TOP, pFull, pEmpty, cFull, cEmpty };
+}
+
+// --------------------------------------------------------------- timeline ---
+// Phase zero is the 148 deg point of the flip: the moment the neck starts to flow again,
+// world-vertical from the pivot, while the glass is still turning. The glass settles at
+// landEnd, the top runs dry at flow, and the flip begins at that very instant (no settle).
+// The clock is an integer number of 1/240 s steps, so every boundary is exact.
+
+const DT = 1 / 240;
+const TIMING = {
+  flow: 5.4,                 // neck flow, from phase zero until the top runs dry
+  flip: 0.85,                // 180 deg, cubic-bezier(0.4, 0, 0.2, 1)
+  restart: 110 * DT,         // time into the flip at which the neck flows again (147.7 deg)
+  ramp: 0.12,                // flow rate ramps in over this long, then the mass rate is constant
+};
+TIMING.cycle = TIMING.flow + TIMING.restart;            // 1406 steps = 5.858333 s
+TIMING.landEnd = TIMING.flip - TIMING.restart;          // phase at which the vessel settles
+TIMING.flipStart = TIMING.flow;
+TIMING.steps = Math.round(TIMING.cycle / DT);
+
+// CSS cubic-bezier(0.4, 0, 0.2, 1): y(x) and dy/dx
+function cubicBezier(p1x, p1y, p2x, p2y) {
+  const X = (u) => 3 * (1 - u) * (1 - u) * u * p1x + 3 * (1 - u) * u * u * p2x + u * u * u;
+  const Y = (u) => 3 * (1 - u) * (1 - u) * u * p1y + 3 * (1 - u) * u * u * p2y + u * u * u;
+  const dX = (u) => 3 * (1 - u) * (1 - u) * p1x + 6 * (1 - u) * u * (p2x - p1x) + 3 * u * u * (1 - p2x);
+  const dY = (u) => 3 * (1 - u) * (1 - u) * p1y + 6 * (1 - u) * u * (p2y - p1y) + 3 * u * u * (1 - p2y);
+  const uFor = (x) => { let lo = 0, hi = 1; for (let i = 0; i < 50; i++) { const m = (lo + hi) / 2; if (X(m) < x) lo = m; else hi = m; } return (lo + hi) / 2; };
+  return {
+    at: (x) => (x <= 0 ? 0 : x >= 1 ? 1 : Y(uFor(x))),
+    slope: (x) => { if (x <= 0 || x >= 1) return 0; const u = uFor(x); return dY(u) / dX(u); },
+  };
+}
+const FLIP_EASE = cubicBezier(0.4, 0, 0.2, 1);
+
+const wrap = (t) => { const k = Math.floor(t / TIMING.cycle); return { k, ph: t - k * TIMING.cycle }; };
+
+// time since the most recent flip began, for a phase (the flip straddles the wrap)
+const sinceFlip = (ph) => (ph >= TIMING.flow ? ph - TIMING.flow : ph + TIMING.restart);
+
+// glass rotation for a phase, in this cycle's frame: -32 deg .. 0 while landing, 0 while
+// pouring, 0 .. 148 deg while flipping
+function rotAt(ph) {
+  const { flow, flip, landEnd } = TIMING;
+  if (ph < landEnd) return Math.PI * FLIP_EASE.at((ph + TIMING.restart) / flip) - Math.PI;
+  if (ph < flow) return 0;
+  return Math.PI * FLIP_EASE.at((ph - flow) / flip);
+}
+// angular speed (rad/s), always >= 0
+function omegaAt(ph) {
+  const { flow, flip, landEnd } = TIMING;
+  if (ph >= landEnd && ph < flow) return 0;
+  return Math.PI * FLIP_EASE.slope(sinceFlip(ph) / flip) / flip;
+}
+
+// cumulative flow: fraction of the top chamber that has passed the neck by phase p
+function flowQ(p) {
+  const { flow, ramp } = TIMING;
+  const r = 1 / (flow - ramp / 2);
+  if (p <= 0) return 0;
+  if (p < ramp) return r * p * p / (2 * ramp);
+  if (p < flow) return r * (p - ramp / 2);
+  return 1;
+}
+const flowRate = (p) => (p < 0 || p >= TIMING.flow ? 0 : Math.min(1, p / TIMING.ramp));
+
+// apex emission (fraction of the full rate) by phase. The stream never stops: it thins to
+// 30% as the top runs dry, holds through the fast part of the flip, and recovers so that full
+// density reaches the pile after the glass has settled.
+const EMIT = { downStart: 5.05, downEnd: 5.35, upStart: 5.55, upEnd: 5.85, low: 0.3 };
+function emissionAt(ph) {
+  const { downStart, downEnd, upStart, upEnd, low } = EMIT;
+  if (ph < downStart || ph >= upEnd) return 1;
+  if (ph < downEnd) { const u = (ph - downStart) / (downEnd - downStart); return 1 - (1 - low) * (1 - (1 - u) ** 3); }   // ease-out
+  if (ph < upStart) return low;
+  const u = (ph - upStart) / (upEnd - upStart); return low + (1 - low) * u ** 3;                                          // ease-in
+}
+const phaseOf = (t) => { const k = Math.floor(t / TIMING.cycle); return t - k * TIMING.cycle; };
+// time for an apex grain to fall to the top pile, near the ring top
+const FALL_TO_PILE = 0.45;
+// crater slope factor: eased while a thinned stream lands on the pile
+const craterKAt = (ph) => 1 - (1 - emissionAt(phaseOf(ph - FALL_TO_PILE))) * (1 - CRATER_KMIN) / (1 - EMIT.low);
+// the glass turns (anything but the upright pour)
+const turningAt = (ph) => ph >= TIMING.flow || ph < TIMING.landEnd;
+// rotation unwrapped across cycles (continuous in absolute time)
+const rotUnwrapped = (t) => { const k = Math.floor(t / TIMING.cycle); return rotAt(t - k * TIMING.cycle) + Math.PI * k; };
+
+// -------------------------------------------------------------- the walls ---
+// Each side wall is the stroke of a polyline rim -> neck -> rim, width L, mitred at the neck:
+// a hexagon in glass space. The stream ends at the first wall surface on its vertical line.
+function wallPolygons(G) {
+  const h = G.L / 2;
+  const side = (P0, P1, P2) => {
+    const nrm = (a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy); return [dx / l, dy / l]; };
+    const d1 = nrm(P0, P1), d2 = nrm(P1, P2), n1 = [-d1[1], d1[0]], n2 = [-d2[1], d2[0]];
+    const meet = (s) => {                         // intersection of the two offset lines
+      const a = [P0[0] + n1[0] * h * s, P0[1] + n1[1] * h * s], b = [P1[0] + n2[0] * h * s, P1[1] + n2[1] * h * s];
+      const den = d1[0] * d2[1] - d1[1] * d2[0];
+      const u = ((b[0] - a[0]) * d2[1] - (b[1] - a[1]) * d2[0]) / den;
+      return [a[0] + d1[0] * u, a[1] + d1[1] * u];
+    };
+    return [[P0[0] + n1[0] * h, P0[1] + n1[1] * h], meet(1), [P2[0] + n2[0] * h, P2[1] + n2[1] * h],
+      [P2[0] - n2[0] * h, P2[1] - n2[1] * h], meet(-1), [P0[0] - n1[0] * h, P0[1] - n1[1] * h]];
+  };
+  return [side(G.tl, G.NL, G.bl), side(G.tr, G.NR, G.br)];
+}
+// first wall hit on the world-vertical line x, falling from yTop, with the glass at rotation
+// rot: { y, hit, a, b } (a, b: the hit edge's end points in world space). No hit: y = G.iy.
+function wallContact(G, polys, rot, x, yTop) {
+  const c = Math.cos(rot), s = Math.sin(rot);
+  const W = (p) => [G.ix + (p[0] - G.ix) * c - (p[1] - G.iy) * s, G.iy + (p[0] - G.ix) * s + (p[1] - G.iy) * c];
+  let best = { y: G.iy, hit: false };
+  for (const poly of polys) {
+    const P = poly.map(W);
+    for (let i = 0; i < P.length; i++) {
+      const a = P[i], b = P[(i + 1) % P.length];
+      if ((a[0] - x) * (b[0] - x) > 0 || a[0] === b[0]) continue;
+      const y = a[1] + ((x - a[0]) / (b[0] - a[0])) * (b[1] - a[1]);
+      // edges 2 and 5 are the butt ends under the ring; the others are the long faces
+      if (y > yTop && y < best.y) best = { y, hit: true, a, b, face: i !== 2 && i !== 5 };
+    }
+  }
+  return best;
+}
+
+const smoothstep = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
+
+// ------------------------------------------------------------------ glow ---
+// The backlight breathes continuously (design panel consensus, replacing the flash on the
+// flip): a raised cosine over exactly one cycle, cresting at phase 0.40, just after the glass
+// settles, so the flip rides the rising swell and the light blooms as the sand lands. Its
+// trough is the approved static look exactly. The light comes from a source hidden behind the
+// triangle, slightly below centre.
+const BREATH = { crest: 0.40 };
+const breathAt = (t) => {
+  const { ph } = wrap(t);
+  return 0.5 + 0.5 * Math.cos((2 * Math.PI * (ph - BREATH.crest)) / TIMING.cycle);
+};
+// light-source offset in units of the triangle's side, in the triangle's (world) frame, y down:
+// fixed 0.04 below the centroid (the base runs warmer). The light never moves on its own (design
+// panel: any autonomous lean competes with the breath); only the opt-in pointer light moves it.
+const SOURCE = { down: 0.04 };
+const sourceAt = () => [0, SOURCE.down];
+
+// ------------------------------------------------------------------- PRNG ---
+
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// ------------------------------------------------------------- simulation ---
+// Fixed-step, seeded, deterministic. Grain positions are evaluated analytically
+// at render time (exact ballistic extrapolation from the last step), so motion is
+// smooth at any display refresh rate.
+
+const STREAM = {
+  g: 3400,          // units / s^2
+  v0: 40,           // exit speed at the apex
+  sigma: 1.75,      // lateral spread of the apex stream (units)
+  fan: 46,          // distance over which the apex stream opens from the apex point
+  rate: 3200,       // grains / s (both streams)
+  rMin: 0.5, rMax: 1.12,
+  v0Neck: 70,       // speed sand leaves the neck
+  taper: 0.14,      // the neck column narrows by this fraction over a full drop
+  headFade: 30,     // the falling column's leading head fades in over this length
+  tailFade: 12,     // and its trailing end, once the top has run dry, fades out over this
+  splash: 0.10,     // share of landing grains that bounce (was 0.30)
+  roll: 0.18,       // share that roll down the flank (was 0.32)
+  // apex grains landing on a wall face while the glass turns
+  slide: 0.4,       // share that slide downhill along the face (the rest stop there)
+  slideK: 0.3,      // slide speed = this x the impact speed's component along the face ...
+  slideMin: 80, slideMax: 400,   // ... clamped to this range (units / s)
+  slideLife: 0.15,  // seconds; they fade out linearly
+  slideMinAngle: 40, // only on faces at least this far from vertical (degrees)
+  slideLift: 0.8,   // sliding grains ride this far clear of the face (units)
+  slideEndFade: 10, // and fade out over their last units before the corner
+  endFade: 6,       // the stream's last units above a wall contact fade out
+};
+
+function createSim(G, C, seed = 7) {
+  let rnd = mulberry32(seed);
+  const gauss = () => {
+    let u = 0, v = 0;
+    while (u === 0) u = rnd();
+    v = rnd();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  };
+  const { g, v0, v0Neck } = STREAM;
+  const yA = G.apex[1], yN = G.iy;
+  const { cycle, flow } = TIMING;
+  const NC = TIMING.steps;                  // steps per cycle (exact)
+
+  // Grains are ballistic, so each one is stored as its birth time plus its own traits and
+  // evaluated analytically whenever it is needed; nothing is integrated per step.
+  let apex = [], apexHead = 0;   // stream from the apex, a FIFO: it never stops, and crosses the wrap
+  let neck = [];                 // sand leaving the neck, inside the column
+  const splash = [];             // ballistic bounce grains
+  const rollers = [];            // grains sliding down the mound flanks
+  // integer step clock: no float drift across cycles. The sim starts one cycle early
+  // (a pre-roll), so the apex stream is already in steady state at t = 0 and every
+  // cycle from 0 on is identical.
+  let n = -NC, t = n * DT, accA = 0, accN = 0;
+  let simCycle = -1;
+  let peak = C.peakFor(0);
+
+  const dist = (tt, v) => v * tt + 0.5 * g * tt * tt;
+  const fall = (dy, v) => (-v + Math.sqrt(v * v + 2 * g * dy)) / g;
+  const apexLife = fall(yN - yA, v0);          // apex to neck
+  const SPLASH_LIFE = 0.5;
+
+  // Bottom level: what has left the neck, delayed by the fall to the pile, which itself rises.
+  // Integrated once at step resolution and read back linearly, so the sim and the renderer
+  // share one smooth curve (it reaches exactly 1 before the wrap).
+  // The pile's tip never rises faster than RISE_MAX: as the funnel under the neck narrows the
+  // last few units would otherwise land within a single frame (a visible pop at the neck);
+  // the mass still arrives, a few frames later, from the column that is still falling.
+  const RISE_MAX = 240;                        // units / s
+  const pTop = C.peakFor(1 - 1e-7);            // tip at the neck line
+  const fForPeak = (p, lo) => {                // inverse of peakFor on [lo, 1)
+    if (p <= pTop) return 1;
+    let hi = 1 - 1e-7;
+    for (let k = 0; k < 40; k++) { const m = (lo + hi) / 2; if (C.peakFor(m) > p) lo = m; else hi = m; }
+    return (lo + hi) / 2;
+  };
+  const fBotTab = new Float64Array(NC + 1);
+  let pPrev = C.peakFor(0);
+  for (let i = 1; i <= NC; i++) {
+    const lag = fall(Math.max(1, C.impactY(pPrev, G.ix) - yN), v0Neck);
+    let f = Math.max(fBotTab[i - 1], flowQ(i * DT - lag));
+    let p = C.peakFor(f);
+    if (pPrev - p > RISE_MAX * DT) { p = pPrev - RISE_MAX * DT; f = fForPeak(p, fBotTab[i - 1]); }
+    fBotTab[i] = f; pPrev = C.peakFor(f);
+  }
+  if (fBotTab[NC] < 1) throw new Error('bottom chamber must be full at the wrap');
+  function levels(ph) {
+    const x = ph / DT, i = Math.min(NC - 1, Math.floor(x)), u = x - i;
+    return { fTop: flowQ(ph), fBot: fBotTab[i] + (fBotTab[i + 1] - fBotTab[i]) * u };
+  }
+  const radius = () => STREAM.rMin + (STREAM.rMax - STREAM.rMin) * Math.pow(rnd(), 1.6);
+  const tone = () => (rnd() < 0.025 ? 1.25 : rnd());
+
+  function spawnApex(born) {
+    let q = gauss(); q = Math.max(-2.6, Math.min(2.6, q));
+    apex.push({ born, off: q * STREAM.sigma, drift: gauss() * 0.9, r: radius(), shade: tone(), sq: rnd() });
+  }
+  // ---- the stream against the walls while the glass turns (first-hit contact) ----
+  const polys = wallPolygons(G);
+  // the stream lands where its centreline meets a wall: every grain stops at that one height
+  // (a grain off the centreline that overlaps the wall there is under the wall), so the end of
+  // the stream is clean instead of fraying along a steep face
+  // During the flip the full chamber swings up into the stream's path: sand stops it too
+  // (the nearer of the wall and the sand edge). Point of the centreline first inside the
+  // chamber that is full while the glass turns (the bottom one, in glass space, before the wrap).
+  const inBot = (gx, gy) => {
+    if (gy <= 0 || gx * gx + gy * gy > G.Rin * G.Rin) return false;      // strictly inside
+    return gy >= (gx - G.nk) * G.slope + G.wallV && gy >= (-G.nk - gx) * G.slope + G.wallV;
+  };
+  // which: 'bot' (full before the wrap) or 'top' (the same sand, after the wrap)
+  function sandEdge(rot, which) {
+    const c = Math.cos(rot), s = Math.sin(rot);
+    const inside = which === 'bot'
+      ? (y) => { const d = y - G.iy; return inBot(d * s, d * c); }               // glass = R(-rot)(0, d)
+      : (y) => { const d = y - G.iy; return inBot(-d * s, -d * c); };            // point reflection: top
+    let prev = G.iy - G.Rin;
+    for (let y = prev; y <= G.iy; y += 1.5) {
+      if (inside(y)) {
+        let lo = prev, hi = y;
+        for (let k = 0; k < 12; k++) { const m = (lo + hi) / 2; if (inside(m)) hi = m; else lo = m; }
+        return hi;
+      }
+      prev = y;
+    }
+    return Infinity;
+  }
+  // A sand contact is a plain occlusion (sharp, exactly where the sand mask hides the stream),
+  // not a landing: the stream does not fade before it. It holds on both sides of the wrap.
+  const contactAt = (tt) => {
+    const ph = phaseOf(tt), rot = rotAt(ph);
+    const w = wallContact(G, polys, rot, G.ix, yA);
+    let ys = Infinity;
+    if (ph >= TIMING.flow) ys = sandEdge(rot, 'bot');
+    else if (ph < TIMING.landEnd) {
+      const e = sandEdge(rot, 'top');
+      // the full chamber is draining: its level surface is the sand's upper edge
+      if (e < Infinity) ys = Math.max(e, C.crater(C.craterFor(levels(ph).fTop, craterKAt(ph)), G.ix, craterKAt(ph)));
+    }
+    if (ys < w.y) return { y: ys, hit: true, face: false, sand: true };
+    return w;
+  };
+  const apexY = (gr, tt) => yA + dist(tt - gr.born, v0);
+  // a grain that lands on a wall face: SLIDE share of them slide downhill along the face (in
+  // glass space, so they ride the turning glass), leave it at the end of the face and fall
+  const rotG = (v, a) => [v[0] * Math.cos(a) - v[1] * Math.sin(a), v[0] * Math.sin(a) + v[1] * Math.cos(a)];
+  function landOnWall(gr, h, c) {
+    gr.dead = h;
+    if (gr.sq >= STREAM.slide) return;
+    // only along a long face inside the chamber; never along a wall's end under the ring
+    if (!c.face || Math.hypot(G.ix - G.ix, c.y - G.iy) > G.Rin - 4) return;
+    let tx = c.b[0] - c.a[0], ty = c.b[1] - c.a[1];
+    const len = Math.hypot(tx, ty); tx /= len; ty /= len;
+    // on a steep face sand does not slide: it would only hug the wall's edge as a fringe
+    if (Math.abs(tx) < Math.sin(STREAM.slideMinAngle * DEG)) return;
+    let end = c.b;
+    if (ty < 0 || (ty === 0 && tx < 0)) { tx = -tx; ty = -ty; end = c.a; }       // downhill
+    let nx = -ty, ny = tx; if (ny > 0) { nx = -nx; ny = -ny; }                   // out of the wall, upward
+    // start on the face, under the grain's own x
+    const gx = apexX(gr, apexY(gr, h), h - gr.born);
+    const x = gx, y = c.a[1] + ((gx - c.a[0]) / (c.b[0] - c.a[0])) * (c.b[1] - c.a[1]);
+    const lift = gr.r + STREAM.slideLift;                                         // clear of the edge
+    const vy = v0 + g * (h - gr.born);
+    const s0 = Math.min(STREAM.slideMax, Math.max(STREAM.slideMin, STREAM.slideK * vy * ty));
+    const a0 = rotUnwrapped(h);
+    const toG = (p) => rotG([p[0] - G.ix, p[1] - G.iy], -a0);
+    gr.slide = {
+      h, s0, ty, P: toG([x + nx * lift, y + ny * lift]), T: rotG([tx, ty], -a0),
+      L: Math.hypot(end[0] - x, end[1] - y),
+    };
+  }
+  // position of a sliding grain at time tt (world), or null once it is gone
+  function slidePos(gr, tt) {
+    const S = gr.slide, tau = tt - S.h;
+    if (tau < 0 || tau >= STREAM.slideLife) return null;
+    const acc = g * S.ty;
+    const s = (u) => S.s0 * u + 0.5 * acc * u * u;
+    const glassToWorld = (p, at) => { const w = rotG(p, rotUnwrapped(at)); return [G.ix + w[0], G.iy + w[1]]; };
+    // time it reaches the end of the face
+    const d = s(tau);
+    // it settles into the corner where the face ends: gone by then (no orphan grains falling
+    // free through the empty wedge, which read as specks of dirt)
+    if (d >= S.L) return null;
+    const p = glassToWorld([S.P[0] + S.T[0] * d, S.P[1] + S.T[1] * d], tt);
+    p.fade = Math.min(1, (S.L - d) / STREAM.slideEndFade);
+    return p;
+  }
+  function spawnNeck(born) {
+    // what happens when it lands is drawn now, so the outcome never depends on the order in
+    // which landings are processed (exact periodicity, whatever floating point does)
+    neck.push({ born, u: rnd() * 2 - 1, r: radius(), shade: tone(), q: rnd(), a: rnd(), b: rnd(), c: rnd(), d: rnd(), e: rnd(), f: rnd() });
+  }
+  const apexX = (gr, y, age) => G.ix + gr.off * Math.min(1, Math.sqrt(Math.max(0, y - yA) / STREAM.fan)) + gr.drift * age;
+  // column half-width: exactly the opening at the neck, narrowing slightly as it accelerates
+  const halfW = (y) => G.a * (1 - STREAM.taper * Math.min(1, Math.max(0, (y - yN) / G.Rin)));
+  const neckX = (gr, y) => G.ix + gr.u * (halfW(y) - gr.r * 0.6);
+
+  // One step covers [t, t + DT). Every event inside it gets its exact time: grains are born at
+  // spread instants, a landing grain gets its hit time and spawns its splash there. Deaths are
+  // judged at the start of the step, so the state after the step is valid for any render time
+  // inside it (the renderer skips what is not yet born and what has already landed). The sim
+  // therefore runs through the step that contains the render time, and the rendered picture
+  // is a continuous function of time: no event ever appears a step late.
+  function step() {
+    // every cycle replays the same grains: reseeding at the wrap makes the whole animation
+    // exactly periodic (and the loop seamless). The apex grains in flight at the wrap were
+    // spawned by the identical tail of the previous cycle; settled grains are long faded.
+    const kc = Math.floor(n / NC);
+    if (kc !== simCycle) { simCycle = kc; rnd = mulberry32(seed); accA = 0; accN = 0; splash.length = 0; rollers.length = 0; }
+    const ph = (n - kc * NC) * DT;
+    const { fBot } = levels(ph);
+    peak = C.peakFor(fBot);
+    const tn = t + DT;
+
+    // apex grains leave the queue in birth order, once past the neck and done sliding
+    while (apexHead < apex.length && t - apex[apexHead].born >= apexLife + STREAM.slideLife + DT) apexHead++;
+    if (apexHead > 512) { apex = apex.slice(apexHead); apexHead = 0; }
+    // while the glass turns, a grain dies where it first meets a wall (the contact moves with
+    // the glass: it dies when the surface reaches it, too). Judged per step, landing instant
+    // solved inside the step, so a dead grain stays dead.
+    if (turningAt(ph) || turningAt(phaseOf(tn))) {
+      const yGate = G.iy - G.R - G.L;              // no wall reaches above this
+      for (let i = apexHead; i < apex.length; i++) {
+        const gr = apex[i];
+        if (gr.dead !== undefined || gr.born > tn || tn - gr.born >= apexLife) continue;
+        const yEnd = apexY(gr, tn);
+        if (yEnd < yGate) continue;
+        // only walls stop grains; sand just hides them (the renderer clips them at its edge)
+        const wallAt = (tt) => wallContact(G, polys, rotAt(phaseOf(tt)), G.ix, yA);
+        const cEnd = wallAt(tn);
+        if (!cEnd.hit || yEnd < cEnd.y) continue;
+        const gap = (tt) => apexY(gr, tt) - wallAt(tt).y;
+        const lo0 = Math.max(t, gr.born);
+        if (gap(lo0) >= 0) { gr.dead = lo0; continue; }      // the wall swept onto it: it just stops
+        let lo = lo0, hi = tn;
+        for (let k = 0; k < 16; k++) { const m = (lo + hi) / 2; if (gap(m) >= 0) hi = m; else lo = m; }
+        const c = wallAt(hi);
+        if (c.hit) landOnWall(gr, hi, c); else gr.dead = hi;
+      }
+    }
+
+    // settled grains: judged at the step start, then moved through the step
+    for (let i = splash.length - 1; i >= 0; i--) {
+      const sp = splash[i];
+      if ((sp.vy > 0 && sp.y >= C.impactY(peak, sp.x)) || t - sp.born >= SPLASH_LIFE || sp.y < yN) { splash[i] = splash[splash.length - 1]; splash.pop(); continue; }
+      sp.x += sp.vx * DT; sp.y += sp.vy * DT + 0.5 * g * DT * DT; sp.vy += g * DT;
+    }
+    for (let i = rollers.length - 1; i >= 0; i--) {
+      const r = rollers[i];
+      if (t - r.born >= r.life || Math.abs(r.x - G.ix) > G.Rin - 4) { rollers[i] = rollers[rollers.length - 1]; rollers.pop(); continue; }
+      r.x += r.v * DT; r.v *= Math.pow(0.02, DT);
+    }
+    // neck grains: drop those that landed before this step; find those landing inside it.
+    // The landing instant is solved against the rising pile (the level at that instant).
+    const peakEnd = C.peakFor(levels(ph + DT).fBot);
+    const surfAt = (tt, x) => C.impactY(C.peakFor(levels(ph + (tt - t)).fBot), x);
+    for (let i = neck.length - 1; i >= 0; i--) {
+      const gr = neck[i];
+      if (gr.hit !== undefined) { if (gr.hit <= t) { neck[i] = neck[neck.length - 1]; neck.pop(); } continue; }
+      const yEnd = yN + dist(tn - gr.born, v0Neck);
+      if (yEnd < C.impactY(peakEnd, neckX(gr, yEnd))) continue;      // still falling at the end of the step
+      {
+        const yAt = (tt) => yN + dist(tt - gr.born, v0Neck);
+        const gap = (tt) => yAt(tt) - surfAt(tt, neckX(gr, yAt(tt)));
+        let lo = t, hi = tn;
+        if (gap(lo) >= 0) hi = lo;               // the pile rose into it between steps
+        for (let k = 0; k < 14 && hi - lo > 1e-7; k++) { const m = (lo + hi) / 2; if (gap(m) >= 0) hi = m; else lo = m; }
+        const h = hi;
+        gr.hit = h;
+        const y = yAt(h), x = neckX(gr, y);
+        const dt = tn - h;                       // the rest of this step, after the landing
+        if (gr.q < STREAM.splash) {
+          const sp = { born: h, x, y: y - 0.5, vx: (gr.a - 0.5) * 2 * (30 + 110 * gr.b), vy: -(40 + 130 * gr.c), r: 0.7 + 0.6 * gr.d, shade: gr.e };
+          sp.x += sp.vx * dt; sp.y += sp.vy * dt + 0.5 * g * dt * dt; sp.vy += g * dt;
+          splash.push(sp);
+        } else if (gr.q < STREAM.splash + STREAM.roll) {
+          const dir = gr.a < 0.5 ? -1 : 1;
+          const r = { born: h, x: x + dir * (1 + 2 * gr.b), v: dir * (70 + 150 * gr.c), r: 0.9 + 0.6 * gr.d, shade: gr.e, life: 0.12 + 0.35 * gr.f };
+          r.x += r.v * dt; r.v *= Math.pow(0.02, dt);
+          rollers.push(r);
+        }
+      }
+    }
+    // emission, born at uniformly spread instants inside the step (no step banding)
+    accA += STREAM.rate * emissionAt(ph) * DT; while (accA >= 1) { accA -= 1; spawnApex(tn - rnd() * DT); }
+    const rate = flowRate(ph);
+    if (rate > 0) { accN += STREAM.rate * rate * DT; while (accN >= 1) { accN -= 1; spawnNeck(tn - rnd() * DT); } }
+    n += 1; t = n * DT;
+  }
+
+  function advanceTo(tt) { while (t < tt) step(); }
+  advanceTo(0);                                   // pre-roll
+
+  // full render state at time tt (the sim has run through the step containing tt)
+  function stateAt(tt) {
+    advanceTo(tt);
+    const tau = tt - t;                    // extrapolation back from the end of the step, <= 0
+    const { k, ph } = wrap(tt);
+    const { fTop, fBot } = levels(ph);
+    const craterK = craterKAt(ph);
+    const pk = C.peakFor(fBot), cr = C.craterFor(fTop, craterK);
+    const impactC = C.impactY(pk, G.ix);
+
+    const rot = rotAt(ph), omega = omegaAt(ph);
+    const parity = ((k % 2) + 2) % 2;      // sand texture is attached to the glass
+    const sh0 = 1 / 120;                   // shutter: streak back along the path for half a 60 Hz frame
+    // settled splash / rollers fade out as the glass starts to turn, rather than holding it
+    const flipFade = ph >= flow ? Math.max(0, 1 - (ph - flow) / 0.22) : 1;
+
+    const turning = turningAt(ph);
+    const cc = turning ? contactAt(tt) : { y: yN, hit: false };
+    const grains = [], spray = [];
+    const yGate = G.iy - G.R - G.L;
+    let front = yA;                         // lowest live grain of the stream
+    for (let i = apexHead; i < apex.length; i++) {
+      const gr = apex[i], age = tt - gr.born;
+      if (age < 0) continue;
+      if (gr.slide && tt >= gr.slide.h) {
+        const p = slidePos(gr, tt);
+        if (p) {
+          const q = slidePos(gr, Math.max(gr.slide.h, tt - sh0)) || p;
+          spray.push({ x0: q[0], y0: q[1], x: p[0], y: p[1], r: gr.r, shade: gr.shade, a: (1 - (tt - gr.slide.h) / STREAM.slideLife) * p.fade });
+        }
+        continue;
+      }
+      if (gr.dead !== undefined && tt >= gr.dead) continue;
+      const y = yA + dist(age, v0), vy = v0 + g * age;
+      if (y >= yN) continue;
+      const x = apexX(gr, y, age);
+      // above a wall contact the stream's last units fade instead of ending in a hard cut
+      let fade = 1;
+      const sh = Math.min(sh0, age), y0 = y - vy * sh + 0.5 * g * sh * sh;
+      const x0 = apexX(gr, y0, age - sh);
+      if (cc.hit && cc.sand && y > cc.y) {
+        // behind sand: clip the streak at the sand's edge (what the sand mask does, sharp)
+        if (y0 >= cc.y) continue;
+        const u = (cc.y - y0) / (y - y0);
+        grains.push({ x0, y0, x: x0 + (x - x0) * u, y: cc.y, r: gr.r, shade: gr.shade, fade });
+        if (cc.y > front) front = cc.y;
+        continue;
+      }
+      if (cc.hit && !cc.sand && y > yGate) { if (y >= cc.y) continue; fade = Math.min(1, (cc.y - y) / STREAM.endFade); }
+      if (y > front) front = y;
+      grains.push({ x0, y0, x, y, r: gr.r, shade: gr.shade, fade });
+    }
+    const neckGrains = [];
+    for (const gr of neck) {
+      const age = tt - gr.born;
+      if (age < 0 || (gr.hit !== undefined && tt >= gr.hit)) continue;
+      const y = yN + dist(age, v0Neck), vy = v0Neck + g * age;
+      const x = neckX(gr, y);
+      if (y >= C.impactY(pk, x)) continue;
+      const sh = Math.min(sh0, age), y0 = Math.max(yN, y - vy * sh + 0.5 * g * sh * sh);
+      neckGrains.push({ x0: neckX(gr, y0), y0, x, y, r: gr.r, shade: gr.shade });
+    }
+    const S2 = [];
+    for (const sp of splash) {
+      const age = tt - sp.born;
+      if (age < 0 || age >= SPLASH_LIFE) continue;
+      const x = sp.x + sp.vx * tau, y = sp.y + sp.vy * tau + 0.5 * g * tau * tau;
+      if (y >= C.impactY(pk, x) || y < yN) continue;
+      S2.push({ x, y, vx: sp.vx, vy: sp.vy + g * tau, r: sp.r, shade: sp.shade });
+    }
+    const R2 = [];
+    for (const r of rollers) {
+      const age = tt - r.born;
+      if (age < 0 || age >= r.life) continue;
+      const x = r.x + r.v * tau;
+      R2.push({ x, y: C.impactY(pk, x) - r.r * 0.8, r: r.r, shade: r.shade, fade: 1 - age / r.life });
+    }
+
+    // faint core of the apex stream: it never stops. Apex to the neck, or to the wall it meets
+    // while the glass turns; its density at each height is the emission rate when the sand
+    // there left the apex. While the glass turns it ends with the live stream: where a wall
+    // swept across the stream, the sand below it is gone and the cut head falls from there.
+    const density = (y) => emissionAt(phaseOf(tt - fall(Math.max(0, y - yA), v0)));
+    const coreEnd = Math.min(cc.y, front);
+    // fade the end where it lands on a wall or is the falling head of a cut stream; where it
+    // meets sand it is simply hidden (sharp, like the sand mask)
+    // The fade is anchored at the nearer of the live head and whatever hides the stream (a wall
+    // it lands on, the sand edge, the top pile's surface in the pour, the neck). Landing on a
+    // wall: full fade. A falling head: its fade shrinks to nothing as it reaches sand or the
+    // neck. Anchored the same way in every phase, so it is continuous across every boundary.
+    const occl = cc.hit ? cc.y : (fTop > 0 && fTop < 1 ? Math.min(yN, C.crater(cr, G.ix, craterK)) : yN);
+    const fadeAt = Math.min(front, occl);
+    const endFade = cc.hit && !cc.sand ? STREAM.endFade : Math.min(STREAM.endFade, Math.max(0, occl - front));
+    // y1: the full line (the static logo draws it in front of everything); yHidden: where it
+    // disappears behind sand or a wall, continuous through every phase (a gradient is
+    // resampled over its whole length when its end moves, so the end must never jump)
+    const core = { y0: yA, y1: coreEnd, yHidden: Math.min(coreEnd, occl), hit: cc.hit, fadeAt, endFade, density };
+    // the neck column: sand leaving the neck. While the top still has sand its top tucks just
+    // above the neck line, under the pile; after the top runs dry the tail falls away. Its
+    // leading head, while falling free, fades in rather than ending in a flat cap.
+    let column = null;
+    {
+      const free = yN + dist(ph, v0Neck);                        // where the head would be in free fall
+      const head = Math.min(free, impactC + 4);
+      const tuck = 6 * Math.min(1, (1 - fTop) / 0.04);          // shrinks to nothing as the top runs dry
+      const top = ph < flow ? Math.min(yN, Math.max(yN - tuck, cr)) : yN + dist(ph - flow, v0Neck);
+      const fadeLen = Math.min(STREAM.headFade, Math.max(0, impactC + 4 - free), Math.max(0, head - top));
+      const tailFade = ph >= flow ? Math.min(STREAM.tailFade, Math.max(0, head - top) / 2) : 0;   // the tail, falling away
+      if (top < head) column = { y0: top, y1: head, fadeLen, tailFade };
+    }
+    return { t: tt, ph, cycleIndex: k, fTop, fBot, peak: pk, crater: cr, craterK, impactC, rot, omega, parity, flipFade,
+      grains, spray, neckGrains, column, halfW, splash: S2, rollers: R2, core, breath: breathAt(tt), source: sourceAt(tt) };
+  }
+
+  return { stateAt, get t() { return t; }, DT };
+}
+
+// The static logo's line (design panel): one solid flat line from the apex to the base, in front
+// of everything, clipped to the triangle, butt caps. In the static logo it replaces the grain
+// stream, its core, the neck column and the splash: a still logo, not a frame of the pour.
+// Widths in mark units: master (marks >= 128 px) and the small cut (24-127 px).
+const STATIC_LINE = { tone: '#8e8e8e', toneLight: '#b8b8b8', master: 8, small: 16,
+  // the line runs to the apex in every variant. In the no-glow mark its inner edge band (#3a3a3a)
+  // is drawn over it, so the band stays continuous across the tip and the line runs up under it;
+  // the glow and light marks have no band, so the line runs into the tip, clipped by the triangle.
+  // Band: 8 units (master), 12 (small cuts)
+  bandMaster: 8, bandSmall: 12 };
+// the static logo / reduced-motion frame: part-way through a pour, with the static line
+const STATIC_PHASE = 2.5;
+// playback opens upright with the pour already under way
+const OPEN_PHASE = 0.6;
+
+// blacksand-hero.js
+// Canvas renderer for the backlit blacksand mark: sand stream from the apex,
+// volume-conserving chambers, 180 deg flip with motion blur, a breathing backlight.
+//
+//   import { mountBlacksand } from './blacksand-hero.js';
+//   const hero = mountBlacksand(document.querySelector('canvas'));
+//   // hero.destroy() on unmount
+//
+// The canvas fills its CSS box. The page behind it should be #000.
+
+
+const PALETTE = {
+  bg: '#000',
+  etchTop: [38, 38, 38], etchBot: [74, 74, 74],      // ring + walls
+  sandTop: [54, 54, 54], sandBot: [94, 94, 94],      // sand body
+  surface: 'rgba(160,160,160,0.28)',                 // lit edge of a sand surface
+  stream: [92, 150], glint: 190, grainAlpha: 0.5,    // grain grey range
+};
+// backlight: the rim (soft edge light on the triangle) and the pool of light under the base.
+// Both brighten with the flip; the crest is +50% on the rim and the spill keeps its ratio.
+const GLOW = { rim: 0.35, rimBreath: 0.15, poolBreath: 0.10 };
+// pointer light (opt-in): the source follows a fine pointer within this offset (units of the
+// side), confined to the lower arc (within +/-100 deg of straight down), on a critically
+// damped spring, and its lean (direction from the centroid) turns at most maxLeanRate deg/s;
+// it lets go after the pointer leaves or idles
+const POINTER = { reach: 0.10, arc: 100, settle: 1.2, idle: 2.5, maxLeanRate: 60 };
+// motion blur: eight samples over a half-frame shutter centred on the frame time, blended
+// with the sharp render by w = smoothstep((travel_px - onset) / width), travel measured at
+// the ring's outer edge. At rest the frame is exactly the sharp render.
+const BLUR = { samples: 8, shutter: 1 / 120, onset: 0.3, width: 2.2 };
+
+const rgb = (c, a = 1) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+const mkCanvas = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+
+function mountBlacksand(canvas, opts = {}) {
+  const G = createGeometry();
+  const C = createChambers(G);
+  let sim = createSim(G, C, opts.seed ?? 7);
+  // the sim only runs forward; asking for an earlier time rebuilds it deterministically
+  const stateAt = (t) => { if (t < sim.t - 1e-9) sim = createSim(G, C, opts.seed ?? 7); return sim.stateAt(t); };
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const { ix, iy, R, H, L, T, Rin } = G;
+  const dbg = Object.assign({ glow: true, particles: true, blur: true }, opts.debug || {});
+  // the still frame (reduced motion) is the approved static look: no breath, no pointer
+  const reducedMotionEarly = opts.reducedMotion ?? (typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  if (reducedMotionEarly) dbg.breath = false;
+
+  let W = 0, Hh = 0, dpr = 1, s = 1, ox = 0, oy = 0;     // device-space transform for mark units
+  let glowA = null, glowD = null, tex = null;           // backlight at rest; crest image (2D fallback)
+  let gl = null, glc = null, glU = null;        // WebGL glow compositor (float + dither per frame)
+  let mark = null;                                       // stream layer: a strip under the apex
+  let box = null;                                        // blur layers: the ring's box
+
+  // ------------------------------------------------------------- layout ---
+  function layout() {
+    dpr = opts.dpr ?? Math.min(2, window.devicePixelRatio || 1);
+    const cw = canvas.clientWidth, ch = canvas.clientHeight;
+    W = Math.max(1, Math.round(cw * dpr)); Hh = Math.max(1, Math.round(ch * dpr));
+    canvas.width = W; canvas.height = Hh;
+    const markCss = opts.markSize ?? Math.min(420, cw * 0.34, ch * 0.5);
+    s = (markCss / 1024) * dpr;
+    // centre the triangle; snap the ring centre to a device pixel so the 180 deg
+    // flip lands on exactly the same pixel grid it started from
+    const cxDev = W / 2, cyDev = Hh * (opts.verticalCenter ?? 0.5);
+    ox = cxDev - ix * s;
+    oy = cyDev - ((138 + 878) / 2) * s;
+    ox = Math.round(ox + ix * s) - ix * s;
+    oy = Math.round(oy + iy * s) - iy * s;
+    buildGlow(); buildTexture();
+    needFull = true;
+    // everything the mark paints lies inside the triangle's box
+    {
+      const x0 = Math.floor(ox + 56 * s) - 4, y0 = Math.floor(oy + 138 * s) - 4;
+      const x1 = Math.ceil(ox + 968 * s) + 4, y1 = Math.ceil(oy + 878 * s) + 4;
+      mbox = { x: Math.max(0, x0), y: Math.max(0, y0), w: Math.min(W, x1) - Math.max(0, x0), h: Math.min(Hh, y1) - Math.max(0, y0) };
+    }
+    // stream layer: from the apex down through the ring, as wide as the ring (grains that land
+    // on a wall mid-flip slide along it toward the side wedge's corner)
+    {
+      const x0 = Math.floor(ox + (ix - R - H / 2) * s) - 2, y0 = Math.floor(oy + 138 * s) - 2;
+      const x1 = Math.ceil(ox + (ix + R + H / 2) * s) + 2, y1 = Math.ceil(oy + (iy + R + H / 2) * s) + 2;
+      mark = { x0, y0, w: x1 - x0, h: y1 - y0, c: mkCanvas(x1 - x0, y1 - y0) };
+    }
+    // blur layers: the ring's box (rotation never leaves it)
+    {
+      const half = Math.ceil((R + H / 2 + 6) * s);
+      const x0 = Math.round(ox + ix * s) - half, y0 = Math.round(oy + iy * s) - half, n = 2 * half;
+      const mk = () => mkCanvas(n, n);
+      box = { x0, y0, n,
+        sand: { S: mk(), P0: mk(), P1: mk(), Q0: mk(), Q1: mk(), F: mk(), X: mk() },
+        walls: { S: mk(), P0: mk(), P1: mk(), Q0: mk(), Q1: mk(), F: mk(), X: mk() },
+        mask: { S: mk(), F: mk(), X: mk() } };
+    }
+  }
+  // transforms: mark units -> device px, for the main canvas or a layer with an origin
+  const base = (c = ctx, x0 = 0, y0 = 0) => c.setTransform(s, 0, 0, s, ox - x0, oy - y0);
+  const rotate = (rot, c = ctx, x0 = 0, y0 = 0) => { base(c, x0, y0); c.translate(ix, iy); c.rotate(rot); c.translate(-ix, -iy); };
+
+  // ------------------------------------------------------------ glow ---
+  // Backlight (design panel consensus). A source hidden behind the triangle:
+  //   rim   = the Gaussian-blurred outline (sigma 14 units), alpha 0.35 x (1 + 0.15 b),
+  //           and, while the pointer light is active, x (1 + 0.25 a max(0, w - 1))
+  //   pool  = the elliptical pool under the base, x (1 + 0.10 b)
+  //   halo  = b w [0.06 exp(-d / 0.05 S) + 0.05 exp(-d / 0.40 S)] outside the silhouette
+  // b: the breath (0 at the trough = the approved static look exactly); d: distance from the
+  // triangle; S: its side; w = clamp(1 + 12 (n . o), 0.6, 2.2) weights the halo toward the
+  // source offset o (in units of S, y down), n the outward direction from the nearest point
+  // of the triangle (edge normal, blending round the corners).
+  // Composed per frame in floating point (WebGL2) and quantised once with a fixed per-pixel
+  // dither, so no large area shows an 8-bit step. Without WebGL2: rest and crest images
+  // (crest at the rest offset) cross-faded by b; that fallback has no swing or pointer and
+  // can show one-level steps over flat regions while the breath moves.
+  const S_SIDE = Math.hypot(T[1][0] - T[2][0], T[1][1] - T[2][1]);
+  const GLSL_VS = `#version 300 es
+in vec2 p; void main() { gl_Position = vec4(p, 0.0, 1.0); }`;
+  const GLSL_FS = `#version 300 es
+precision highp float; precision highp int;
+uniform sampler2D rim; uniform vec2 res; uniform vec3 mark;
+uniform float kRim, kSpill, breath, act; uniform vec2 src;  // breath: the halo factor h
+uniform vec2 T0, T1, T2; uniform float side;
+out vec4 o;
+float spill(float d) {
+  if (d >= 1.0) return 0.0;
+  if (d < 0.28) return mix(0.22, 0.09, d / 0.28);
+  if (d < 0.6) return mix(0.09, 0.025, (d - 0.28) / 0.32);
+  return mix(0.025, 0.0, (d - 0.6) / 0.4);
+}
+vec2 closestOnSeg(vec2 p, vec2 a, vec2 b) { vec2 ab = b - a; float t = clamp(dot(p - a, ab) / dot(ab, ab), 0.0, 1.0); return a + ab * t; }
+float cross2(vec2 a, vec2 b) { return a.x * b.y - a.y * b.x; }
+void main() {
+  float r = texture(rim, gl_FragCoord.xy / res).r;
+  float u = (gl_FragCoord.x - mark.x) / mark.z;
+  float v = (res.y - gl_FragCoord.y - mark.y) / mark.z;
+  vec2 P = vec2(u, v);
+  float dx = u - 512.0, dy = (v - 905.0) * (1250.0 / 820.0);
+  float sp = spill(sqrt(dx * dx + dy * dy) / 1250.0);
+  // nearest point of the triangle, and the direction out of it
+  vec2 c0 = closestOnSeg(P, T0, T1), c1 = closestOnSeg(P, T1, T2), c2 = closestOnSeg(P, T2, T0);
+  float d0 = distance(P, c0), d1 = distance(P, c1), d2 = distance(P, c2);
+  vec2 c = c0; float dd = d0;
+  if (d1 < dd) { c = c1; dd = d1; } if (d2 < dd) { c = c2; dd = d2; }
+  float s0 = cross2(T1 - T0, P - T0), s1 = cross2(T2 - T1, P - T1), s2 = cross2(T0 - T2, P - T2);
+  bool inside = (s0 >= 0.0 && s1 >= 0.0 && s2 >= 0.0) || (s0 <= 0.0 && s1 <= 0.0 && s2 <= 0.0);
+  vec2 n = dd > 1e-4 ? (P - c) / dd : vec2(0.0, 1.0);
+  if (inside) n = -n;
+  float w = clamp(1.0 + 12.0 * dot(n, src), 0.6, 2.2);
+  float halo = inside ? 0.0 : breath * w * (0.06 * exp(-dd / (0.05 * side)) + 0.05 * exp(-dd / (0.40 * side)));
+  float rimK = kRim * (1.0 + 0.25 * act * max(0.0, w - 1.0));
+  uint x = uint(gl_FragCoord.x), y = uint(res.y - gl_FragCoord.y);
+  uint h = x * 374761393u + y * 668265263u; h = (h ^ (h >> 13)) * 1274126177u; h ^= h >> 16;
+  float d = float(h) / 4294967296.0;
+  float q = floor((r * rimK + sp * kSpill + halo) * 255.0 + d);
+  o = vec4(vec3(min(q, 255.0) / 255.0), 1.0);
+}`;
+  // the same light in JS, for the 2D fallback's precomputed images
+  function haloJS(u, v, b, srcX, srcY) {
+    if (b <= 0) return 0;
+    const P = [u, v];
+    let best = Infinity, cx = 0, cy = 0;
+    for (let k = 0; k < 3; k++) {
+      const A = T[k], B = T[(k + 1) % 3], abx = B[0] - A[0], aby = B[1] - A[1];
+      const t = Math.max(0, Math.min(1, ((P[0] - A[0]) * abx + (P[1] - A[1]) * aby) / (abx * abx + aby * aby)));
+      const qx = A[0] + abx * t, qy = A[1] + aby * t, dd = Math.hypot(P[0] - qx, P[1] - qy);
+      if (dd < best) { best = dd; cx = qx; cy = qy; }
+    }
+    const cr = (a, b2, p) => (b2[0] - a[0]) * (p[1] - a[1]) - (b2[1] - a[1]) * (p[0] - a[0]);
+    const s0 = cr(T[0], T[1], P), s1 = cr(T[1], T[2], P), s2 = cr(T[2], T[0], P);
+    if ((s0 >= 0 && s1 >= 0 && s2 >= 0) || (s0 <= 0 && s1 <= 0 && s2 <= 0)) return 0;
+    const nx = best > 1e-4 ? (P[0] - cx) / best : 0, ny = best > 1e-4 ? (P[1] - cy) / best : 1;
+    const w = Math.max(0.6, Math.min(2.2, 1 + 12 * (nx * srcX + ny * srcY)));
+    return b * w * (0.06 * Math.exp(-best / (0.05 * S_SIDE)) + 0.05 * Math.exp(-best / (0.40 * S_SIDE)));
+  }
+  function initGL() {
+    if (opts.webgl === false) return false;
+    try {
+      glc = mkCanvas(1, 1);
+      gl = glc.getContext('webgl2', { alpha: false, antialias: false, depth: false, stencil: false, premultipliedAlpha: false, preserveDrawingBuffer: false });
+      if (!gl) return false;
+      const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
+      const prog = gl.createProgram();
+      gl.attachShader(prog, sh(gl.VERTEX_SHADER, GLSL_VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, GLSL_FS));
+      gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+      gl.useProgram(prog);
+      const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+      const loc = gl.getAttribLocation(prog, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+      const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      const U = (n) => gl.getUniformLocation(prog, n);
+      glU = { res: U('res'), mark: U('mark'), kRim: U('kRim'), kSpill: U('kSpill'), breath: U('breath'), act: U('act'), src: U('src') };
+      gl.uniform1i(U('rim'), 0);
+      gl.uniform2f(U('T0'), T[0][0], T[0][1]); gl.uniform2f(U('T1'), T[1][0], T[1][1]); gl.uniform2f(U('T2'), T[2][0], T[2][1]);
+      gl.uniform1f(U('side'), S_SIDE);
+      glc.addEventListener('webglcontextlost', (e) => { e.preventDefault(); gl = null; glKey = ''; buildGlow(); needFull = true; }, false);
+      return true;
+    } catch (e) { gl = null; return false; }
+  }
+  // draw the glow for breath b, source offset (sx, sy) and pointer activity a (only when changed)
+  let glKey = '';
+  function glowGL(b, sx, sy, a) {
+    const key = `${b},${sx},${sy},${a}`;
+    if (glKey === key) return;
+    gl.uniform1f(glU.kRim, GLOW.rim * (1 + GLOW.rimBreath * b));
+    gl.uniform1f(glU.kSpill, 1 + GLOW.poolBreath * b);
+    // halo factor: the breath, with a floor of 0.5 a while the pointer light is active
+    // (equal to b when a = 0, so the pointer-off trough is the static look exactly)
+    gl.uniform1f(glU.breath, b + 0.5 * a * (1 - b)); gl.uniform1f(glU.act, a); gl.uniform2f(glU.src, sx, sy);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    glKey = key;
+  }
+  function buildGlow() {
+    const rc = mkCanvas(W, Hh);
+    const g = rc.getContext('2d', { alpha: false, willReadFrequently: true });
+    g.fillStyle = '#000'; g.fillRect(0, 0, W, Hh);
+    g.globalCompositeOperation = 'lighter';
+    const OFF = W + 2000;                        // draw the shape off-canvas, keep only its shadow
+    g.save();
+    g.setTransform(s, 0, 0, s, ox - OFF, oy);
+    g.shadowOffsetX = OFF; g.shadowOffsetY = 0;
+    g.shadowBlur = 2 * 14 * s;                   // sigma 14 units
+    g.shadowColor = 'rgba(255,255,255,1)';
+    g.strokeStyle = '#fff'; g.lineWidth = 10; g.lineJoin = 'round';
+    g.beginPath(); g.moveTo(...T[0]); g.lineTo(...T[1]); g.lineTo(...T[2]); g.closePath(); g.stroke();
+    g.restore();
+    if (gl) {
+      glc.width = W; glc.height = Hh; gl.viewport(0, 0, W, Hh);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, rc);
+      gl.uniform2f(glU.res, W, Hh); gl.uniform3f(glU.mark, ox, oy, s);
+      glKey = ''; glowGL(0, 0, SOURCE.down, 0);
+      // the rest image (breath 0: the approved static look), pixel-identical to the shader
+      glowA = mkCanvas(W, Hh); glowA.getContext('2d').drawImage(glc, 0, 0);
+      glowD = null;
+      return;
+    }
+    const rim = g.getImageData(0, 0, W, Hh).data;
+    const A = new ImageData(W, Hh), B = new ImageData(W, Hh);
+    const a = A.data, b = B.data;
+    const kR = GLOW.rim / 255, kRp = kR * (1 + GLOW.rimBreath), kSp = 1 + GLOW.poolBreath;
+    let bx0 = W, by0 = Hh, bx1 = -1, by1 = -1, dMax = 1;         // bounds and size of the crest-rest delta
+    const stops = [[0, 0.22], [0.28, 0.09], [0.6, 0.025], [1, 0]];
+    const spill = (d) => {
+      if (d >= 1) return 0;
+      let i = 1; while (stops[i][0] < d) i++;
+      const [d0, v0] = stops[i - 1], [d1, v1] = stops[i];
+      return v0 + (v1 - v0) * (d - d0) / (d1 - d0);
+    };
+    const ky = 1250 / 820;
+    for (let y = 0, i = 0; y < Hh; y++) {
+      const v = (y + 0.5 - oy) / s, dy = (v - 905) * ky;
+      for (let x = 0; x < W; x++, i += 4) {
+        const u = (x + 0.5 - ox) / s, dx = u - 512;
+        const sp = spill(Math.sqrt(dx * dx + dy * dy) / 1250);
+        const r = rim[i];
+        // fixed per-pixel dither in [0,1): an integer hash of the device pixel
+        let h = (x * 374761393 + y * 668265263) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16;
+        const d = (h >>> 0) / 4294967296;
+        const va = Math.min(255, Math.floor(r * kR * 255 + sp * 255 + d));
+        const vb = Math.min(255, Math.floor(r * kRp * 255 + sp * kSp * 255 + haloJS(u, v, 1, 0, SOURCE.down) * 255 + d));
+        a[i] = a[i + 1] = a[i + 2] = va; a[i + 3] = 255;
+        b[i] = b[i + 1] = b[i + 2] = vb; b[i + 3] = 255;
+        if (vb !== va) { if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (y < by0) by0 = y; if (y > by1) by1 = y; if (vb - va > dMax) dMax = vb - va; }
+      }
+    }
+    glowA = mkCanvas(W, Hh); glowA.getContext('2d').putImageData(A, 0, 0);
+    // below this weight the cross-fade truncates to the rest image on every pixel, so skipping
+    // it changes nothing
+    glowD = { x0: bx0, y0: by0, w: Math.max(1, bx1 - bx0 + 1), h: Math.max(1, by1 - by0 + 1), snap: 0.99 / dMax };
+    glowD.c = mkCanvas(glowD.w, glowD.h);
+    glowD.c.getContext('2d').putImageData(B, -bx0, -by0);
+  }
+
+  // sand grain texture, in glass space (it turns with the vessel)
+  function buildTexture() {
+    const size = Math.ceil(2 * R * s) + 2;
+    tex = mkCanvas(size, size);
+    const t = tex.getContext('2d');
+    t.setTransform(s, 0, 0, s, 1, 1);
+    let a = 12345;
+    const rnd = () => { a = (a * 1103515245 + 12345) & 0x7fffffff; return a / 0x7fffffff; };
+    const n = Math.round(Math.PI * R * R * 0.34);
+    for (let i = 0; i < n; i++) {
+      const x = rnd() * 2 * R, y = rnd() * 2 * R;
+      const r = 0.32 + rnd() * 0.55;
+      const q = rnd();
+      t.fillStyle = q < 0.55 ? `rgba(0,0,0,${0.08 + rnd() * 0.16})` : q < 0.994 ? `rgba(255,255,255,${0.03 + rnd() * 0.06})` : `rgba(255,255,255,${0.10 + rnd() * 0.08})`;
+      t.beginPath(); t.arc(x, y, r, 0, Math.PI * 2); t.fill();
+    }
+  }
+
+  // ------------------------------------------------------------ paths ---
+  // Points are added through the current transform, so a chamber built under a
+  // rotation keeps its shape when the world transform is restored for filling.
+  function chamberPath(which, c = ctx) {
+    const a = (p) => Math.atan2(p[1] - iy, p[0] - ix);
+    c.beginPath();
+    if (which === 'bot') {
+      c.moveTo(...G.NR); c.lineTo(...G.br); c.arc(ix, iy, R, a(G.br), a(G.bl), false); c.lineTo(...G.NL);
+    } else {
+      c.moveTo(...G.NL); c.lineTo(...G.tl); c.arc(ix, iy, R, a(G.tl), a(G.tr), false); c.lineTo(...G.NR);
+    }
+    c.closePath();
+  }
+  function surfacePath(fn, close, c = ctx) {
+    c.beginPath();
+    const x0 = ix - R - 24, x1 = ix + R + 24;
+    for (let x = x0; x <= x1 + 1e-6; x += 1.5) { const y = fn(x); x === x0 ? c.moveTo(x, y) : c.lineTo(x, y); }
+    if (close) { c.lineTo(x1, iy + R + 60); c.lineTo(x0, iy + R + 60); c.closePath(); }
+  }
+  function etchGradient(c = ctx) {
+    const gr = c.createLinearGradient(0, iy - R - H / 2, 0, iy + R + H / 2);
+    gr.addColorStop(0, rgb(PALETTE.etchTop)); gr.addColorStop(1, rgb(PALETTE.etchBot));
+    return gr;
+  }
+  function sandGradient(c = ctx) {
+    const gr = c.createLinearGradient(0, iy - R, 0, iy + R);
+    gr.addColorStop(0, rgb(PALETTE.sandTop)); gr.addColorStop(1, rgb(PALETTE.sandBot));
+    return gr;
+  }
+  // a sand body, or (for a full chamber) the whole chamber: the two chambers then draw the
+  // identical region, so the wrap of the cycle, where their roles swap, is seamless
+  const topSurface = (st) => (st.fTop <= 0 ? null : (x) => C.crater(st.crater, x, st.craterK));
+  const botSurface = (st) => (st.fBot >= 1 ? null : (x) => C.mound(st.peak, x));
+
+  // --------------------------------------------------------- layer draws ---
+  // L = { c, x0, y0 } is a layer; the main canvas is { c: ctx, x0: 0, y0: 0 }
+  const MAIN = { get c() { return ctx; }, x0: 0, y0: 0 };
+
+  // A sand surface is level under gravity, so it is drawn in world space; only the chamber
+  // (the glass) turns. Upright, the two are the same thing.
+  function drawSandBody(L, which, surfaceFn, rot, texRot, edge) {
+    const c = L.c;
+    c.save();
+    rotate(rot, c, L.x0, L.y0); chamberPath(which, c); c.clip();
+    if (surfaceFn) { base(c, L.x0, L.y0); surfacePath(surfaceFn, true, c); c.clip(); }
+    base(c, L.x0, L.y0); c.fillStyle = sandGradient(c); c.fillRect(ix - R - 40, iy - R - 40, 2 * R + 80, 2 * R + 80);
+    rotate(texRot, c, L.x0, L.y0);
+    if (streamLayer !== 'front') c.drawImage(tex, ix - R - 1 / s, iy - R - 1 / s, tex.width / s, tex.height / s);   // the still frame's sand is flat
+    c.restore();
+    if (!surfaceFn || edge <= 0) return;
+    // lit surface edge
+    c.save();
+    rotate(rot, c, L.x0, L.y0); chamberPath(which, c); c.clip();
+    base(c, L.x0, L.y0); surfacePath(surfaceFn, false, c);
+    c.globalAlpha = edge; c.strokeStyle = PALETTE.surface; c.lineWidth = 1.6; c.lineJoin = 'round'; c.stroke();
+    c.restore();
+  }
+
+  // both sand bodies plus the grains resting on the mound, in glass space at rotation rot
+  function drawSand(L, st, rot) {
+    const texRot = rot + st.parity * Math.PI;
+    const edgeT = Math.min(1, (1 - st.fTop) / 0.12, st.fTop / 0.04);
+    const edgeB = Math.min(1, st.fBot / 0.06, (1 - st.fBot) / 0.04);
+    if (st.fTop < 1) drawSandBody(L, 'top', topSurface(st), rot, texRot, edgeT);
+    if (st.fBot > 0) drawSandBody(L, 'bot', botSurface(st), rot, texRot, edgeB);
+    // splash + rolling grains: they live on the mound, ride with the glass, and fade as it turns
+    if (dbg.particles && st.flipFade > 0 && streamLayer !== 'front' && (st.splash.length || st.rollers.length)) {
+      const c = L.c;
+      c.save();
+      rotate(rot, c, L.x0, L.y0); chamberPath('bot', c); c.clip();
+      c.lineCap = 'round';
+      for (const p of st.splash) {
+        const k = Math.round(PALETTE.stream[0] + (PALETTE.stream[1] - PALETTE.stream[0]) * Math.min(1, p.shade));
+        c.strokeStyle = `rgba(${k},${k},${k},${0.7 * st.flipFade})`; c.lineWidth = 2 * p.r;
+        c.beginPath(); c.moveTo(p.x - p.vx / 240, p.y - p.vy / 240); c.lineTo(p.x, p.y); c.stroke();
+      }
+      for (const p of st.rollers) {
+        const k = Math.round(96 + 50 * p.shade);
+        c.fillStyle = `rgba(${k},${k},${k},${Math.max(0, Math.min(1, p.fade * 1.4)) * st.flipFade})`;
+        c.beginPath(); c.arc(p.x, p.y, p.r, 0, Math.PI * 2); c.fill();
+      }
+      c.restore();
+    }
+  }
+
+  // the visible sand (inside the ring's inner edge) as an opaque mask: what hides the stream
+  function drawMask(L, st, rot) {
+    const c = L.c;
+    for (const which of ['top', 'bot']) {
+      const fn = which === 'top' ? (st.fTop < 1 ? topSurface(st) : undefined) : (st.fBot > 0 ? botSurface(st) : undefined);
+      if (fn === undefined) continue;
+      c.save();
+      base(c, L.x0, L.y0); c.beginPath(); c.arc(ix, iy, Rin, 0, Math.PI * 2); c.clip();
+      rotate(rot, c, L.x0, L.y0); chamberPath(which, c); c.clip();
+      if (fn) { base(c, L.x0, L.y0); surfacePath(fn, true, c); c.clip(); }
+      base(c, L.x0, L.y0); c.fillStyle = '#000'; c.fillRect(ix - R - 40, iy - R - 40, 2 * R + 80, 2 * R + 80);
+      c.restore();
+    }
+  }
+
+  function drawWalls(Ly, rot) {
+    const c = Ly.c;
+    rotate(rot, c, Ly.x0, Ly.y0);
+    c.beginPath();
+    c.moveTo(...G.tl); c.lineTo(...G.NL); c.lineTo(...G.bl);
+    c.moveTo(...G.tr); c.lineTo(...G.NR); c.lineTo(...G.br);
+    base(c, Ly.x0, Ly.y0); c.strokeStyle = etchGradient(c); c.lineWidth = G.L; c.lineJoin = 'miter'; c.miterLimit = 10; c.lineCap = 'butt';
+    c.stroke();
+    c.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  function drawRing() {
+    base(); ctx.strokeStyle = etchGradient(); ctx.lineWidth = H;
+    ctx.beginPath(); ctx.arc(ix, iy, R, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  // grains batched by tone, size and fade (gr.fade, 0..1, quantised to FADES levels), as streaks
+  const FADES = 6;
+  function strokeGrains(c, list, fadeKey = 'fade') {
+    const BINS = 6, SB = 3, { rMin, rMax } = STREAM;
+    const buckets = new Map();
+    for (const gr of list) {
+      const f = gr[fadeKey] ?? 1;
+      if (f <= 0) continue;
+      const fb = Math.max(1, Math.min(FADES, Math.ceil(f * FADES)));
+      const tb = gr.shade > 1 ? BINS : Math.min(BINS - 1, Math.floor(gr.shade * BINS));
+      const sb = Math.min(SB - 1, Math.floor(((gr.r - rMin) / (rMax - rMin)) * SB));
+      const key = (fb * (BINS + 1) + tb) * SB + sb;
+      let b = buckets.get(key); if (!b) buckets.set(key, (b = []));
+      b.push(gr);
+    }
+    c.lineCap = 'round';
+    // fixed order: translucent strokes composite order-dependently, so the order must not
+    // depend on which grains happen to be visible
+    for (const key of [...buckets.keys()].sort((p, q) => p - q)) {
+      const list = buckets.get(key);
+      const sb = key % SB, tb = Math.floor(key / SB) % (BINS + 1), fb = Math.floor(key / SB / (BINS + 1));
+      const k = tb === BINS ? PALETTE.glint : Math.round(PALETTE.stream[0] + (PALETTE.stream[1] - PALETTE.stream[0]) * ((tb + 0.5) / BINS));
+      c.strokeStyle = `rgba(${k},${k},${k},${PALETTE.grainAlpha * fb / FADES})`;
+      c.lineWidth = 2 * (rMin + (rMax - rMin) * ((sb + 0.5) / SB));
+      c.beginPath();
+      for (const gr of list) { c.moveTo(gr.x0, gr.y0); c.lineTo(gr.x, gr.y); }
+      c.stroke();
+    }
+  }
+
+  // Sand leaving the neck: a column exactly as wide as the opening at the neck, in the sand's
+  // own tone, with the moving grains on top. Drawn under both sand bodies. Its side edges are
+  // crisp; while the head falls free it fades in over its last stretch instead of a flat cap.
+  function drawColumn(st) {
+    const { y0, y1, fadeLen, tailFade } = st.column, N = 32;
+    ctx.save();
+    base();
+    ctx.beginPath();
+    for (let i = 0; i <= N; i++) { const y = y0 + (y1 - y0) * i / N; i ? ctx.lineTo(ix + st.halfW(y), y) : ctx.moveTo(ix + st.halfW(y), y); }
+    for (let i = N; i >= 0; i--) { const y = y0 + (y1 - y0) * i / N; ctx.lineTo(ix - st.halfW(y), y); }
+    ctx.closePath(); ctx.clip();
+    const tone = (y) => { const u = Math.max(0, Math.min(1, (y - (iy - R)) / (2 * R))); return PALETTE.sandTop.map((v, i) => Math.round(v + (PALETTE.sandBot[i] - v) * u)); };
+    if (fadeLen > 0.01 || tailFade > 0.01) {
+      const gr = ctx.createLinearGradient(0, y0, 0, y1), K = 10, h = y1 - y0;
+      const stop = (y, a) => gr.addColorStop(Math.min(1, Math.max(0, (y - y0) / h)), rgb(tone(y), a));
+      if (tailFade > 0.01) for (let i = 0; i <= K; i++) stop(y0 + tailFade * i / K, smoothstep(i / K));
+      else stop(y0, 1);
+      if (fadeLen > 0.01) for (let i = 0; i <= K; i++) stop(y1 - fadeLen + fadeLen * i / K, 1 - smoothstep(i / K));
+      else stop(y1, 1);
+      ctx.fillStyle = gr;
+    } else ctx.fillStyle = sandGradient();
+    ctx.fillRect(ix - 20, y0 - 2, 40, y1 - y0 + 4);
+    if (dbg.particles) strokeGrains(ctx, st.neckGrains);
+    ctx.restore();
+  }
+
+  // the apex stream, into the mark-box layer (or straight onto the canvas): faint core + grains
+  function drawStream(L, st) {
+    const c = L.c;
+    c.save();
+    base(c, L.x0, L.y0);
+    c.beginPath(); c.moveTo(...T[0]); c.lineTo(...T[1]); c.lineTo(...T[2]); c.closePath(); c.clip();
+    const front = streamLayer === 'front';
+    if (st.core && (front ? st.core.y1 : st.core.yHidden ?? st.core.y1) > st.core.y0) {
+      const { y0, density } = st.core;
+      // the static logo (stream in front) is one unbroken line: no end fade there
+      const y1 = front ? st.core.y1 : st.core.yHidden ?? st.core.y1;
+      const endFade = front ? 0 : st.core.endFade;
+      const fadeAt = st.core.fadeAt ?? y1;
+      const yA = G.apex[1];
+      const half = (y) => 1.3 * Math.min(1, Math.sqrt(Math.max(0, y - yA) / 46));
+      c.beginPath();
+      const N = 40;
+      for (let i = 0; i <= N; i++) { const y = y0 + (y1 - y0) * i / N; i ? c.lineTo(ix + half(y), y) : c.moveTo(ix + half(y), y); }
+      for (let i = N; i >= 0; i--) { const y = y0 + (y1 - y0) * i / N; c.lineTo(ix - half(y), y); }
+      c.closePath();
+      // the core's density follows the grains' (the emission when that sand left the apex);
+      // above a wall contact its last units fade out
+      // stops at fixed heights (every 16 units from the apex), so moving the end never
+      // re-interpolates the rest of the line; plus the fade stops at the end
+      const gr = c.createLinearGradient(0, y0, 0, y1), hgt = y1 - y0;
+      const alpha = (y) => { const e = endFade > 0 ? Math.max(0, Math.min(1, (fadeAt - y) / endFade)) : 1; return 0.24 * (density ? density(y) : 1) * e; };
+      const ys = [];
+      for (let y = y0; y < y1; y += 16) ys.push(y);
+      if (endFade > 0) for (let i = 0; i <= 4; i++) ys.push(fadeAt - endFade * (1 - i / 4));
+      ys.push(y1);
+      ys.filter((y) => y >= y0 && y <= y1).sort((a, b) => a - b)
+        .forEach((y) => gr.addColorStop((y - y0) / hgt, `rgba(118,118,118,${alpha(y).toFixed(4)})`));
+      c.fillStyle = gr; c.fill();
+    }
+    strokeGrains(c, st.grains);
+    // grains that landed on a wall, sliding off it (they fade out)
+    if (st.spray && st.spray.length) strokeGrains(c, st.spray, 'a');
+    c.restore();
+  }
+
+  // ------------------------------------------------------- blur helpers ---
+  const clear = (cv) => { const c = cv.getContext('2d'); c.setTransform(1, 0, 0, 1, 0, 0); c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1; c.clearRect(0, 0, cv.width, cv.height); };
+  // dst = a * wa + b * wb, premultiplied, additive (a transparent-cleared destination)
+  function mix(dst, a, wa, b, wb) {
+    clear(dst);
+    const c = dst.getContext('2d');
+    c.globalCompositeOperation = 'lighter';
+    if (wa > 0) { c.globalAlpha = wa; c.drawImage(a, 0, 0); }
+    if (wb > 0) { c.globalAlpha = wb; c.drawImage(b, 0, 0); }
+    c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+  }
+  const avg = (dst, a, b) => mix(dst, a, 0.5, b, 0.5);
+
+  // ------------------------------------------------------------- frame ---
+  const reducedMotion = opts.reducedMotion ?? (typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  // In motion the stream falls behind the sand (into the top pile, out of the neck).
+  // A still frame keeps the static logo's foreground line.
+  const streamLayer = opts.streamLayer ?? (reducedMotion ? 'front' : 'behind-sand');
+
+  // the sample rotations for a frame: the shutter is centred on the frame time and the
+  // rotation is continuous across the wrap of the cycle (where rotAt jumps by pi)
+  function sampleRots(st) {
+    const { samples, shutter } = BLUR;
+    const out = [];
+    for (let k = 0; k < samples; k++) {
+      const tk = st.t + ((k + 0.5) / samples - 0.5) * shutter;
+      const kk = Math.floor(tk / TIMING.cycle), phk = tk - kk * TIMING.cycle;
+      out.push(rotAt(phk) + Math.PI * (kk - st.cycleIndex));
+    }
+    return out;
+  }
+
+  let lastRest = false, needFull = true, mbox = null;    // partial repaint bookkeeping
+
+  // --------------------------------------------------- pointer light ---
+  // Opt-in (opts.pointerLight). A fine pointer over the canvas pulls the hidden source toward
+  // it: offset up to POINTER.reach (units of the side) from the triangle's centroid, confined
+  // to the lower arc so it stays a backlight. Source and activity a (0..1) ride critically
+  // damped springs (POINTER.settle to settle), so nothing ever steps; the light lets go when
+  // the pointer leaves or idles for POINTER.idle seconds. Touch, pen-less coarse pointers and
+  // reduced motion never engage it, and renderAt (captures, the MP4) leaves it untouched.
+  const pointer = { a: 0, va: 0, x: 0, y: SOURCE.down, vx: 0, vy: 0, tx: 0, ty: SOURCE.down, ta: 0, lastMove: -1e9 };
+  const pointerOn = !!opts.pointerLight && typeof window !== 'undefined';
+  const centroid = [(T[0][0] + T[1][0] + T[2][0]) / 3, (T[0][1] + T[1][1] + T[2][1]) / 3];
+  function pointerTarget(e) {
+    const rect = canvas.getBoundingClientRect();
+    const px = ((e.clientX - rect.left) * dpr - ox) / s, py = ((e.clientY - rect.top) * dpr - oy) / s;
+    let dx = (px - centroid[0]) / S_SIDE, dy = (py - centroid[1]) / S_SIDE;
+    let r = Math.hypot(dx, dy) * POINTER.reach;              // one side away = full reach
+    r = Math.min(POINTER.reach, r);
+    let ang = Math.atan2(dx, dy);                             // 0 = straight down
+    const lim = POINTER.arc * Math.PI / 180;
+    // past the arc the reach fades to nothing at straight up, so a pointer crossing over the
+    // apex never makes the light swing from one end of the arc to the other
+    const over = Math.abs(ang) - lim;
+    if (over > 0) r *= 1 - smoothstep(over / (Math.PI - lim));
+    ang = Math.max(-lim, Math.min(lim, ang));
+    pointer.tx = r * Math.sin(ang); pointer.ty = r * Math.cos(ang);
+  }
+  const fine = (e) => e.pointerType === 'mouse' && (typeof matchMedia === 'undefined' || matchMedia('(pointer: fine)').matches);
+  const onPointer = (e) => { if (!fine(e)) return; pointerTarget(e); pointer.ta = 1; pointer.lastMove = performance.now(); };
+  const onLeave = () => { pointer.ta = 0; };
+  // critically damped spring step (omega from the 2% settle time)
+  const OMEGA = 5.83 / POINTER.settle;
+  function spring(v, vel, target, dt) {
+    const acc = OMEGA * OMEGA * (target - v) - 2 * OMEGA * vel;
+    vel += acc * dt; return [v + vel * dt, vel];
+  }
+  function stepPointer(dt) {
+    if (!pointerOn) return;
+    if (performance.now() - pointer.lastMove > POINTER.idle * 1000) pointer.ta = 0;
+    const n = Math.max(1, Math.ceil(dt / (1 / 240)));
+    for (let k = 0; k < n; k++) {
+      const h = dt / n;
+      [pointer.a, pointer.va] = spring(pointer.a, pointer.va, pointer.ta, h);
+      const px0 = pointer.x, py0 = pointer.y;
+      [pointer.x, pointer.vx] = spring(pointer.x, pointer.vx, pointer.tx, h);
+      [pointer.y, pointer.vy] = spring(pointer.y, pointer.vy, pointer.ty, h);
+      // cap how fast the light's direction turns (radius is free)
+      const r0 = Math.hypot(px0, py0), r1 = Math.hypot(pointer.x, pointer.y);
+      if (r0 > 1e-4 && r1 > 1e-4) {
+        const a0 = Math.atan2(px0, py0), a1 = Math.atan2(pointer.x, pointer.y);
+        let da = a1 - a0; da -= 2 * Math.PI * Math.round(da / (2 * Math.PI));
+        const cap = POINTER.maxLeanRate * Math.PI / 180 * h;
+        if (Math.abs(da) > cap) {
+          const a = a0 + Math.sign(da) * cap;
+          pointer.x = r1 * Math.sin(a); pointer.y = r1 * Math.cos(a);
+          pointer.vx = (pointer.x - px0) / h; pointer.vy = (pointer.y - py0) / h;
+        }
+      }
+    }
+    if (pointer.ta === 0 && pointer.a < 1e-3 && Math.abs(pointer.va) < 1e-3) { pointer.a = 0; pointer.va = 0; }
+    pointer.a = Math.max(0, Math.min(1, pointer.a));
+  }
+
+  // optional section timings (opts.profile): hero.prof = { section: [ms, ...] }
+  const prof = opts.profile ? {} : null;
+  let pt = 0;
+  const tick = (name) => { if (!prof) return; const now = performance.now(); (prof[name] ||= []).push(now - pt); pt = now; };
+
+  function render(st) {
+    if (prof) pt = performance.now();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    // light behind the glass: it breathes continuously; the hidden source leans with the glass
+    // and, if enabled, toward the pointer. At the breath's trough (with no pointer) it is the
+    // rest image, the approved static look; while that holds, only the mark's box is repainted.
+    if (dbg.glow) {
+      const b = dbg.breath === false ? 0 : st.breath;
+      const so = dbg.breath === false ? [0, SOURCE.down] : st.source;
+      const pa = pointer.a, sx = (1 - pa) * so[0] + pa * pointer.x, sy = (1 - pa) * so[1] + pa * pointer.y;
+      const atRest = b === 0 && pa === 0;
+      if (gl) {
+        if (!atRest) { glowGL(b, sx, sy, pa); ctx.drawImage(glc, 0, 0); }
+        else if (!lastRest || needFull) ctx.drawImage(glowA, 0, 0);
+        else ctx.drawImage(glowA, mbox.x, mbox.y, mbox.w, mbox.h, mbox.x, mbox.y, mbox.w, mbox.h);
+      } else {
+        // 2D fallback: breath only (the crest image is at the rest offset)
+        const P = b < glowD.snap ? 0 : b;
+        if (P > 0 || !lastRest || needFull) ctx.drawImage(glowA, 0, 0);
+        else ctx.drawImage(glowA, mbox.x, mbox.y, mbox.w, mbox.h, mbox.x, mbox.y, mbox.w, mbox.h);
+        if (P > 0) { ctx.globalAlpha = P; ctx.drawImage(glowD.c, glowD.x0, glowD.y0); ctx.globalAlpha = 1; }
+      }
+      lastRest = atRest; needFull = false;
+    } else { ctx.fillStyle = PALETTE.bg; ctx.fillRect(0, 0, W, Hh); }
+    tick('glow');
+
+    // solid black face
+    base(); ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.moveTo(...T[0]); ctx.lineTo(...T[1]); ctx.lineTo(...T[2]); ctx.closePath(); ctx.fill();
+    tick('face');
+
+    const showStream = dbg.particles && (st.grains.length || st.core);
+    if (showStream && streamLayer === 'behind') drawStream(MAIN, st);
+
+    // motion blur weight for this frame
+    const travel = st.omega * (R + H / 2) * s * BLUR.shutter;
+    const w = dbg.blur ? smoothstep((travel - BLUR.onset) / BLUR.width) : 0;
+    const rots = w > 0 ? sampleRots(st) : null;
+
+    // the column goes under both sand bodies: the pile covers its top, the mound its foot,
+    // each with its own clean edge, so there is no seam where sand meets stream
+    // the still frame (stream in front) is the static logo: the line replaces the pour
+    if (dbg.particles && st.column && streamLayer !== 'front') drawColumn(st);
+    tick('column');
+
+    // sand, attached to the glass while it turns
+    if (w <= 0) {
+      drawSand(MAIN, st, st.rot);
+    } else {
+      const X = blurred(box.sand, st, rots, w, (L, rot) => drawSand(L, st, rot), true);
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(X, box.x0, box.y0);
+    }
+    tick('sand');
+
+    // etched ring, over the sand so its inner half is never painted over
+    // (fixed in place: a circle is unchanged by the flip)
+    drawRing();
+    tick('ring');
+
+    // the stream, from the apex: over the ring, behind the visible sand and under the walls.
+    // While the glass turns it ends where it first meets a wall (the engine's first-hit
+    // contact), so a wall never hides part of it: it lands on the wall instead.
+    if (showStream && streamLayer !== 'behind') {
+      if (streamLayer === 'front') { /* the static line is drawn last, over the walls */ }
+      else {
+        const mc = mark.c.getContext('2d');
+        clear(mark.c);
+        drawStream({ c: mc, x0: mark.x0, y0: mark.y0 }, st);
+        mc.globalCompositeOperation = 'destination-out';
+        mc.setTransform(1, 0, 0, 1, 0, 0);
+        if (w <= 0) {
+          drawMask({ c: mc, x0: mark.x0, y0: mark.y0 }, st, st.rot);
+        } else {
+          const M = blurred(box.mask, st, rots, w, (L, rot) => drawMask(L, st, rot), false);
+          mc.drawImage(M, box.x0 - mark.x0, box.y0 - mark.y0);
+        }
+        mc.globalCompositeOperation = 'source-over';
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.drawImage(mark.c, mark.x0, mark.y0);
+      }
+    }
+    tick('stream');
+
+    // glass walls: they cover every edge where sand meets glass
+    if (w <= 0) {
+      drawWalls(MAIN, st.rot);
+    } else {
+      const X = blurred(box.walls, st, rots, w, (L, rot) => drawWalls(L, rot), true);
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(X, box.x0, box.y0);
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    // the static logo's line (the still frame only): over the walls, under the bottom mound
+    if (streamLayer === 'front' && dbg.particles) {
+      const triPx = (T[1][1] - T[0][1]) * s;                    // the triangle's height in device px
+      const lw = triPx * 1024 / 740 >= 128 ? STATIC_LINE.master : STATIC_LINE.small;
+      ctx.save();
+      base(); ctx.beginPath(); ctx.moveTo(...T[0]); ctx.lineTo(...T[1]); ctx.lineTo(...T[2]); ctx.closePath(); ctx.clip();
+      // it runs from the apex down into the bottom mound: clipped above the mound's surface
+      // (6 units past the peak, so the pile covers its end)
+      surfacePath((x) => C.mound(st.peak, x), false); ctx.lineTo(ix + R + 24, 0); ctx.lineTo(ix - R - 24, 0); ctx.closePath(); ctx.clip();
+      ctx.beginPath(); ctx.moveTo(ix, T[0][1]); ctx.lineTo(ix, st.peak + 6);
+      ctx.strokeStyle = STATIC_LINE.tone; ctx.lineWidth = lw; ctx.lineCap = 'butt'; ctx.stroke();
+      ctx.restore(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
+    tick('walls');
+  }
+
+  // eight-sample blur of one group, mixed with its sharp render by w. Returns group.X.
+  // tree: averaged pairwise (P0,P1 -> Q0/Q1 -> F) so flat areas round by at most one level;
+  // the mask (a soft alpha) is simply accumulated.
+  function blurred(group, st, rots, w, draw, tree) {
+    const { S, F, X } = group;
+    const L = { c: S.getContext('2d'), x0: box.x0, y0: box.y0 };
+    const sample = (k) => { clear(S); draw(L, rots[k]); };
+    if (tree) {
+      const { P0, P1, Q0, Q1 } = group;
+      const pair = (dst, k) => { sample(k); mix(dst, S, 0.5, S, 0); sample(k + 1); const c = dst.getContext('2d'); c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.5; c.drawImage(S, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; };
+      pair(P0, 0); pair(P1, 2); avg(Q0, P0, P1);
+      pair(P0, 4); pair(P1, 6); avg(Q1, P0, P1);
+      avg(F, Q0, Q1);
+    } else {
+      clear(F);
+      const c = F.getContext('2d');
+      c.globalCompositeOperation = 'lighter'; c.globalAlpha = 1 / BLUR.samples;
+      for (let k = 0; k < BLUR.samples; k++) { sample(k); c.drawImage(S, 0, 0); }
+      c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+    }
+    if (w >= 1) return F;
+    clear(S); draw(L, st.rot);                    // the sharp render at the frame time
+    mix(X, S, 1 - w, F, w);
+    return X;
+  }
+
+  // -------------------------------------------------------------- clock ---
+  const reduced = reducedMotion;
+  let clock = opts.startTime ?? (reduced ? STATIC_PHASE : OPEN_PHASE);
+  let last = null, raf = 0, running = false, visible = true;
+
+  function frame(now) {
+    if (!running) return;
+    if (last !== null) { const dt = Math.min(0.1, (now - last) / 1000); clock += dt; stepPointer(dt); }   // hitches slow down, never jump
+    last = now;
+    render(stateAt(clock));
+    raf = requestAnimationFrame(frame);
+  }
+  const autoplay = opts.autoplay !== false;
+  function start() { if (running || reduced || !autoplay) return; running = true; last = null; raf = requestAnimationFrame(frame); }
+  function stop() { running = false; cancelAnimationFrame(raf); }
+
+  initGL();
+  layout();
+  render(stateAt(clock));
+  const ro = new ResizeObserver(() => { layout(); render(stateAt(clock)); });
+  ro.observe(canvas);
+  if (pointerOn && !reduced) {
+    canvas.addEventListener('pointerenter', onPointer); canvas.addEventListener('pointermove', onPointer);
+    canvas.addEventListener('pointerleave', onLeave);
+  }
+  const onVis = () => { visible = !document.hidden; visible ? start() : stop(); };
+  document.addEventListener('visibilitychange', onVis);
+  let io = null;
+  if ('IntersectionObserver' in window) {
+    io = new IntersectionObserver(([e]) => (e.isIntersecting && visible ? start() : stop()));
+    io.observe(canvas);
+  }
+  start();
+
+  return {
+    start, stop,
+    // deterministic: render the frame at absolute time t (seconds)
+    renderAt(t) { stop(); clock = t; const st = stateAt(t); tick('sim'); render(st); },
+    state: (t) => stateAt(t),
+    prof,
+    destroy() { stop(); ro.disconnect(); io && io.disconnect(); document.removeEventListener('visibilitychange', onVis); canvas.removeEventListener('pointerenter', onPointer); canvas.removeEventListener('pointermove', onPointer); canvas.removeEventListener('pointerleave', onLeave); if (gl) { const ext = gl.getExtension('WEBGL_lose_context'); ext && ext.loseContext(); } },
+    timing: TIMING,
+    get glow() { return gl ? 'webgl' : 'canvas2d'; },
+    get pointerState() { return { a: pointer.a, x: pointer.x, y: pointer.y }; },
+  };
+}
+
+  const p = new URLSearchParams(location.search);
+  window.hero = mountBlacksand(document.getElementById('blacksand'), {
+    autoplay: p.get('autoplay') !== '0',
+    dpr: p.has('dpr') ? +p.get('dpr') : undefined,
+    markSize: p.has('mark') ? +p.get('mark') : undefined,
+    streamLayer: p.get('layer') || undefined,
+    debug: p.has('debug') ? Object.fromEntries(p.get('debug').split(',').filter(Boolean).map((k) => [k, false])) : undefined,
+    profile: p.has('profile'),
+    webgl: p.get('webgl') === '0' ? false : undefined,
+    pointerLight: p.get('pointer') !== '0',
+  });
+  window.heroReady = true;
+})();
+</script>
+</body>
+</html>

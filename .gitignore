@@ -5,3 +5,7 @@ node_modules/
 *.log
 .DS_Store
 /dist/
+
+# Generated logo-package work.
+/blacksand-mark/tools/.build/
+/blacksand-mark/tools/__pycache__/
