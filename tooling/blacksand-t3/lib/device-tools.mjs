@@ -351,7 +351,8 @@ export async function reviewToolClosure(pin, previous, { isKnownHost, lock = nul
   try {
     const scanOf = async (pkg, into) => {
       const { name, version } = splitPin(pkg);
-      return scan((await fetch(name, version, path.join(work, into))).dir);
+      const fetched = await fetch(name, version, path.join(work, into));
+      return scan(fetched.dir, fetched.identity);
     };
     for (const [i, pkg] of added.entries()) {
       const { name } = splitPin(pkg);

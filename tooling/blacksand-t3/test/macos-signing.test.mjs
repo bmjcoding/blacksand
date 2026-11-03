@@ -6,7 +6,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 const dataModule = (source) => `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`;
-async function staging(name, configured = true) {
+async function staging(name, configured = true, copyStderr = "") {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "blacksand-signing-test-"));
   const state = path.join(dir, "state"); fs.mkdirSync(state);
   if (configured) {
@@ -14,9 +14,9 @@ async function staging(name, configured = true) {
     fs.writeFileSync(path.join(state, "signing.keychain-pass"), "fixture password", { mode: 0o600 });
   }
   const calls = [];
-  const command = (cmd, args) => {
-    calls.push([cmd, args]);
-    return { status: 0, stdout: cmd === "security" && args[0] === "find-identity" ? `1) ${"A".repeat(40)} "${name}"\n` : "", stderr: "" };
+  const command = (cmd, args, options) => {
+    calls.push([cmd, args, options]);
+    return { status: 0, stdout: cmd === "security" && args[0] === "find-identity" ? `1) ${"A".repeat(40)} "${name}"\n` : "", stderr: cmd === "ditto" ? copyStderr : "" };
   };
   globalThis.__blacksandSigningFixture = { spawnSync: command, run: command, capture: () => '"/fixture/login.keychain-db"', log: () => {} };
   const util = dataModule(`export * from ${JSON.stringify(new URL("../lib/util.mjs", import.meta.url).href)}; export const STATE=${JSON.stringify(state)}; export const {run,capture,log}=globalThis.__blacksandSigningFixture;`);
@@ -52,4 +52,10 @@ test("missing or unrelated configured identities refuse staging without ad-hoc s
     assert.match(result.error?.message ?? "", /no configured signing identity/);
     assert.ok(result.calls.every(([cmd]) => cmd !== "codesign" && cmd !== "op"));
   }
+});
+test("a zero-exit copy with permission errors refuses staging before signing", async () => {
+  const result = await staging("Blacksand T3 Local Signing", true, "ditto: cache/bytecode: Permission denied\n");
+  assert.match(result.error?.message ?? "", /incomplete app copy: ditto: cache\/bytecode: Permission denied/);
+  assert.ok(result.calls.every(([cmd]) => cmd !== "codesign" && cmd !== "security" && cmd !== "xattr"));
+  assert.equal(result.calls.find(([cmd]) => cmd === "ditto")[2].stdio[2], "pipe");
 });

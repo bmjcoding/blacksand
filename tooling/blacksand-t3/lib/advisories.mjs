@@ -452,11 +452,12 @@ const sourceTier = (record) => Math.min(...record.sources.map((source) => ({ osv
  * fixed: [versions], curatedFixed, severity, records }], sources, origins }], most
  * severe first (mergeAdvisories); sources: what each
  * source was asked and when; gaps }. `watch`: package names whose own
- * repository's advisories are read too (the device tools).
+ * repository's advisories are read too (the device tools). Forge is always
+ * included when present: its maintainer reports can precede curated records.
  */
 export async function scanAdvisories(packages, { watch = [], meta = npmMeta } = {}) {
   const list = [...new Set(packages)].sort();
-  const watched = new Set(watch);
+  const watched = new Set([...watch, "node-forge"]);
   const at = () => new Date().toISOString();
   const osv = await osvAdvisories(list);
   const osvAt = at();

@@ -1,5 +1,5 @@
 {
-  "note": "Security overrides applied to every build. `overrides` (rule deps/security-overrides): each replaces one exact vulnerable version with the lowest same-major version that fixes every advisory against it, chosen 2026-10-30 from OSV.dev (agent-device, 2026-10-31, from its repository's own advisories) and checked for publisher and provenance continuity (lib/fastlane.mjs). `deviceTools` (rule server/device-tool-overrides): the same for a device tool version upstream pins in apps/server/src/device/deviceToolVersions.json, raised within its line (0.x: its minor) to the fix, which pin.json must keep a reviewed lock for (blacksand t3 device-tool-lock). Changing this file needs a commit the repository owner signs. Remove an entry once upstream ships the fix and the fix is at least 3 days old.",
+  "note": "Security overrides applied to every build. `overrides` (rule deps/security-overrides): each replaces one exact vulnerable version with the lowest same-major version that fixes every advisory against it, chosen 2026-10-30 from OSV.dev (agent-device, 2026-10-31, from its repository's own advisories; node-forge, 2026-11-02, from OSV.dev, GitHub's database and its maintainer advisories) and checked for publisher and provenance continuity (lib/fastlane.mjs). `deviceTools` (rule server/device-tool-overrides): the same for a device tool version upstream pins in apps/server/src/device/deviceToolVersions.json, raised within its line (0.x: its minor) to the fix, which pin.json must keep a reviewed lock for (blacksand t3 device-tool-lock). Changing this file needs a commit the repository owner signs. Remove an entry once upstream ships the fix and the fix is at least 3 days old.",
   "overrides": [
     {
       "selector": "@modelcontextprotocol/sdk@1.29.0",
@@ -59,6 +59,20 @@
       "version": "10.7.4",
       "advisories": [
         "GHSA-rxp7-6hxx-x8q5"
+      ]
+    },
+    {
+      "selector": "node-forge@1.4.0",
+      "version": "1.4.1",
+      "advisories": [
+        "GHSA-5x38-2vff-x55p",
+        "GHSA-7wch-p9px-956x",
+        "GHSA-86w9-cpqp-85rv",
+        "GHSA-8hrf-8g6f-7xwp",
+        "GHSA-hqq3-7jhf-c5jx",
+        "GHSA-jc66-7q78-782g",
+        "GHSA-6qrw-m8cv-hcxf",
+        "GHSA-rhr8-3pm8-cq29"
       ]
     },
     {

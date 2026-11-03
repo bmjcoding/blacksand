@@ -258,9 +258,16 @@ export const makeRules = ({ updater, build }) => [
     edits: [
       {
         // A no-op service spelled out here: upstream removed AnalyticsService.layerTest in 0.1.4.
-        find: "Layer.provideMerge(AnalyticsService.layer),",
-        replace:
-          "Layer.provideMerge(\n    Layer.succeed(\n      AnalyticsService.AnalyticsService,\n      AnalyticsService.AnalyticsService.of({ record: () => Effect.void, flush: Effect.void, recordOwners: () => Effect.void }),\n    ),\n  ),",
+        ...shapes(
+          ...[
+            "Layer.provideMerge(AnalyticsService.layer),",
+            "Layer.provideMerge(AnalyticsService.layer.pipe(Layer.provide(ManagedPolicy.layer))),",
+          ].map((find) => ({
+            find,
+            replace:
+              "Layer.provideMerge(\n    Layer.succeed(\n      AnalyticsService.AnalyticsService,\n      AnalyticsService.AnalyticsService.of({ record: () => Effect.void, flush: Effect.void, recordOwners: () => Effect.void }),\n    ),\n  ),",
+          })),
+        ),
       },
     ],
   },
@@ -305,13 +312,19 @@ export const makeRules = ({ updater, build }) => [
     why: "Restarts a managed relay tunnel from stored secrets even when cloud config is absent",
     file: "apps/server/src/server.ts",
     edits: [
-      {
-        // The layer must still run: server activation waits on cloudLinkParked.
-        // Skip straight to parking so no tunnel is ever started or recovered.
-        find: /(const layerCloudDesiredLinkReconcile = Layer\.effectDiscard\(\n(\s+)Effect\.gen\(function\* \(\) \{\n)/,
-        replace:
-          "$1$2  if (!hasCloudPublicConfig) {\n$2    yield* Deferred.succeed(cloudLinkParked, undefined).pipe(Effect.orDie);\n$2    return;\n$2  }\n",
-      },
+      // Activation must still be signalled, before acquiring CloudLink or registering
+      // any recovery/finalizer. The managed-policy branch now parks too; replace
+      // that exact prelude rather than accepting another signal anywhere in the file.
+      shapes(
+        {
+          find: "    const layerCloudDesiredLinkReconcile = Layer.effectDiscard(\n      Effect.gen(function* () {\n        const cloudLink = yield* CloudLink.CloudLink;\n        const releaseManagedTunnel = cloudLink.releaseManagedTunnelOnShutdown().pipe(\n",
+          replace: "    const layerCloudDesiredLinkReconcile = Layer.effectDiscard(\n      Effect.gen(function* () {\n        if (!hasCloudPublicConfig) {\n          yield* Deferred.succeed(cloudLinkParked, undefined).pipe(Effect.orDie);\n          return;\n        }\n        const cloudLink = yield* CloudLink.CloudLink;\n        const releaseManagedTunnel = cloudLink.releaseManagedTunnelOnShutdown().pipe(\n",
+        },
+        {
+          find: "    const layerCloudDesiredLinkReconcile = Layer.effectDiscard(\n      Effect.gen(function* () {\n        const cloudLink = yield* CloudLink.CloudLink;\n        // CloudLink unlinks on startup when the policy turns Connect off; nothing to restore.\n        if (!ManagedLimits.allowsConnect(yield* ManagedPolicy.ManagedPolicy)) {\n          yield* Deferred.succeed(cloudLinkParked, undefined).pipe(Effect.orDie);\n          return;\n        }\n        const releaseManagedTunnel = cloudLink.releaseManagedTunnelOnShutdown().pipe(\n",
+          replace: "    const layerCloudDesiredLinkReconcile = Layer.effectDiscard(\n      Effect.gen(function* () {\n        if (!hasCloudPublicConfig) {\n          yield* Deferred.succeed(cloudLinkParked, undefined).pipe(Effect.orDie);\n          return;\n        }\n        const cloudLink = yield* CloudLink.CloudLink;\n        const releaseManagedTunnel = cloudLink.releaseManagedTunnelOnShutdown().pipe(\n",
+        },
+      ),
       {
         // Assert-only: if upstream renames the parking signal, the guard above is wrong.
         find: "yield* Deferred.succeed(cloudLinkParked, undefined).pipe(Effect.orDie);",
@@ -690,15 +703,23 @@ export const makeRules = ({ updater, build }) => [
         find: "    !/^(?:npm-global:|bun-global$|pnpm-global$|vite-plus-global$|yarn-global$|volta$)/.test(\n",
         replace: "    !/^(?:npm-global:|pnpm-global$)/.test(\n",
       },
-      {
-        // bun, yarn, Volta and Vite+ pin only the provider, then resolve its dependencies with
-        // no lockfile and no minimum age, so a settled provider can still pull in a dependency
-        // published minutes ago. Each such install is left to the user, saying why.
-        find: /    return makeProviderMaintenanceCapabilities\(\{\n      provider: definition\.provider,\n      packageName,\n      updateExecutable: "(vp|bun|yarn|volta)",\n      updateArgs: \[[^\]\n]*\],\n      updateLockKey: "(?:vite-plus-global|bun-global|yarn-global|volta)",\n    \}\);\n/,
-        count: 4,
-        replace: (_, executable) =>
-          `    return blacksandUngatedInstall(manual, "${{ vp: "Vite+", bun: "bun", yarn: "yarn", volta: "Volta" }[executable]}");\n`,
-      },
+      // Each ungated installer has its own exact command/key pair. Newer releases
+      // pass the provider environment too; neither shape may leave an installer.
+      ...[
+        ["vp", "[\"i\", \"-g\", packageName]", "vite-plus-global", "Vite+"],
+        ["bun", "[\"i\", \"-g\", `${packageName}@latest`]", "bun-global", "bun"],
+        ["yarn", "[\"global\", \"add\", `${packageName}@latest`]", "yarn-global", "yarn"],
+        ["volta", "[\"install\", `${packageName}@latest`]", "volta", "Volta"],
+      ].map(([executable, args, lockKey, label]) =>
+        shapes(...["", "      env: context.env,\n"].map((environment) => ({
+          find:
+            "    return makeProviderMaintenanceCapabilities({\n" +
+            "      provider: definition.provider,\n      packageName,\n" +
+            `      updateExecutable: "${executable}",\n      updateArgs: ${args},\n      updateLockKey: "${lockKey}",\n` +
+            environment + "    });\n",
+          replace: `    return blacksandUngatedInstall(manual, "${label}");\n`,
+        }))),
+      ),
       {
         find: "function manualUpdateMessage(latestVersion: string, installPath: string | undefined): string {\n",
         replace:
@@ -777,13 +798,13 @@ export const makeRules = ({ updater, build }) => [
     why: "Carries why an install is left to the user (provider/updates-minimum-age), so the settings and the update say so",
     file: "packages/provider-core/src/server/maintenance.ts",
     edits: [
-      {
-        find: "  readonly installPath?: string;\n}\n",
-        replace:
-          "  readonly installPath?: string;\n" +
-          "  /** blacksand: why blacksand-t3 leaves this install to the user, in place of the generic advice. */\n" +
-          "  readonly manualReason?: string;\n}\n",
-      },
+      shapes(...[
+        "  readonly installPath?: string;\n}\n",
+        "  readonly installPath?: string;\n  /** Displayed for manual updates; never executed by T3 Code. */\n  readonly manualCommand?: string;\n}\n",
+      ].map((find) => ({
+        find,
+        replace: find.replace("\n}\n", "\n  /** blacksand: why blacksand-t3 leaves this install to the user, in place of the generic advice. */\n  readonly manualReason?: string;\n}\n"),
+      }))),
     ],
   },
   {
@@ -1796,11 +1817,17 @@ export const makeRules = ({ updater, build }) => [
   },
   {
     id: "web/blacksand-version-stamp",
-    why: "The build version stamped into the window's bottom-right corner, with its changes on hover (Blacksand themes)",
-    file: "apps/web/src/components/AppSidebarLayout.tsx",
+    why: "Window-corner build details, compact when needed to keep the composer clear, with hover/focus/tap access",
+    file: "apps/web/src/components/ChatView.tsx",
     edits: [
-      { find: 'import { isElectron } from "../env";', replace: 'import { isElectron } from "../env";\nimport { BlacksandVersionStamp } from "./BlacksandBrand";' },
-      { find: "        <SidebarControl />\n", replace: "        <SidebarControl />\n        <BlacksandVersionStamp />\n" },
+      {
+        find: 'import { ComposerSurface } from "./chat/ComposerSurface";',
+        replace: 'import { ComposerSurface } from "./chat/ComposerSurface";\nimport { BlacksandVersionStamp } from "./BlacksandBrand";',
+      },
+      {
+        find: "                  </div>\n                </div>\n              </div>\n            </div>\n\n            {canOperatePreview",
+        replace: "                  </div>\n                </div>\n                {embedded ? null : <BlacksandVersionStamp />}\n              </div>\n            </div>\n\n            {canOperatePreview",
+      },
     ],
   },
   {
@@ -2191,11 +2218,14 @@ export const makeRules = ({ updater, build }) => [
     why: "Re-enable upstream's update UI in packaged builds (there is no release feed to require)",
     file: "apps/desktop/src/updates/DesktopUpdates.ts",
     edits: [
-      {
-        find: "}): string | null {\n  if (!args.hasUpdateFeedConfig) {",
-        replace:
-          "}): string | null {\n  if (args.isPackaged && !args.isDevelopment) return null;\n  if (!args.hasUpdateFeedConfig) {",
-      },
+      // Keep the administrator's off switch ahead of the packaged Blacksand UI.
+      shapes(...[
+        "}): string | null {\n",
+        "}): string | null {\n  if (args.policy.mode === \"off\") {\n    return args.policy.message ?? \"Updates are turned off on this machine.\";\n  }\n",
+      ].map((head) => ({
+        find: head + "  if (!args.hasUpdateFeedConfig) {",
+        replace: head + "  if (args.isPackaged && !args.isDevelopment) return null;\n  if (!args.hasUpdateFeedConfig) {",
+      }))),
     ],
   },
   {
@@ -2799,14 +2829,52 @@ export const makeRules = ({ updater, build }) => [
     why: "`--tailscale-serve` (T3CODE_TAILSCALE_SERVE) makes the server write Tailscale Serve's configuration, and turn it off when it stops",
     file: "apps/server/src/server.ts",
     edits: [
-      {
-        find: 'import { disableTailscaleServe, ensureTailscaleServe } from "@t3tools/tailscale";\n',
-        replace:
-          'import { disableTailscaleServe, ensureTailscaleServe as upstreamEnsureTailscaleServe } from "@t3tools/tailscale";\n' +
+      shapes(...[
+        "import { disableTailscaleServe, ensureTailscaleServe } from \"@t3tools/tailscale\";\n",
+        "import {\n  disableTailscaleServe,\n  ensureTailscaleServe,\n  readTailscaleServeRoutesTo,\n  readTailscaleStatus,\n} from \"@t3tools/tailscale\";\n",
+      ].map((find) => ({
+        find,
+        replace: find.replace("ensureTailscaleServe", "ensureTailscaleServe as upstreamEnsureTailscaleServe") +
+          (find.includes("readTailscaleServeRoutesTo") ? 'import * as BlacksandPlatformError from "effect/PlatformError";\n' : "") +
           "/** blacksand: Tailscale Serve is the host admin's (scripts/add-phone-service.sh); this server never writes it. */\n" +
           "const ensureTailscaleServe = (_input: Parameters<typeof upstreamEnsureTailscaleServe>[0]) =>\n" +
           `  Effect.fail(new Error(${JSON.stringify(`blacksand-t3 leaves Tailscale Serve to the host's admin: from the admin account, in the blacksand-t3 clone, run \`${BLACKSAND_PHONE_SERVICE}\`, and start this server without --tailscale-serve.`)}));\n`,
-      },
+      }))),
+      shapes(
+        // Before managed policy there was no startup cleanup. Assert the old bind.
+        {
+          find: '        host: config.host ?? "127.0.0.1",\n',
+          replace: '        host: config.host ?? "127.0.0.1",\n',
+        },
+        {
+          find: "    yield* ManagedLimits.closeTailscaleServeTo(policy, { host: bindHost, port: config.port });\n",
+          replace: `    // blacksand: check managed restrictions without changing the host admin's Serve routes.
+    if (!ManagedLimits.allowsRemoteClients(policy)) {
+      const target = { host: bindHost, port: config.port };
+      if (!(yield* (yield* NetService.NetService).canListenOnHost(target.port, target.host))) {
+        return yield* ManagedLimits.refuseRemoteClients(policy, "so the server does not start while its port is occupied");
+      }
+      const routes = yield* readTailscaleServeRoutesTo(target).pipe(
+        Effect.catchTags({
+          TailscaleCommandSpawnError: (error) =>
+            (BlacksandPlatformError.isPlatformError(error.cause) && error.cause.reason._tag === "NotFound") ||
+            (error.cause instanceof Error && "code" in error.cause && error.cause.code === "ENOTDIR")
+              ? Effect.succeed([])
+              : Effect.fail(error),
+          TailscaleCommandExitError: (error) =>
+            error.stderrDiagnostic === "not-running" || error.stderrDiagnostic === "not-logged-in"
+              ? Effect.succeed([])
+              : Effect.fail(error),
+        }),
+        Effect.mapError(() => ManagedLimits.refuseRemoteClients(policy, "so the server does not start until the host admin can check Tailscale Serve")),
+      );
+      if (routes.length > 0) {
+        return yield* ManagedLimits.refuseRemoteClients(policy, "so the server does not start while Tailscale Serve forwards here; ask the host admin to remove those routes");
+      }
+    }
+`,
+        },
+      ),
     ],
   },
   {
@@ -2931,14 +2999,15 @@ export const makeRules = ({ updater, build }) => [
     why: "The welcome screen says the app collects anonymous usage data; this build collects none",
     file: "apps/web/src/components/onboarding/WelcomeWizard.tsx",
     edits: [
-      {
-        find:
-          "          T3 Code collects anonymous usage data to help us improve it. To read more about how your\n" +
-          '          data is used and how to opt out, see our{" "}\n',
+      shapes(...[
+        "          T3 Code collects anonymous usage data to help us improve it. To read more about how your\n          data is used and how to opt out, see our{\" \"}\n",
+        "          {telemetryOff ?? \"T3 Code collects anonymous usage data to help us improve it.\"} To read\n          more about how your data is used{telemetryOff === undefined ? \" and how to opt out\" : \"\"},\n          see our{\" \"}\n",
+      ].map((find) => ({
+        find,
         replace:
           "          T3 Code (blacksand) collects no usage data: this build of the app has its analytics and telemetry\n" +
-          '          removed. To see everything it removes and what still connects out, read the{" "}\n',
-      },
+          `          removed.${find.includes("telemetryOff") ? " {telemetryOff}" : ""} To see everything it removes and what still connects out, read the{\" \"}\n`,
+      }))),
       { find: "            privacy policy\n          </a>\n", replace: "            Blacksand privacy notes\n          </a>\n" },
     ],
   },
@@ -2947,10 +3016,15 @@ export const makeRules = ({ updater, build }) => [
     why: "Settings → About says the app collects anonymous usage data and offers T3's privacy policy",
     file: "apps/web/src/components/settings/SettingsPanels.tsx",
     edits: [
-      {
-        find: 'description="How we handle your data, including the anonymous usage data T3 Code collects."',
-        replace: 'description="T3 Code (blacksand) collects no usage data. Blacksand\'s privacy notes list what this build removes and what still connects out."',
-      },
+      shapes(...[
+        "description=\"How we handle your data, including the anonymous usage data T3 Code collects.\"",
+        "description={\n            telemetryOff === undefined\n              ? \"How we handle your data, including the anonymous usage data T3 Code collects.\"\n              : `How we handle your data. ${telemetryOff}`\n          }",
+      ].map((find) => ({
+        find,
+        replace: find.includes("telemetryOff")
+          ? 'description={`T3 Code (blacksand) collects no usage data. Blacksand\'s privacy notes list what this build removes and what still connects out.${telemetryOff === undefined ? "" : ` ${telemetryOff}`}`}'
+          : "description=\"T3 Code (blacksand) collects no usage data. Blacksand's privacy notes list what this build removes and what still connects out.\"",
+      }))),
       { find: "              View policy\n", replace: "              Read more\n" },
     ],
   },

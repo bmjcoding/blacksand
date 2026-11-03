@@ -92,10 +92,15 @@ test("provider and ACP Registry installs keep to the release age", () => {
 
 test("installers that can't keep to the release age are manual, and ACP agents never run prebuilt binaries", () => {
   const provider = byId.get("provider/updates-minimum-age").edits;
-  const ungated = provider.find((edit) => edit.find instanceof RegExp && edit.count === 4);
-  assert.ok(ungated, "the four installer branches are replaced, all or nothing");
-  const replaced = 'return makeProviderMaintenanceCapabilities({\n      provider: definition.provider,\n      packageName,\n      updateExecutable: "bun",\n      updateArgs: ["i", "-g", `${packageName}@latest`],\n      updateLockKey: "bun-global",\n    });\n';
-  assert.equal(`    ${replaced}`.replace(new RegExp(ungated.find.source, "g"), ungated.replace), '    return blacksandUngatedInstall(manual, "bun");\n');
+  const ungated = provider.filter((edit) => edit.alternatives?.every((shape) => shape.replace.includes("return blacksandUngatedInstall(")));
+  assert.equal(ungated.length, 4, "each installer has one strict edit");
+  for (const edit of ungated) {
+    assert.equal(edit.alternatives.length, 2, "with and without the provider environment");
+    for (const shape of edit.alternatives) {
+      assert.equal(shape.find.replace(new RegExp(edit.find.source, "g"), edit.replace), shape.replace);
+      assert.doesNotMatch(shape.replace, /makeProviderMaintenanceCapabilities|env:|updateExecutable/);
+    }
+  }
   const text = provider.map((edit) => (typeof edit.replace === "string" ? edit.replace : "")).join("\n");
   assert.match(text, /Update this provider with npm or pnpm, or its own updater\./);
   assert.match(text, /!\/\^\(\?:npm-global:\|pnpm-global\$\)\/\.test\(/, "only npm and pnpm take a targeted install");

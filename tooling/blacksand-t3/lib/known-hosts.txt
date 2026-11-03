@@ -23,6 +23,7 @@ accounts.x.ai
 agentclientprotocol.com
 api.anthropic.com
 api.bitbucket.org
+api.cursor.com # Cursor SDK account/model catalog (GET /v1/me, /v1/models); uses the configured Cursor key
 api.example.com # placeholder text in Settings -> ACP session management's URL field
 api.expo.dev # EAS device hosts (upstream #21843); only with your own Expo token or eas login
 api.github.com # LiteLLM pricing fallback is disabled by server/litellm-rates-off; also source control

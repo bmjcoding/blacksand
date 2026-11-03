@@ -41,38 +41,70 @@
 
 /* ------------------------------------------------------- version stamp -- */
 
-/* The build version in the window's bottom-right corner, styled as a stamp,
-   with what the build changed on hover or focus. BlacksandBrand.tsx only
-   renders it while Settings -> Appearance -> Version stamp is on. */
-.t3b-version-stamp {
+/* The badge belongs to the window, including while a draft composer is centered.
+   Only a bottom composer that would cover the compact target needs clearance. */
+.chat-composer-lane[data-t3b-version-corner-reserve] {
+  padding-inline-end: calc(env(safe-area-inset-right) + 4rem + var(--chat-lane-inset-end, 0px));
+}
+
+.t3b-version-rail {
   position: fixed;
-  right: 12px;
-  bottom: 10px;
-  z-index: 30;
+  inset-inline-end: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 49;
+  pointer-events: auto;
+}
+
+.t3b-version-stamp {
+  --t3b-version-surface: var(--card);
   display: inline-flex;
-  align-items: center;
+  position: relative;
+  min-width: 32px;
+  height: 32px;
   gap: 6px;
-  padding: 4px 7px;
-  border-radius: 2px;
-  background: #000;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--t3b-version-surface);
   box-shadow: 0 0 0 1px var(--t3b-card-edge);
   color: var(--t3b-ember);
   font: 700 9.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
   letter-spacing: 0.06em;
-  cursor: default;
+  cursor: pointer;
   outline: none;
   user-select: none;
 }
 
-.t3b-version-stamp:focus-visible {
-  box-shadow: 0 0 0 1px var(--t3b-ember);
+/* Use ComposerSurface's theme surface and Glass treatment for its neighbor. */
+.dark .t3b-version-stamp { --t3b-version-surface: var(--surface-raised); }
+html[data-theme-id] .t3b-version-stamp { --t3b-version-surface: var(--app-theme-surface-raised); }
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .t3b-version-stamp {
+    background: color-mix(in oklab, var(--t3b-version-surface) var(--glass-opacity), transparent);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  }
 }
 
-.t3b-version-stamp > i {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--t3b-ember);
+.t3b-version-stamp:focus-visible {
+  box-shadow: 0 0 0 2px var(--t3b-ember);
+}
+
+.t3b-version-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* Hidden text keeps its intrinsic width measurable in compact mode. */
+.t3b-version-label { white-space: nowrap; }
+.t3b-version-rail[data-compact] .t3b-version-stamp { width: 32px; gap: 0; }
+.t3b-version-rail[data-compact] .t3b-version-label {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* Near-neutral greys warmed a touch toward the accent, so the card sits with
@@ -86,24 +118,20 @@
   --t3b-card-muted: color-mix(in oklab, var(--t3b-accent) 10%, #7c7c7c);
 }
 
-/* The card sits above the stamp; its bottom padding bridges the gap so the
-   pointer can travel up into it without it closing. */
+/* The shared popover handles hover travel, focus, Escape, outside press and
+   viewport collisions. Its portal avoids the chat/panel overflow clipping. */
 .t3b-version-notes {
-  position: absolute;
-  right: -1px;
-  bottom: 100%;
-  display: none;
-  padding-bottom: 8px;
-}
-
-.t3b-version-stamp:is(:hover, :focus-within) .t3b-version-notes {
-  display: block;
+  width: 340px;
+  max-width: calc(100vw - 16px);
+  max-height: min(420px, 60vh);
+  overflow: hidden;
 }
 
 .t3b-version-card {
-  width: 340px;
-  max-height: min(420px, 60vh);
+  width: 100%;
+  max-height: min(420px, 60vh, var(--available-height, 60vh));
   overflow-y: auto;
+  overflow-wrap: anywhere;
   padding: 12px 14px;
   border-radius: 10px;
   background: var(--t3b-card);
@@ -189,12 +217,6 @@
 .t3b-version-card code {
   color: var(--t3b-card-muted);
   font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-/* A build that left features out: a hollow dot, and the list leads the card's end. */
-.t3b-version-stamp[data-drift] > i {
-  background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--t3b-ember);
 }
 
 .t3b-version-card .t3b-version-drift {
