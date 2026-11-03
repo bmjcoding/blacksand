@@ -290,3 +290,20 @@ marks, lockups and demo are byte-identical to the files they replace, except the
 | `blacksand_mark_on_black.svg` | removed (the glow mark on a black rect; use `blacksand-mark-glow.svg` on black) |
 | `tools/wordmark.json` | `tools/data/wordmark.json` |
 | `tools/geom.json`, `tools/mark_fragment.json` | build intermediates, now in `tools/.build/` (git-ignored) |
+
+## Glowing sand stream (glow mark)
+
+Owner: "what if we made the sandstream glow? … I feel like it would be more cohesive rather than just the line
+fill", then "darken the line just a tad bit and brighten the glow", then "the line from A2 but the soft haze/tight
+halo from D1", then "I like [rim] 40, but the line needs fixed … it's much brighter when being overlayed on the gray".
+The design panel judged twelve variants by one rule: light is brightest at its core and fades evenly outward.
+
+- **Glow:** a soft haze (white 30%, width 18, blur 16) and a tight halo (white 38%, width 8, blur 4) around the
+  line, both clipped like the line; the rim goes from 35% to 40%.
+- **Core:** white at 18% over the glow, 122 of 255 on black, the brightness of the approved line.
+- **Even brightness:** an opaque grey core went darker than the sand beside it (the glow added to the sand but the
+  core covered it: up to 24 levels darker); an added-light core went brighter over grey (131 over the ring, 151
+  over the sand). The stream is now drawn opaque over its own black backing and lightened onto the logo: the line
+  measures 121–122 over the air, the ring and the sand, and no pixel of the logo is darker than without the stream.
+- **Scope:** only `blacksand-mark-glow.svg` and `-glow-small.svg` change (the small cut's glow scales with its
+  16-unit line); every other logo and lockup file is byte-identical.

@@ -21,7 +21,7 @@ the cut meant for marks 24–127 px tall. The base name is always the master, fo
 | File | Use |
 |---|---|
 | `logo/blacksand-mark.svg`, `-small` | **The default logo**, for dark surfaces (docs, avatars, decks, app icons). No glow: the black triangle has a crisp #3a3a3a inner edge so it holds on black. Transparent background. |
-| `logo/blacksand-mark-glow.svg`, `-small` | The backlit mark, for black key art and posters: an even rim of light on all three edges, no pool. |
+| `logo/blacksand-mark-glow.svg`, `-small` | The backlit mark, for black key art and posters: an even rim of light on all three edges (white 40%), no pool, and a glowing sand stream lit by the same light. The stream is drawn with a lighten blend, so it holds one brightness over the air, the ring and the sand; browsers render it, but some design tools ignore SVG blend modes and show a flatter stream. |
 | `logo/blacksand-mark-light.svg`, `-small` | For white and light surfaces (an email signature, documents): solid black triangle, lighter flat interior (ring and walls #5c5c5c, sand #8a8a8a, line #b8b8b8), no lighting. |
 | `logo/blacksand-icon.svg`, `blacksand-icon-dark.svg` | Simplified one-colour cuts for marks under 24 px (favicon): white for dark surfaces, black for light ones. |
 | `logo/blacksand-mark@2x.png` | The default mark, transparent, 1024 px wide. |
