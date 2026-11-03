@@ -27,6 +27,7 @@ the cut meant for marks 24–127 px tall. The base name is always the master, fo
 | `logo/blacksand-mark@2x.png` | The default mark, transparent, 1024 px wide. |
 | `lockups/blacksand-lockup.svg`, `blacksand-lockup-mono.svg` | Lockups with the default mark: sans (Geist Semibold, tracking -4.5%) and mono (Geist Mono Medium, tracking -3%), text #666666, for dark surfaces. |
 | `lockups/blacksand-lockup-light.svg`, `blacksand-lockup-mono-light.svg` | The same with the light mark and text #262626, for white surfaces. |
+| `lockups/blacksand-lockup-glow.svg`, `blacksand-lockup-mono-glow.svg` | The same with the glow mark and text #d4d4d4, for black and near-black surfaces such as a dark-mode README (12.8:1 on GitHub's #0d1117, where #666666 is 3.3:1). |
 | `lockups/*-small.svg` | Each lockup's cut for marks under 128 px tall (the usual header size). |
 | `hero/blacksand-engine.js` | Geometry, volume-conserving sand levels, seeded grain simulation, timeline, glow breath and light-source offset. No DOM. |
 | `hero/blacksand-hero.js` | Canvas renderer. `mountBlacksand(canvas, { markSize })` returns `{ start, stop, renderAt, destroy }`. |

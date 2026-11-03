@@ -113,6 +113,7 @@ fs.writeFileSync(new URL('mark-fragment.json', BUILD), JSON.stringify({
   vb: vbFor(16), tri: T, iy, R,
   dark: mark('bsl', 'dark', { lineW: LINE.small, edgeW: LINE.bandSmall }), darkLarge: mark('bsl', 'dark'),
   light: mark('bsl', 'light', { lineW: LINE.small, edgeW: LINE.bandSmall }), lightLarge: mark('bsl', 'light'),
+  glow: mark('bsl', 'glow', { lineW: LINE.small, edgeW: LINE.bandSmall }), glowLarge: mark('bsl', 'glow'), glowPad: VARIANTS.glow.pad,
 }));
 // geometry + timing for the QA suite
 fs.writeFileSync(new URL('geom.json', BUILD), JSON.stringify({
