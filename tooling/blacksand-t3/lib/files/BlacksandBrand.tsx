@@ -208,6 +208,25 @@ function VersionStamp() {
         <PopoverPopup
           side="top"
           align="end"
+          sideOffset={({ side, positioner }) => {
+            if (side !== "top") return 4;
+            const bounds = trigger.current?.getBoundingClientRect();
+            const stack = anchor.current?.closest(".chat-composer-lane")
+              ?.querySelector("[data-chat-composer-stack]");
+            if (!bounds || !stack) return 4;
+            let offset = 4;
+            for (const action of stack.querySelectorAll<HTMLElement>(
+              "[data-chat-composer-transition-actions], [data-chat-composer-mobile-pending-actions], [data-t3b-send]",
+            )) {
+              const row = action.getBoundingClientRect();
+              if (getComputedStyle(action).visibility !== "hidden" && row.width > 0 && row.height > 0 &&
+                row.right > bounds.right - positioner.width && row.left < bounds.right &&
+                row.top < bounds.top - 4 && row.bottom > bounds.top - 4 - positioner.height) {
+                offset = Math.max(offset, bounds.top - row.top + 8);
+              }
+            }
+            return offset;
+          }}
           padding="none"
           initialFocus={false}
           finalFocus={false}

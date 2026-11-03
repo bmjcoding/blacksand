@@ -288,10 +288,13 @@ describe("responsive version stamp", () => {
     await vi.waitFor(() => expect(width()).toBe(32));
     await screen.rerender(<Shell max="100%" />);
     await vi.waitFor(() => expect(width()).toBe(32));
+    const lane = screen.container.querySelector<HTMLElement>(".chat-composer-lane")!;
+    await vi.waitFor(() => expect(lane.hasAttribute("data-t3b-version-corner-reserve")).toBe(true));
     const composer = screen.container.querySelector('[data-slot="composer-shell"]')!;
     const before = rect(composer).width;
     await act(() => setBlacksandInterface("stamp", false));
     expect(document.querySelector(".t3b-version-rail")).toBeNull();
+    expect(lane.hasAttribute("data-t3b-version-corner-reserve")).toBe(false);
     expect(rect(composer).width).toBeGreaterThan(before);
     expect(getComputedStyle(screen.container.querySelector(".chat-composer-lane")!).display).toBe(
       "block",
@@ -324,10 +327,10 @@ describe("responsive version stamp", () => {
     expect(bounds().right).toBe(1084);
     expect(bounds().bottom).toBe(684);
   });
-  for (const width of [360, 2200]) {
+  for (const width of [360, 1100, 2200]) {
     it(`opens readable, reachable changes on hover at ${width}px`, async () => {
       await page.viewport(width, 600);
-      await using screen = await render(<Shell />);
+      await using screen = await render(<Shell context />);
       await userEvent.hover(document.querySelector(".t3b-version-stamp")!);
       await expect.element(page.getByRole("heading", { name: /^Upstream/ })).toBeVisible();
       await expect.element(page.getByRole("heading", { name: /^Blacksand/ })).toBeVisible();
@@ -337,7 +340,10 @@ describe("responsive version stamp", () => {
       await vi.waitFor(() => {
         expect(positioner.getAttribute("data-side")).toBe("top");
         const stamp = document.querySelector(".t3b-version-stamp")!;
-        expect(Math.abs(rect(positioner).bottom - rect(stamp).top + 4)).toBeLessThan(2);
+        expect(rect(positioner).bottom).toBeLessThanOrEqual(rect(stamp).top - 4);
+        for (const button of screen.container.querySelectorAll("button")) {
+          separate(rect(positioner), rect(button));
+        }
       });
       inViewport(rect(card));
       expect(rect(card).height).toBeLessThanOrEqual(window.innerHeight * 0.6 + 1);
