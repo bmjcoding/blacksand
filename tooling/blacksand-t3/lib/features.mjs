@@ -44,7 +44,7 @@ export const features = [
   {
     name: "wordmark",
     label: "blacksand in the sidebar logo",
-    description: "A muted blacksand after upstream's T3 Code at the top of the sidebar",
+    description: "A muted blacksand centred under upstream's T3 Code at the top of the sidebar",
     rules: ["web/blacksand-sidebar-name"],
   },
   {

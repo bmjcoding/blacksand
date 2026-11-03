@@ -132,11 +132,12 @@ test("the app is called T3 Code (blacksand) everywhere it shows its name, with n
   assert.equal(replaces("web/branding-display-name"), "  return input.baseName;\n");
 });
 
-test("the sidebar logo is upstream's T3 Code with a muted, smaller blacksand after it", () => {
+test("the sidebar logo is upstream's T3 Code with a muted, smaller blacksand centred under it", () => {
   for (const id of ["web/blacksand-wordmark", "web/blacksand-stage-art"]) assert.ok(!byId.has(id), `${id} is gone`);
-  const [edit] = byId.get("web/blacksand-sidebar-name").edits;
-  assert.equal(edit.find, "        Code\n      </span>\n    </span>\n", "after upstream's muted Code, inside its mark");
-  assert.match(edit.replace, /^ {8}Code\n {6}<\/span>\n {6}<span className=\{cn\("shrink-0 text-xs font-normal", onBackdrop \? "text-white\/50" : "text-muted-foreground\/70"\)\}>\n {8}blacksand\n {6}<\/span>\n {4}<\/span>\n$/);
+  const [column, name] = byId.get("web/blacksand-sidebar-name").edits;
+  assert.match(column.replace, /^ {4}<span className="inline-flex min-w-0 flex-col items-center">\n {4}<span className="inline-flex min-w-0 items-baseline gap-1 text-sm font-medium tracking-tight">\n$/, "upstream's mark, in a centred column");
+  assert.equal(name.find, "        Code\n      </span>\n    </span>\n", "after upstream's muted Code, under its mark");
+  assert.match(name.replace, /text-\[10px\] leading-none font-normal tracking-\[0\.1em\]", onBackdrop \? "text-white\/55" : "text-muted-foreground\/70"\)\}>\n {8}blacksand\n {6}<\/span>\n {4}<\/span>\n$/);
   assert.equal(index.get("web/blacksand-sidebar-name"), "wordmark");
   assert.doesNotMatch(file("BlacksandBrand.tsx"), /Wordmark|Redacted|BLACKOUT/);
   assert.doesNotMatch(file("blacksand.css"), /t3b-wordmark|t3b-redacted/);

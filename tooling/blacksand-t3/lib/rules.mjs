@@ -1732,14 +1732,22 @@ export const makeRules = ({ updater, build }) => [
   },
   {
     id: "web/blacksand-sidebar-name",
-    why: "Upstream's sidebar logo, T3 Code, with a muted, smaller blacksand after it",
+    why: "Upstream's sidebar logo, T3 Code, with a muted, smaller blacksand centred under it, so the header row stays narrow",
     file: "apps/web/src/components/sidebar/SidebarChrome.tsx",
     edits: [
       {
+        find: '    <span className="inline-flex min-w-0 items-baseline gap-1 text-sm font-medium tracking-tight">\n',
+        replace:
+          '    <span className="inline-flex min-w-0 flex-col items-center">\n' +
+          '    <span className="inline-flex min-w-0 items-baseline gap-1 text-sm font-medium tracking-tight">\n',
+      },
+      {
+        // 10px, tracked out to the width of "T3 Code" above it; with the row's trimmed
+        // 18px the pair fills the logo's 28px link exactly
         find: "        Code\n      </span>\n    </span>\n",
         replace:
-          "        Code\n      </span>\n" +
-          '      <span className={cn("shrink-0 text-xs font-normal", onBackdrop ? "text-white/50" : "text-muted-foreground/70")}>\n' +
+          "        Code\n      </span>\n    </span>\n" +
+          '      <span className={cn("text-[10px] leading-none font-normal tracking-[0.1em]", onBackdrop ? "text-white/55" : "text-muted-foreground/70")}>\n' +
           "        blacksand\n      </span>\n    </span>\n",
       },
     ],

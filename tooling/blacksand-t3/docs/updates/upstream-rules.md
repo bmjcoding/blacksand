@@ -41,13 +41,14 @@ The rules remove what [privacy](../security/privacy.md) lists. They also give th
 its own name, bundle ID and data directory. The name is T3 Code (blacksand). The icon
 is upstream's T3, with a blacksand backdrop behind it: a night sky, one low dune, and
 the blacksand static logo, its centre line through the gap between the T and the 3. The sidebar logo is
-upstream's too, with a muted "blacksand" after it. Two touches follow whichever
+upstream's too, with a muted "blacksand" centred under it, which keeps the header
+row narrow. Two touches follow whichever
 theme you pick: a version stamp and accent text selection. Each has its own switch
 in **Settings → Appearance → Interface**. The send button is upstream's.
 
 On nightly builds, the sidebar header shows Blacksand artwork instead of upstream's
 starry sky: a monochrome desert night, with dunes along the bottom and the blacksand
-mark pressed faintly into the sky under the sidebar's "blacksand". The send button
+mark pressed faintly into the sky behind the two-line "T3 Code / blacksand" label. The send button
 on nightly is filled with the same sky and stars, without the mark or the dunes.
 The art fades into the sidebar like upstream's, in light mode and dark. It is
 static, and it stays put when you resize the sidebar. **Settings → Appearance →

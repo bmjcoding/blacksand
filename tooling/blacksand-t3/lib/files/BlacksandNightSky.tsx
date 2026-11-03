@@ -15,10 +15,10 @@ const VIEW_BOX = "0 0 8192 96";
 const U = 96 / 80; // svg units per css px
 
 // The mark: docs/assets/blacksand.svg as it is (1024 viewBox; triangle 56..968 x 138..878).
-// 42px tall, its left edge 190px in, its top 5px down: under the sidebar's "blacksand",
-// with its base resting on the far ridge.
+// 42px tall, its left edge 131px in, its top 5px down: centred behind the sidebar's
+// two-line "T3 Code / blacksand" label as one lockup, its base resting on the far ridge.
 const MARK_TRIANGLE = "M512.0 138.0 L968.0 878.0 L56.0 878.0Z";
-const MARK_TRANSFORM = `translate(${190 * U} ${5 * U}) scale(${(42 * U) / 740}) translate(-56 -138)`;
+const MARK_TRANSFORM = `translate(${131 * U} ${5 * U}) scale(${(42 * U) / 740}) translate(-56 -138)`;
 const MARK_OPACITY = 0.09;
 
 const mulberry32 = (seed: number) => () => {
