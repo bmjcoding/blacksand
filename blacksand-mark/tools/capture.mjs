@@ -1,4 +1,4 @@
-// Deterministic frame capture: opens index.html from disk (file://), drives
+// Deterministic frame capture: opens hero/index.html from disk (file://), drives
 // hero.renderAt(t) and dumps PNGs plus meta.json.
 //
 //   node tools/capture.mjs <outdir> <t0> <t1> <fps> <w> <h> <dpr> <mark> [debug] [layer]
@@ -12,7 +12,7 @@ import { createRequire } from 'node:module';
 const { chromium } = createRequire(import.meta.url)('playwright');
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
-export const INDEX = path.resolve(HERE, '..', 'index.html');
+export const INDEX = path.resolve(HERE, '..', 'hero', 'index.html');
 
 export async function capture({ out, times, w, h, dpr, mark, debug = '', layer = '', url, timing = false }) {
   fs.mkdirSync(out, { recursive: true });

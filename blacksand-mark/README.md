@@ -2,27 +2,41 @@
 
 Backlit primary mark: a black triangle lit from behind, an etched ring and hourglass whose walls pinch to a 10-unit neck, and a sand stream that pours from the apex. There are two forms. The static logo is a still mark: one solid line runs from the apex down into the bottom mound, over flat sand and the etched hourglass, with no lighting effects in the default file. The animated hero is the live version, where that line is a falling sand stream that disappears into the top pile and leaves through the neck, under a breathing backlight.
 
+## Layout
+
+```
+blacksand-mark/
+  logo/       the static mark: SVGs for dark, glow and light surfaces, the icon, a PNG
+  lockups/    mark + wordmark (sans and mono), dark and light
+  hero/       the animated hero: engine, renderer, React wrapper, standalone demo
+  media/      rendered MP4, poster and still
+  tools/      build scripts, frame capture, QA suite (data/ holds the wordmark outlines)
+```
+
+Naming: every file starts `blacksand-`. Then comes the variant (`-glow`, `-light`, `-mono`), then `-small` for
+the cut meant for marks 24–127 px tall. The base name is always the master, for 128 px and up.
+
 ## Files
 
 | File | Use |
 |---|---|
-| `blacksand-engine.js` | Geometry, volume-conserving sand levels, seeded grain simulation, timeline, glow breath and light-source offset. No DOM. |
-| `blacksand-hero.js` | Canvas renderer. `mountBlacksand(canvas, { markSize })` returns `{ start, stop, renderAt, destroy }`. |
-| `BlacksandMark.tsx` | React / Next.js wrapper (client component). |
-| `index.html` | Full-bleed hero demo. Self-contained, opens straight from disk (double-click, `file://`). Rebuild it with `node tools/build-demo.mjs` after changing the modules. |
-| `blacksand_mark.svg`, `blacksand_mark_64.svg` | **The default logo**, for dark surfaces (docs, avatars, decks, app icons). No glow: the black triangle has a crisp #3a3a3a inner edge so it holds on black. Transparent background. |
-| `blacksand_mark_glow.svg`, `blacksand_mark_glow_64.svg` | The backlit mark, for black key art and posters: an even rim of light on all three edges, no pool. |
-| `blacksand_mark_light.svg`, `blacksand_mark_light_64.svg` | For white and light surfaces (an email signature, documents): solid black triangle, lighter flat interior (ring and walls #5c5c5c, sand #8a8a8a, line #b8b8b8), no lighting. |
-| `blacksand_mark_on_black.svg` | The glow mark on its own black field (kept under its old name). |
-| `blacksand_v2_small.svg`, `blacksand_v2_small_dark.svg` | Small cuts below 24 px (favicon). The original uses `currentColor` (set the CSS colour; as a plain image it renders black); `_dark` is explicit #000 for light surfaces. |
-| `blacksand_lockup.svg`, `blacksand_lockup_mono.svg` | Lockups with the default mark: B (Geist Semibold, tracking -4.5%) and D (Geist Mono Medium, tracking -3%), text #666666, for dark surfaces. Each has a `_large` cut. |
-| `blacksand_lockup_light.svg`, `blacksand_lockup_mono_light.svg` | The same lockups with the light mark and text #262626, for white surfaces. Each has a `_large` cut. |
-| `blacksand_mark@2x.png` | The default mark, transparent, 1024 px wide. |
-| `blacksand_hero_still@2x.png` | The hero's static frame (the reduced-motion look): the logo's interior (line into the mound, flat sand) under the hero's rest lighting. 1600x1000 at 2x, mark 440 px. |
-| `blacksand_hero_poster@2x.png` | The hero's poster: exactly the first frame the animation plays (phase 0.6), so nothing pops on play. |
-| `blacksand_hero_preview.mp4` | 1080p60, two full cycles (703 frames), opens at phase 0.6, loops seamlessly. |
+| `logo/blacksand-mark.svg`, `-small` | **The default logo**, for dark surfaces (docs, avatars, decks, app icons). No glow: the black triangle has a crisp #3a3a3a inner edge so it holds on black. Transparent background. |
+| `logo/blacksand-mark-glow.svg`, `-small` | The backlit mark, for black key art and posters: an even rim of light on all three edges, no pool. |
+| `logo/blacksand-mark-light.svg`, `-small` | For white and light surfaces (an email signature, documents): solid black triangle, lighter flat interior (ring and walls #5c5c5c, sand #8a8a8a, line #b8b8b8), no lighting. |
+| `logo/blacksand-icon.svg`, `blacksand-icon-dark.svg` | Simplified one-colour cuts for marks under 24 px (favicon): white for dark surfaces, black for light ones. |
+| `logo/blacksand-mark@2x.png` | The default mark, transparent, 1024 px wide. |
+| `lockups/blacksand-lockup.svg`, `blacksand-lockup-mono.svg` | Lockups with the default mark: sans (Geist Semibold, tracking -4.5%) and mono (Geist Mono Medium, tracking -3%), text #666666, for dark surfaces. |
+| `lockups/blacksand-lockup-light.svg`, `blacksand-lockup-mono-light.svg` | The same with the light mark and text #262626, for white surfaces. |
+| `lockups/*-small.svg` | Each lockup's cut for marks under 128 px tall (the usual header size). |
+| `hero/blacksand-engine.js` | Geometry, volume-conserving sand levels, seeded grain simulation, timeline, glow breath and light-source offset. No DOM. |
+| `hero/blacksand-hero.js` | Canvas renderer. `mountBlacksand(canvas, { markSize })` returns `{ start, stop, renderAt, destroy }`. |
+| `hero/BlacksandMark.tsx` | React / Next.js wrapper (client component); imports `./blacksand-hero.js`, so keep the three files together. |
+| `hero/index.html` | Full-bleed hero demo. Self-contained, opens straight from disk (double-click, `file://`). Generated: rebuild with `node tools/build-demo.mjs` after changing the modules. |
+| `media/blacksand-hero.mp4` | 1080p60, two full cycles (703 frames), opens at phase 0.6, loops seamlessly. |
+| `media/blacksand-hero-poster@2x.png` | The hero's poster: exactly the first frame the animation plays (phase 0.6), so nothing pops on play. |
+| `media/blacksand-hero-still@2x.png` | The hero's static frame (the reduced-motion look): the logo's interior (line into the mound, flat sand) under the hero's rest lighting. 1600x1000 at 2x, mark 440 px. |
 | `tools/` | Build scripts, deterministic frame capture and the QA suite. |
-| `VALIDATION.md` | What was implemented against the handoff, QA results at 1x and 2x, review findings, performance, limitations. |
+| `VALIDATION.md` | What was implemented against the handoff, QA results at 1x and 2x, review findings, performance, limitations, and the old → new file-name map. |
 
 ## Behaviour
 
@@ -57,11 +71,11 @@ Backlit primary mark: a black triangle lit from behind, an etched ring and hourg
 
 | Surface | Mark 128 px tall and up | 24–127 px | Under 24 px |
 |---|---|---|---|
-| Dark (general use) | `blacksand_mark.svg` | `blacksand_mark_64.svg` | `blacksand_v2_small.svg` (white) |
-| Black key art, posters | `blacksand_mark_glow.svg` | `blacksand_mark_glow_64.svg` | `blacksand_v2_small.svg` (white) |
-| White / light | `blacksand_mark_light.svg` | `blacksand_mark_light_64.svg` | `blacksand_v2_small_dark.svg` |
+| Dark (general use) | `blacksand-mark.svg` | `blacksand-mark-small.svg` | `blacksand-icon.svg` |
+| Black key art, posters | `blacksand-mark-glow.svg` | `blacksand-mark-glow-small.svg` | `blacksand-icon.svg` |
+| White / light | `blacksand-mark-light.svg` | `blacksand-mark-light-small.svg` | `blacksand-icon-dark.svg` |
 
-Lockups follow the same rule: the default lockup files for marks under 128 px tall (the usual header size), `_large` for 128 px and up. The small cuts carry a 16-unit line (and a 12-unit edge on the no-glow mark) so neither drops below 1 device pixel; the masters use 8 units.
+Lockups follow the same rule: the base lockup for marks 128 px tall and up, `-small` below that. The small cuts carry a 16-unit line (and a 12-unit edge on the no-glow mark) so neither drops below 1 device pixel; the masters use 8 units.
 
 Static logo construction: the line (#8e8e8e; #b8b8b8 on the light mark) runs from the apex at x 512 down into the bottom mound, which covers its last 6 units. On the no-glow mark the inner edge band is drawn over the line, so the band stays continuous across the tip and the line runs up under it; on the glow and light marks the line runs into the tip itself. The sand is the approved world-space gradient, flat (no grain texture). The static files carry no pool of light; that belongs to the animated hero.
 
@@ -70,18 +84,22 @@ Static logo construction: the line (#8e8e8e; #b8b8b8 on the light mark) runs fro
 Node 22 and Playwright with Chromium (`require('playwright')` must resolve), ffmpeg, Python 3 with numpy and Pillow for the QA suite.
 
 ```
-node tools/build-static.mjs      # blacksand_mark*.svg (incl. _64), tools/geom.json, tools/mark_fragment.json
-node tools/lockups.mjs           # lockups (both cuts) from the mark fragment + tools/wordmark.json (pre-shaped Geist outlines)
-node tools/build-demo.mjs        # index.html (engine + renderer inlined as a classic script)
-node tools/preview.mjs still     # blacksand_hero_still@2x.png (static logo frame)
-node tools/preview.mjs poster    # blacksand_hero_poster@2x.png (first played frame)
-node tools/preview.mjs mark      # blacksand_mark@2x.png
-node tools/preview.mjs video     # blacksand_hero_preview.mp4 (703 frames, libx264 -tune grain CRF 14, full-range 8-bit, faststart)
-python3 tools/qa.py 1            # frame-by-frame QA at 1x (python3 tools/qa.py 2 for 2x); exits non-zero on failure
+cd blacksand-mark
+node tools/build-static.mjs      # logo/blacksand-mark*.svg; intermediates in tools/.build/ (geom.json, mark-fragment.json)
+node tools/lockups.mjs           # lockups/ from the mark fragment + tools/data/wordmark.json (pre-shaped Geist outlines)
+node tools/build-demo.mjs        # hero/index.html (engine + renderer inlined as a classic script)
+node tools/preview.mjs still     # media/blacksand-hero-still@2x.png (static logo frame)
+node tools/preview.mjs poster    # media/blacksand-hero-poster@2x.png (first played frame)
+node tools/preview.mjs mark      # logo/blacksand-mark@2x.png
+node tools/preview.mjs video     # media/blacksand-hero.mp4 (703 frames, libx264 -tune grain CRF 14, full-range 8-bit, faststart)
+python3 tools/qa.py 1            # frame-by-frame QA at 1x (2 for 2x); needs build-static first; exits non-zero on failure
+node tools/package.mjs           # ../dist/blacksand-mark.zip (not committed)
 ```
 
-`tools/capture.mjs` drives `hero.renderAt(t)` in the demo page over `file://` and dumps PNGs; `debug=glow,particles,blur,breath` switches layers off (`breath` holds the glow at rest), `profile` records per-section timings.
+The icon SVGs are hand-made and not generated.
+
+`tools/capture.mjs` drives `hero.renderAt(t)` in `hero/index.html` over `file://` and dumps PNGs; `debug=glow,particles,blur,breath` switches layers off (`breath` holds the glow at rest), `profile` records per-section timings.
 
 ## Fonts
 
-Geist and Geist Mono, SIL Open Font License 1.1. The wordmark outlines in `tools/wordmark.json` were shaped from them.
+Geist and Geist Mono, SIL Open Font License 1.1. The wordmark outlines in `tools/data/wordmark.json` were shaped from them.

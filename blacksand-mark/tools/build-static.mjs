@@ -1,10 +1,13 @@
 // Builds the static logo SVGs (three variants; the sand levels of STATIC_PHASE with the static
 // line), plus geom.json for the QA suite and the mark fragments for the lockups.
-//   node tools/build-static.mjs [outdir]
+//   node tools/build-static.mjs [outdir]       (default: logo/; intermediates go to tools/.build/)
 import fs from 'node:fs';
-import { createGeometry, createChambers, createSim, STATIC_PHASE, STREAM, TIMING, BREATH, SOURCE, STATIC_LINE } from '../blacksand-engine.js';
+import { createGeometry, createChambers, createSim, STATIC_PHASE, STREAM, TIMING, BREATH, SOURCE, STATIC_LINE } from '../hero/blacksand-engine.js';
 
-const out = process.argv[2] || new URL('..', import.meta.url).pathname;
+const out = process.argv[2] || new URL('../logo', import.meta.url).pathname;
+const BUILD = new URL('.build/', import.meta.url);
+fs.mkdirSync(BUILD, { recursive: true });
+fs.mkdirSync(out, { recursive: true });
 const G = createGeometry(process.env.NECK ? { neck: +process.env.NECK } : {}), C = createChambers(G);
 const st = createSim(G, C, 7).stateAt(STATIC_PHASE);
 const { ix, iy, R, H, L, T } = G;
@@ -76,26 +79,23 @@ ${body}
 </svg>
 `;
 const emit = (name, variant, o = {}) => fs.writeFileSync(`${out}/${name}`, wrap(mark('bs', variant, o), vbFor(VARIANTS[variant].pad)));
-// master (marks 128 px tall and up) and the small cut (24-127 px): wider line (and edge) there
-emit('blacksand_mark.svg', 'dark');
-emit('blacksand_mark_64.svg', 'dark', { lineW: LINE.small, edgeW: LINE.bandSmall });
-emit('blacksand_mark_glow.svg', 'glow');
-emit('blacksand_mark_glow_64.svg', 'glow', { lineW: LINE.small, edgeW: LINE.bandSmall });
-emit('blacksand_mark_light.svg', 'light');
-emit('blacksand_mark_light_64.svg', 'light', { lineW: LINE.small, edgeW: LINE.bandSmall });
-// kept under its old name until the renames are approved: the glow mark on its own black field
-emit('blacksand_mark_on_black.svg', 'glow', { bg: '#000' });
-// the small cut below 24 px, for light surfaces (the original uses currentColor)
-fs.writeFileSync(`${out}/blacksand_v2_small_dark.svg`, fs.readFileSync(new URL('../blacksand_v2_small.svg', import.meta.url), 'utf8').replace('fill="currentColor"', 'fill="#000"').replace(/stroke="currentColor"/g, 'stroke="#000"'));
+// base name: marks 128 px tall and up (8-unit line); -small: 24-127 px (16-unit line, 12-unit edge).
+// Below 24 px use the hand-drawn icons (logo/blacksand-icon.svg, -dark.svg), not built here.
+emit('blacksand-mark.svg', 'dark');
+emit('blacksand-mark-small.svg', 'dark', { lineW: LINE.small, edgeW: LINE.bandSmall });
+emit('blacksand-mark-glow.svg', 'glow');
+emit('blacksand-mark-glow-small.svg', 'glow', { lineW: LINE.small, edgeW: LINE.bandSmall });
+emit('blacksand-mark-light.svg', 'light');
+emit('blacksand-mark-light-small.svg', 'light', { lineW: LINE.small, edgeW: LINE.bandSmall });
 // fragments for the lockups (default dark and light, both line cuts)
-fs.writeFileSync(new URL('mark_fragment.json', import.meta.url), JSON.stringify({
+fs.writeFileSync(new URL('mark-fragment.json', BUILD), JSON.stringify({
   vb: vbFor(16), tri: T, iy, R,
   dark: mark('bsl', 'dark', { lineW: LINE.small, edgeW: LINE.bandSmall }), darkLarge: mark('bsl', 'dark'),
   light: mark('bsl', 'light', { lineW: LINE.small, edgeW: LINE.bandSmall }), lightLarge: mark('bsl', 'light'),
 }));
 // geometry + timing for the QA suite
-fs.writeFileSync(new URL('geom.json', import.meta.url), JSON.stringify({
+fs.writeFileSync(new URL('geom.json', BUILD), JSON.stringify({
   ix, iy, R, Rin: G.Rin, H, L, nk: G.nk, a: G.a, hx: G.hx, slope: G.slope, tl: G.tl, tr: G.tr, bl: G.bl, br: G.br, T,
   timing: TIMING, breathCrest: BREATH.crest, source: SOURCE, side: Math.hypot(T[1][0] - T[2][0], T[1][1] - T[2][1]), KB: C.K_BOT, KT: C.K_TOP, taper: STREAM.taper, staticPhase: STATIC_PHASE,
 }));
-console.log('static phase', STATIC_PHASE, 'line end', f(lineEnd), 'mound peak', f(st.peak), '; default mark', fs.statSync(`${out}/blacksand_mark.svg`).size, 'bytes');
+console.log('static phase', STATIC_PHASE, 'line end', f(lineEnd), 'mound peak', f(st.peak), '; default mark', fs.statSync(`${out}/blacksand-mark.svg`).size, 'bytes');

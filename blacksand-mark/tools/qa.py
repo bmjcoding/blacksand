@@ -2,7 +2,7 @@
 
     python3 tools/qa.py [dpr] [workdir]
 
-Frames come from tools/capture.mjs, which opens index.html from disk (file://). Timeline:
+Frames come from tools/capture.mjs, which opens hero/index.html from disk (file://). Timeline:
 phase 0 is the 148 deg point of the flip; the vessel settles at landEnd, the top runs dry
 at flow, the flip starts there and runs through the wrap of the cycle.
 
@@ -27,7 +27,7 @@ import numpy as np
 from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-G = json.load(open(os.path.join(HERE, 'geom.json')))
+G = json.load(open(os.path.join(HERE, '.build', 'geom.json')))   # written by tools/build-static.mjs
 TM = G['timing']
 ix, iy, R, Rin, H, L = G['ix'], G['iy'], G['R'], G['Rin'], G['H'], G['L']
 W, Hh, MARK = 1200, 900, 420

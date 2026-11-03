@@ -1,12 +1,12 @@
-// Builds index.html as a single self-contained file (engine + renderer inlined as a
+// Builds hero/index.html as a single self-contained file (engine + renderer inlined as a
 // classic script), so it opens straight from disk. The ES modules stay the source of truth.
 import fs from 'node:fs';
 const strip = (src) => src
   .replace(/^import .*?;\s*$/gm, '')
   .replace(/^export const /gm, 'const ')
   .replace(/^export function /gm, 'function ');
-const engine = strip(fs.readFileSync(new URL('../blacksand-engine.js', import.meta.url), 'utf8'));
-const hero = strip(fs.readFileSync(new URL('../blacksand-hero.js', import.meta.url), 'utf8'));
+const engine = strip(fs.readFileSync(new URL('../hero/blacksand-engine.js', import.meta.url), 'utf8'));
+const hero = strip(fs.readFileSync(new URL('../hero/blacksand-hero.js', import.meta.url), 'utf8'));
 const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -43,5 +43,5 @@ ${hero}
 </body>
 </html>
 `;
-fs.writeFileSync(new URL('../index.html', import.meta.url), html);
-console.log('index.html', html.length, 'bytes');
+fs.writeFileSync(new URL('../hero/index.html', import.meta.url), html);
+console.log('hero/index.html', html.length, 'bytes');

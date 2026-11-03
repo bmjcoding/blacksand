@@ -2,24 +2,26 @@
 // tracking -3%) for docs/CLI. Mark height 1.9x cap height, gap 0.5x cap height, text #666666.
 // The wordmark outlines were shaped once from the Geist fonts and are kept as paths in
 // wordmark.json (with their placement), so no font tooling is needed to rebuild the lockups
-// after the mark changes. Run build-static.mjs first; it writes mark_fragment.json.
-//   node tools/lockups.mjs [outdir]
+// after the mark changes. Run build-static.mjs first; it writes tools/.build/mark-fragment.json.
+//   node tools/lockups.mjs [outdir]       (default: lockups/)
 import fs from 'node:fs';
 
-const out = process.argv[2] || new URL('..', import.meta.url).pathname;
-const frag = JSON.parse(fs.readFileSync(new URL('mark_fragment.json', import.meta.url), 'utf8'));
-const words = JSON.parse(fs.readFileSync(new URL('wordmark.json', import.meta.url), 'utf8'));
+const out = process.argv[2] || new URL('../lockups', import.meta.url).pathname;
+fs.mkdirSync(out, { recursive: true });
+const frag = JSON.parse(fs.readFileSync(new URL('.build/mark-fragment.json', import.meta.url), 'utf8'));
+const words = JSON.parse(fs.readFileSync(new URL('data/wordmark.json', import.meta.url), 'utf8'));
 
-// Variants (design panel, review 3): the default no-glow mark (wordmark #666666, for dark
-// surfaces) and the light-background mark (wordmark #262626). Two cuts each: the default for
-// marks under 128 px tall (16-unit static line, never under 1 px) and _large for 128 px and up.
+// Variants: the default no-glow mark (wordmark #666666, for dark surfaces) and the light-background
+// mark (-light, wordmark #262626). Two cuts each, as for the marks: the base name for a mark 128 px
+// tall and up (8-unit line), -small for 24-127 px (16-unit line, never under 1 px).
 // The boxes are tight: no lighting in a lockup, so no margin for a pool. The approved spacing is
 // kept (mark-to-text gap; equal breathing room left and right, 16 units).
 const PAD = 16;
 const cuts = [
-  ['', 'dark', '#666666'], ['_large', 'darkLarge', '#666666'],
-  ['_light', 'light', '#262626'], ['_light_large', 'lightLarge', '#262626'],
+  ['', 'darkLarge', '#666666'], ['-small', 'dark', '#666666'],
+  ['-light', 'lightLarge', '#262626'], ['-light-small', 'light', '#262626'],
 ];
+// wordmark.json keys are the output base names: blacksand-lockup (Geist), blacksand-lockup-mono (Geist Mono)
 for (const [name, w] of Object.entries(words)) {
   const [vx, vy, vw] = w.viewBox.split(/\s+/).map(Number);
   const right = vx + vw - (56 - vx) + PAD;               // text's right edge + the same pad as on the left

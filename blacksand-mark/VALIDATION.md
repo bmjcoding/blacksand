@@ -3,7 +3,7 @@
 Final implementation of the recorded design decisions from `HANDOFF.txt` (the published checkpoint had the
 old 7.55 s timeline; everything below was rebuilt from the recorded decisions). All results here were produced
 in this session from this package with `tools/qa.py`, `tools/capture.mjs` and `tools/preview.mjs`, over
-`file://index.html` in headless Chromium (software rasterisation, WebGL2 via SwiftShader).
+`file://hero/index.html` in headless Chromium (software rasterisation, WebGL2 via SwiftShader).
 
 ## What changed against the checkpoint
 
@@ -159,9 +159,9 @@ Agreed and implemented (panel consensus each round; the owner's instructions tak
   saw as blur is gone from every static file.
 - **Lighting.** The pool is removed from the static files; a rim on all edges with a floor light only beneath
   was inconsistent. The animated hero keeps its own lighting (rim, pool, breath).
-- **Variants.** `blacksand_mark` is the no-glow default; `_glow` (even rim, no pool) is for black key art;
-  `_light` is for white surfaces. There are lockups for each surface, a black small cut, and the old names
-  kept as aliases (see the README's "Which file" table).
+- **Variants.** `blacksand-mark` is the no-glow default; `-glow` (even rim, no pool) is for black key art;
+  `-light` is for white surfaces. There are lockups for each surface and a black icon cut (see the README's
+  "Which file" table).
 - **The hero's reduced-motion frame.** The logo's interior (line into the mound, flat sand) under the hero's
   rest lighting. The poster is the first played frame.
 
@@ -204,17 +204,17 @@ levels, the same as an ordinary instant.
 
 ## Page behaviour over file://
 
-- `index.html` opened from disk without parameters: no page errors, the WebGL glow path is active, the frame
+- `hero/index.html` opened from disk without parameters: no page errors, the WebGL glow path is active, the frame
   changes within 0.7 s (autoplay from phase 0.6).
 - With `prefers-reduced-motion: reduce`: the frame is static and byte-identical to the explicit
   phase-2.5, stream-in-front render with the glow at rest.
 - Pointer light, live page, real mouse: it leans left, right and down as the pointer moves. Above the apex it
   stays calm and symmetric, and it lets go after the idle time. No page errors.
-- Every QA capture in this record was taken through `file://index.html` (the capture tool loads it that way).
+- Every QA capture in this record was taken through `file://hero/index.html` (the capture tool loads it that way).
 
 ## Preview video and still
 
-- `blacksand_hero_preview.mp4`: 1920x1080, 60 fps, 703 frames (exactly two cycles), opens at phase 0.6,
+- `media/blacksand-hero.mp4`: 1920x1080, 60 fps, 703 frames (exactly two cycles), opens at phase 0.6,
   mark 480 px, libx264 slow -tune grain CRF 14, full-range 8-bit (yuvj420p, BT.709 tags), faststart.
 - Banding: limited-range 8-bit (the usual yuv420p) squeezes 256 levels into 220 luma steps and flattens the
   dither. Contour rings showed in the glow's long halo at 3× gain, and no CRF fixed them (low-frequency error
@@ -222,8 +222,8 @@ levels, the same as an ordinary instant.
   crest is 0.08 levels mean and 1 max against the lossless source. 10-bit is also clean but is poorly
   supported for H.264 in browsers.
 - Loop seam: mean grayscale difference last frame → first frame 0.0148, ordinary adjacent step 0.0150.
-- `blacksand_hero_still@2x.png`: phase 2.5, 1600x1000 at 2x, mark 440 px, stream in front, glow at rest.
-- `blacksand_mark@2x.png`: from `blacksand_mark_on_black.svg` at 2x.
+- `media/blacksand-hero-still@2x.png`: phase 2.5, 1600x1000 at 2x, mark 440 px, stream in front, glow at rest.
+- `logo/blacksand-mark@2x.png`: `logo/blacksand-mark.svg` (the no-glow default) at 2x, transparent, 1024 px wide.
 
 ## Independent review
 
@@ -270,3 +270,23 @@ frames measured in its capture runs took 130–165 ms median with WebGL, the sam
 - The 2D fallback (no WebGL2) has the breath but not the pointer light.
 - With the breath, the glow is recomposed every frame. In software rasterisation that full-screen pass dominates the frame
   time (see the performance table); on a GPU it is negligible.
+
+## File names
+
+The package was reorganised after this record was written; the measurements above apply unchanged. The rebuilt
+marks, lockups and demo are byte-identical to the files they replace, except the icon. The icon's fill was
+`currentColor` and is now explicit `#fff`. Old name → new name:
+
+| Old | New |
+|---|---|
+| `index.html`, `blacksand-engine.js`, `blacksand-hero.js`, `BlacksandMark.tsx` | `hero/` (same names) |
+| `blacksand_mark.svg`, `_glow`, `_light` | `logo/blacksand-mark.svg`, `-glow`, `-light` |
+| `blacksand_mark_64.svg`, `_glow_64`, `_light_64` | `logo/blacksand-mark-small.svg`, `-glow-small`, `-light-small` |
+| `blacksand_v2_small.svg`, `blacksand_v2_small_dark.svg` | `logo/blacksand-icon.svg`, `logo/blacksand-icon-dark.svg` |
+| `blacksand_mark@2x.png` | `logo/blacksand-mark@2x.png` |
+| `blacksand_lockup_large.svg` (and `_mono_large`, `_light_large`, `_mono_light_large`) | `lockups/blacksand-lockup.svg` (and `-mono`, `-light`, `-mono-light`) |
+| `blacksand_lockup.svg` (and `_mono`, `_light`, `_mono_light`) | `lockups/blacksand-lockup-small.svg` (and `-mono-small`, `-light-small`, `-mono-light-small`) |
+| `blacksand_hero_preview.mp4`, `blacksand_hero_still@2x.png`, `blacksand_hero_poster@2x.png` | `media/blacksand-hero.mp4`, `media/blacksand-hero-still@2x.png`, `media/blacksand-hero-poster@2x.png` |
+| `blacksand_mark_on_black.svg` | removed (the glow mark on a black rect; use `blacksand-mark-glow.svg` on black) |
+| `tools/wordmark.json` | `tools/data/wordmark.json` |
+| `tools/geom.json`, `tools/mark_fragment.json` | build intermediates, now in `tools/.build/` (git-ignored) |
