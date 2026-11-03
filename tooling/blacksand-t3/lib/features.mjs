@@ -84,7 +84,7 @@ export const features = [
   {
     name: "app-icon",
     label: "blacksand backdrop on the app icon",
-    description: "Upstream's T3 with a night sky, a dune and the blacksand static logo behind it, in the Dock, Finder, launcher and splash, layered for Liquid Glass",
+    description: "Upstream's T3 with a night sky, a silver dune and the blacksand glow logo behind it, in the Dock, Finder, launcher and splash, layered for Liquid Glass",
     rules: ["desktop/app-icon-*"],
   },
   {

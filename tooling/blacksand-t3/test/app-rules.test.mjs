@@ -173,30 +173,39 @@ test("the send button is upstream's: no ring, no composer glow, only a marker th
   assert.doesNotMatch(file("blacksandInterface.ts"), /\n {2}(send|sky): \{/);
 });
 
-test("the app icon is upstream's T3 with the blacksand backdrop behind it", () => {
+test("the app icon is upstream's T3 with the blacksand backdrop behind it", async () => {
+  const backdrop = await import("../lib/icon-backdrop.mjs");
   assert.equal(file("blacksand.svg"), fs.readFileSync(new URL("../../../docs/assets/blacksand.svg", import.meta.url), "utf8"), "the sidebar's mark is docs/assets/blacksand.svg");
-  for (const id of ["desktop/app-icon-badge", "desktop/app-icon-badge-layer"]) assert.ok(!byId.has(id), `${id} is gone`);
+  for (const id of ["desktop/app-icon-badge", "desktop/app-icon-badge-layer", "desktop/app-icon-backdrop-logo"]) assert.ok(!byId.has(id), `${id} is gone`);
   const assets = rules.filter((rule) => rule.id.startsWith("desktop/app-icon-backdrop-") && rule.kind === "write");
-  assert.deepEqual(assets.map((rule) => rule.file).sort(), ["dune", "logo", "sky"].map((part) => `assets/prod/app-icon.icon/Assets/blacksand-${part}.svg`));
-  // the static logo as it is, but for its sand line, which is dimmed
-  const logo = byId.get("desktop/app-icon-backdrop-logo").content;
-  const mark = file("blacksand-mark.svg");
-  for (const [, d] of mark.matchAll(/<path d="([^"]{40,})"/g)) assert.ok(logo.includes(d), "the static logo's geometry");
-  assert.doesNotMatch(logo, /#8e8e8e/i);
-  assert.match(logo, /#555555/);
-  // its centre line runs through the gap between upstream's T and 3, not the icon's centre
-  assert.match(logo, /<g transform="translate\((\S+) /);
-  const [, tx] = logo.match(/<g transform="translate\((\S+) (\S+)\) scale\((\S+)\)"/);
-  const scale = Number(logo.match(/scale\((\S+)\)"/)[1]);
-  assert.ok(Math.abs(Number(tx) + 512 * scale - (512 + 2.25 * 8.5)) < 0.05, "x 531: the middle of 64.33..68.17 in text.svg at scale 8.5");
-  for (const { content } of assets) assert.doesNotMatch(content, /<filter|feGaussianBlur|<animate/, "flat: nothing soft enough to fringe");
+  assert.deepEqual(assets.map((rule) => rule.file.replace("assets/prod/app-icon.icon/Assets/", "")).sort(),
+    ["blacksand-dune.svg", "blacksand-etch.png", "blacksand-face.png", "blacksand-rim.png", "blacksand-sand.png", "blacksand-sky.svg", "blacksand-stream.png"]);
+  for (const name of ["rim", "face", "sand", "etch", "stream"]) {
+    const png = byId.get(`desktop/app-icon-backdrop-${name}`).content;
+    assert.ok(Buffer.isBuffer(png) && png.subarray(1, 4).toString() === "PNG", `${name}: the rendered PNG from lib/files (scripts/backdrop-icons.mjs)`);
+  }
+  // the glow logo as blacksand-mark builds it: rim 40%, a glowing stream drawn as a fixed light
+  const glow = file("blacksand-mark-glow.svg");
+  assert.match(glow, /stroke-opacity="0\.4" stroke-width="10" stroke-linejoin="round" filter="url\(#bs-rim\)"/);
+  assert.match(glow, /<g style="mix-blend-mode:lighten">/);
+  // in the icon: the stream's tight halo only (no haze reaching the T3), its core lifted to keep the logo's brightness
+  assert.doesNotMatch(backdrop.LOGO_SOURCES.whole, /bs-haze\)"/);
+  assert.match(backdrop.LOGO_SOURCES.whole, /stroke-opacity="0\.34" stroke-width="8" stroke-linecap="butt"/);
+  // the stream runs through the gap between upstream's T and 3, not the icon's centre
+  const [, tx, scale] = backdrop.LOGO_TRANSFORM.match(/^translate\((\S+) \S+\) scale\((\S+)\)$/);
+  assert.ok(Math.abs(Number(tx) + 512 * Number(scale) - (512 + 2.25 * 8.5)) < 0.05, "x 531: the middle of 64.33..68.17 in text.svg at scale 8.5");
+  for (const part of [backdrop.BACKDROP_ASSETS["blacksand-sky.svg"].svg, backdrop.BACKDROP_ASSETS["blacksand-dune.svg"].svg]) assert.doesNotMatch(part, /<filter|<animate/);
   // Upstream's icon.json at v0.1.7-nightly.20261102.4093, abridged.
   const upstream = { fill: { solid: "display-p3:0.00000,0.00000,0.00000,1.00000" }, groups: [{ layers: [{ "image-name": "text.svg", name: "Text" }], translucency: { enabled: true, value: 0.5 } }], "supported-platforms": { squares: "shared" } };
   const icon = JSON.parse(byId.get("desktop/app-icon-backdrop-layers").transform(JSON.stringify(upstream, null, 2)));
   assert.equal(icon.groups.length, 1, "one group, as upstream's nightly icon does it");
-  assert.deepEqual(icon.groups[0].layers.map((layer) => layer["image-name"]), ["text.svg", "blacksand-dune.svg", "blacksand-logo.svg", "blacksand-sky.svg"], "front to back: the T3 first");
-  assert.deepEqual(icon.groups[0].layers[0], upstream.groups[0].layers[0], "upstream's T3 as it is");
-  assert.deepEqual(icon.groups[0].layers.slice(1).map((layer) => layer.glass), [false, false, true], "only the sky is glass: no rim on the logo");
+  const layers = icon.groups[0].layers;
+  assert.deepEqual(layers.map((layer) => layer["image-name"]), ["text.svg", "blacksand-stream.png", "blacksand-etch.png", "blacksand-sand.png", "blacksand-face.png", "blacksand-rim.png", "blacksand-dune.svg", "blacksand-sky.svg"], "front to back: the T3 first");
+  assert.deepEqual(layers[0], upstream.groups[0].layers[0], "upstream's T3 as it is");
+  assert.deepEqual(layers.slice(1).map((layer) => layer.glass), [false, false, false, false, false, false, true], "only the sky is glass: no rim on the logo");
+  const tint = (layer) => layer["fill-specializations"]?.find((s) => s.appearance === "tinted")?.value.solid ?? null;
+  assert.equal(tint(layers.find((l) => l.name === "Blacksand face")), null, "the face is never painted: a tint keeps the mark, not a triangle");
+  assert.ok(["stream", "ring and walls", "sand", "rim"].every((n) => tint(layers.find((l) => l.name === `Blacksand ${n}`))), "every other part of the mark has its own tint strength");
   assert.deepEqual({ ...icon, groups: upstream.groups }, upstream, "the fill and everything else stays upstream's");
   assert.throws(() => byId.get("desktop/app-icon-backdrop-layers").transform("{}"), /no group with text\.svg/);
   const writes = rules.filter((rule) => rule.id.startsWith("desktop/app-icon-") && rule.kind === "write" && rule.overwrite).map((rule) => rule.file).sort();

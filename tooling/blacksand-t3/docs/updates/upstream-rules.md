@@ -39,8 +39,9 @@ machine stays on the installed build and says why.
 
 The rules remove what [privacy](../security/privacy.md) lists. They also give the app
 its own name, bundle ID and data directory. The name is T3 Code (blacksand). The icon
-is upstream's T3, with a blacksand backdrop behind it: a night sky, one low dune, and
-the blacksand static logo, its centre line through the gap between the T and the 3. The sidebar logo is
+is upstream's T3, with a blacksand backdrop behind it: a night sky, a moonlit silver dune,
+and the blacksand glow logo, its glowing sand stream through the gap between the T and
+the 3. The sidebar logo is
 upstream's too, with a muted "blacksand" centred under it, which keeps the header
 row narrow. Two touches follow whichever
 theme you pick: a version stamp and accent text selection. Each has its own switch
@@ -60,18 +61,23 @@ change the accent.
 
 The sidebar's mark is [`docs/assets/blacksand.svg`](../../../../docs/assets/blacksand.svg).
 `tooling/blacksand-t3/lib/files/blacksand.svg` is a copy, so the T3 component builds on its
-own. A test keeps the two the same. The icon's logo is the static logo,
-`tooling/blacksand-t3/lib/files/blacksand-mark.svg`, with its sand line dimmed from
-#8e8e8e to #555555 so it doesn't read as a seam through the T at Dock sizes.
-`tooling/blacksand-t3/lib/icon-backdrop.mjs` draws the backdrop. The build adds its
-parts to upstream's Icon Composer bundle as layers behind the T3, so with Xcode 26 the
-icon is Liquid Glass. Only the sky is glass. The logo and the dune are flat layers,
-so no glass edge rims them, and with a system tint they become faint white shapes.
-The flat PNGs, `tooling/blacksand-t3/lib/files/backdrop-*.png`, cover a build without
-Xcode 26, DMG volumes, Linux and the startup splash. They are upstream's icons with the
-same backdrop drawn behind the T3. When upstream changes its icons, or the backdrop
-changes, remake them with `tooling/blacksand-t3/scripts/backdrop-icons.mjs`. It runs
-anywhere Chrome or Chromium does, and its first lines say how.
+own. A test keeps the two the same. The icon's logo is the glow logo,
+`tooling/blacksand-t3/lib/files/blacksand-mark-glow.svg`, a copy of what blacksand-mark's
+`tools/build-static.mjs` builds: an even rim of light, and a sand stream that glows from the
+same light. In the icon the stream keeps only its tight halo, so no light reaches the T3.
+`tooling/blacksand-t3/lib/icon-backdrop.mjs` lays out the backdrop. The build adds its parts
+to upstream's Icon Composer bundle as layers behind the T3, so with Xcode 26 the icon is
+Liquid Glass. Only the sky is glass. The logo is five flat layers (rim, face, sand, ring
+and walls, stream), so no glass edge rims it. With a system tint each part becomes white at
+its own strength and the face stays black, so the whole mark shows, not a plain triangle.
+The rim and the stream are images (`tooling/blacksand-t3/lib/files/icon-*.png`): the rim's
+glow is a blur, and the stream is a light that only brightens what's behind it, and Icon
+Composer layers can't be trusted to draw either from SVG. The flat PNGs,
+`tooling/blacksand-t3/lib/files/backdrop-*.png`, cover a build without Xcode 26, DMG
+volumes, Linux and the startup splash: upstream's icons with the same backdrop drawn behind
+the T3. When upstream changes its icons, or the backdrop or the glow logo changes, remake
+all of them with `tooling/blacksand-t3/scripts/backdrop-icons.mjs`. It runs anywhere Chrome
+or Chromium does, and its first lines say how.
 
 ## The build report
 

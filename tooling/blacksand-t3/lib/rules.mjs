@@ -2140,14 +2140,14 @@ export const makeRules = ({ updater, build }) => [
   // The app icon: upstream's T3 Code icon with the blacksand badge, on every
   // channel. The Icon Composer bundle (Liquid Glass) is upstream's own plus a
   // badge layer; the PNGs are upstream's with the badge drawn on.
-  // The app icon is upstream's, with the blacksand backdrop behind its T3: a night
-  // sky, one low dune, and the static logo (lib/icon-backdrop.mjs).
-  ...Object.entries(BACKDROP_ASSETS).map(([name, content]) => ({
-    id: `desktop/app-icon-backdrop-${name.replace(/^blacksand-|\.svg$/g, "")}`,
+  // The app icon is upstream's, with the blacksand backdrop behind its T3: a night sky,
+  // a moonlit silver dune, and the glow logo with its glowing stream (lib/icon-backdrop.mjs).
+  ...Object.entries(BACKDROP_ASSETS).map(([name, source]) => ({
+    id: `desktop/app-icon-backdrop-${name.replace(/^blacksand-|\.(svg|png)$/g, "")}`,
     why: "A backdrop layer's image, beside upstream's T3 in its Icon Composer bundle",
     kind: "write",
     file: `assets/prod/app-icon.icon/Assets/${name}`,
-    content,
+    content: source.svg ?? readBinary(source.png),
   })),
   {
     id: "desktop/app-icon-backdrop-layers",

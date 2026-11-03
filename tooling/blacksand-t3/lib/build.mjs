@@ -286,7 +286,7 @@ function liquidGlassIconEnv() {
 function findLiquidGlassIcon() {
   if (process.platform !== "darwin") return {};
   const icon = path.join(WORK, "assets", "prod", "app-icon.icon");
-  if (!fs.existsSync(path.join(icon, "Assets", "blacksand-logo.svg"))) return {};
+  if (!fs.existsSync(path.join(icon, "Assets", "blacksand-stream.png"))) return {};
   const actoolMajor = (developerDir) => {
     const env = { ...process.env };
     if (developerDir) env.DEVELOPER_DIR = developerDir;
