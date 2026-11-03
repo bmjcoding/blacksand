@@ -1,68 +1,42 @@
 /* Injected by blacksand and imported after index.css. Deliberately unlayered:
    unlayered rules beat Tailwind's @layer utilities without !important, which
-   is how the send button and composer overrides below win. */
+   is how the overrides below win. */
 
 :root {
   /* Everything orange here is the selected theme's accent, so a theme or a
      custom copy with another accent recolours it all.
-     Ember is the accent lifted a step, for rings, text and links on black. */
+     Ember is the accent lifted a step, for text and links on black. */
   --t3b-accent: var(--app-theme-accent, var(--primary));
   --t3b-ember: oklch(from var(--t3b-accent) calc(l + 0.06) c h);
   --t3b-black: #0a0a0a;
 }
 
-/* ---------------------------------------------------------- send button -- */
+/* ------------------------------------------------------------ night sky -- */
 
-/* Replaces upstream's send button on every track and theme (the starfield fill
-   on nightly) while Settings -> Appearance -> Send button ring is on. */
-html[data-t3b-send="on"] [data-t3b-send] {
-  background: color-mix(in oklab, var(--t3b-ember) 10%, var(--t3b-black));
-  color: var(--t3b-ember);
-  box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--t3b-ember) 55%, transparent),
-    0 0 18px color-mix(in oklab, var(--t3b-accent) 35%, transparent);
+/* BlacksandNightSky.tsx's desert night fades into the chrome, light or dark, like
+   upstream's art, but the fade starts under the far ridge (63% of the 80px box)
+   and eases out to the bottom, so the dunes keep their shape. Upstream's mask
+   starts at 55% and its ::after veil at 28%: they would dim the ridge in dark
+   mode, where the night already meets a black chrome. Upstream's own art keeps
+   both. */
+.sidebar-stage-backdrop:has(> [data-stage-art="blacksand"]) {
+  --t3b-sky-fade: linear-gradient(
+    to bottom,
+    black 0%,
+    black 63%,
+    rgb(0 0 0 / 86%) 69%,
+    rgb(0 0 0 / 62%) 76%,
+    rgb(0 0 0 / 36%) 83%,
+    rgb(0 0 0 / 15%) 90%,
+    rgb(0 0 0 / 4%) 96%,
+    transparent 100%
+  );
+  mask-image: var(--t3b-sky-fade);
+  -webkit-mask-image: var(--t3b-sky-fade);
 }
 
-html[data-t3b-send="on"] [data-t3b-send]:hover:not(:disabled) {
-  box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--t3b-ember) 75%, transparent),
-    0 0 24px color-mix(in oklab, var(--t3b-accent) 50%, transparent);
-}
-
-html[data-t3b-send="on"] [data-t3b-send]:disabled {
-  box-shadow: 0 0 0 1px color-mix(in oklab, var(--t3b-ember) 25%, transparent);
-}
-
-/* The ring replaces the starfield fill too. data-stage-art is set exactly when
-   upstream draws that art, as the button's first child. */
-html[data-t3b-send="on"] [data-t3b-send][data-stage-art="nightly"] > :first-child {
+.sidebar-stage-backdrop:has(> [data-stage-art="blacksand"])::after {
   display: none;
-}
-
-/* ------------------------------------------------------------- composer -- */
-
-/* Only while the chat box has focus: warm its outline and top highlight (both
-   variables upstream sets per theme) and add a glow, whenever the send button
-   above is ringed. */
-html[data-t3b-send="on"] [data-slot="composer-shell"]:focus-within {
-  --chat-composer-outline: color-mix(in oklab, var(--t3b-ember) 22%, var(--t3b-black));
-  --chat-composer-highlight: color-mix(in oklab, var(--t3b-ember) 25%, transparent);
-}
-
-html[data-t3b-send="on"] [data-slot="composer-shell"] :is([data-slot="composer-host"], [data-chat-composer-main-surface]) {
-  transition: box-shadow 200ms ease-out;
-}
-
-/* The glow goes on the host, which is the chat box's outline, unless a tray
-   (Queued and the like) is attached above it. The host then spans the tray's
-   inset gutters too, so the glow would trace empty corners either side of the
-   tray; it moves to the chat box itself instead. */
-html[data-t3b-send="on"] [data-slot="composer-shell"]:not(:has([data-composer-banner-surface="attached"])):focus-within [data-slot="composer-host"],
-html[data-t3b-send="on"] [data-slot="composer-shell"]:has([data-composer-banner-surface="attached"]):focus-within [data-chat-composer-main-surface] {
-  box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--t3b-ember) 8%, transparent),
-    0 0 32px -6px color-mix(in oklab, var(--t3b-accent) 30%, transparent),
-    0 20px 60px rgb(0 0 0 / 50%);
 }
 
 /* ------------------------------------------------------- version stamp -- */

@@ -42,7 +42,7 @@ describe("blacksand interface switches", () => {
     stubDom({ getItem: (key: string) => (key === "blacksand:interface:stamp" ? "off" : null), setItem: () => {} });
     await load();
     expect(attributes.get("data-t3b-stamp")).toBe("off");
-    expect(attributes.get("data-t3b-send")).toBe("on");
+    expect(attributes.get("data-t3b-selection")).toBe("on");
   });
   it("registers each switch with Settings search under its title", async () => {
     stubDom({ getItem: () => null });

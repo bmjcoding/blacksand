@@ -9,11 +9,6 @@
 import { useSyncExternalStore } from "react";
 
 export const BLACKSAND_INTERFACE = {
-  send: {
-    title: "Send button ring",
-    description: "A ringed send button in the theme's accent, and a glow around the chat box while you type.",
-    searchTerms: "send button ring composer chat box glow accent",
-  },
   stamp: {
     title: "Version stamp",
     description: "The build version in the window's bottom-right corner. Hover, focus or tap for changes and omitted features.",

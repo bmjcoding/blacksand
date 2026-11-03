@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 
 import { NPM_FALLBACK } from "./device-tools.mjs";
 import { overrideYamlLines, raiseCatalog, raiseToolVersions, readOverrides } from "./overrides.mjs";
+import { BACKDROP_ASSETS, BACKDROP_LAYERS } from "./icon-backdrop.mjs";
 import { RuleDrift } from "./strip-engine.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -52,39 +53,6 @@ export function desktopBuildsOnly(yaml) {
   }
   return lines.join("\n");
 }
-
-/**
- * The app icon's blacksand badge: the logo, as it is, in white, in a dark circle
- * with a thin light ring. lib/files/blacksand.svg is docs/assets/blacksand.svg,
- * copied so this folder builds on its own (test/app-rules.test.mjs keeps them the
- * same). lib/files/badge-*.png are upstream's PNG icons with this drawn on
- * (scripts/badge-icons.swift).
- */
-export const BLACKSAND_BADGE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-<circle cx="512" cy="512" r="496" fill="#0b0b0c" stroke="#d9d9d9" stroke-width="16"/>
-<g color="#ffffff" fill="#ffffff" transform="translate(512 512) scale(0.74) translate(-512 -620)">
-${readFile("blacksand.svg").trim()}
-</g>
-</svg>
-`;
-
-/**
- * The badge as a layer of its own in front of upstream's Icon Composer icon: 42%
- * of the icon's width, in its bottom-right corner. Icon Composer measures from
- * the centre of a 1024-point canvas, y down.
- */
-const BADGE_LAYER = {
-  layers: [
-    {
-      glass: false,
-      "image-name": "blacksand-badge.svg",
-      name: "Blacksand badge",
-      position: { scale: 0.42, "translation-in-points": [250, 250] },
-    },
-  ],
-  shadow: { kind: "neutral", opacity: 0.5 },
-};
-
 
 /** The build's version and what it changes, baked into the web bundle for the version stamp. */
 const buildInfoModule = (build) => {
@@ -1738,7 +1706,7 @@ export const makeRules = ({ updater, build }) => [
   // -------------------------------------------------------------- blacksand --
   {
     id: "web/blacksand-css",
-    why: "Ringed send button, composer glow, version stamp, accent text selection",
+    why: "The desert night's fade, the version stamp, accent text selection",
     kind: "write",
     file: "apps/web/src/blacksand.css",
     content: readFile("blacksand.css"),
@@ -1777,16 +1745,47 @@ export const makeRules = ({ updater, build }) => [
     ],
   },
   {
-    id: "web/blacksand-send-button",
-    why: "Lets blacksand.css find the send button, and the composer around it, and the stage they are drawn for",
-    file: "apps/web/src/components/chat/ComposerPrimaryActions.tsx",
+    id: "web/blacksand-night-sky-file",
+    why: "The nightly stage art: a monochrome desert night with the blacksand mark imprinted in the sky",
+    kind: "write",
+    file: "apps/web/src/components/BlacksandNightSky.tsx",
+    content: readFile("BlacksandNightSky.tsx"),
+  },
+  {
+    id: "web/blacksand-night-sky",
+    why: "Nightly's sidebar header and send button use the desert night instead of upstream's starry sky",
+    file: "apps/web/src/components/SidebarStageBackdrop.tsx",
     edits: [
       {
-        find: 'type={showResume ? "button" : "submit"}',
-        replace:
-          'type={showResume ? "button" : "submit"}\n      data-t3b-send=""\n      data-stage-art={stageBackdropVariant ?? undefined}',
+        find: 'import { primaryServerConfigAtom } from "../state/server";\n',
+        replace: 'import { primaryServerConfigAtom } from "../state/server";\nimport { BlacksandNightSky } from "./BlacksandNightSky";\n',
+      },
+      {
+        find: '  return variant === "nightly" ? <NightlySkyArt /> : <DevBlueprintArt />;\n',
+        replace: '  return variant === "nightly" ? <BlacksandNightSky /> : <DevBlueprintArt />;\n',
+      },
+      {
+        find: '  return variant === "nightly" ? <NightlySkyArt compact /> : <DevBlueprintArt compact />;\n',
+        replace: '  return variant === "nightly" ? <BlacksandNightSky compact /> : <DevBlueprintArt compact />;\n',
+      },
+      // Both callers now use BlacksandNightSky; retire upstream's unused art.
+      {
+        find: /\nconst NIGHTLY_STARS: ReadonlyArray<\{[\s\S]+?\n\}\n\n(?=function DevBlueprintArt\()/,
+        replace: "\n",
       },
     ],
+  },
+  {
+    id: "web/blacksand-send-button",
+    why: "Marks upstream's send button (unstyled) so the version card opens clear of it",
+    file: "apps/web/src/components/chat/ComposerPrimaryActions.tsx",
+    edits: [{ find: 'type={showResume ? "button" : "submit"}', replace: 'type={showResume ? "button" : "submit"}\n      data-t3b-send=""' }],
+  },
+  {
+    id: "web/blacksand-artwork-label",
+    why: "Environment identification names the nightly art for what it shows: Blacksand artwork",
+    file: "apps/web/src/components/settings/AppearanceSettingsPanel.tsx",
+    edits: [{ find: '"Nightly artwork"', replace: '"Blacksand artwork"', count: 4 }],
   },
   {
     id: "web/blacksand-build-info",
@@ -1812,7 +1811,7 @@ export const makeRules = ({ updater, build }) => [
   },
   {
     id: "web/blacksand-interface-file",
-    why: "The Blacksand interface switches (send ring, version stamp, selection), per client, on by default",
+    why: "The Blacksand interface switches (version stamp, selection), per client, on by default",
     kind: "write",
     file: "apps/web/src/blacksandInterface.ts",
     content: readFile("blacksandInterface.ts"),
@@ -2138,22 +2137,28 @@ export const makeRules = ({ updater, build }) => [
   // The app icon: upstream's T3 Code icon with the blacksand badge, on every
   // channel. The Icon Composer bundle (Liquid Glass) is upstream's own plus a
   // badge layer; the PNGs are upstream's with the badge drawn on.
-  {
-    id: "desktop/app-icon-badge",
-    why: "The badge's image, beside upstream's T3 mark in its Icon Composer bundle",
+  // The app icon is upstream's, with the blacksand backdrop behind its T3: a night
+  // sky, one low dune, and the static logo (lib/icon-backdrop.mjs).
+  ...Object.entries(BACKDROP_ASSETS).map(([name, content]) => ({
+    id: `desktop/app-icon-backdrop-${name.replace(/^blacksand-|\.svg$/g, "")}`,
+    why: "A backdrop layer's image, beside upstream's T3 in its Icon Composer bundle",
     kind: "write",
-    file: "assets/prod/app-icon.icon/Assets/blacksand-badge.svg",
-    content: BLACKSAND_BADGE_SVG,
-  },
+    file: `assets/prod/app-icon.icon/Assets/${name}`,
+    content,
+  })),
   {
-    id: "desktop/app-icon-badge-layer",
-    why: "Put the badge in front of upstream's layers (compiled by lib/build.mjs when Xcode 26+ is present)",
+    id: "desktop/app-icon-backdrop-layers",
+    why: "Put the backdrop behind upstream's T3, in its group (compiled by lib/build.mjs when Xcode 26+ is present)",
     kind: "transform",
     file: "assets/prod/app-icon.icon/icon.json",
     transform: (source) => {
       const icon = JSON.parse(source);
-      if (!Array.isArray(icon.groups)) throw new RuleDrift("desktop/app-icon-badge-layer: icon.json has no groups", { file: "assets/prod/app-icon.icon/icon.json" });
-      return `${JSON.stringify({ ...icon, groups: [BADGE_LAYER, ...icon.groups] }, null, 2)}\n`;
+      const file = "assets/prod/app-icon.icon/icon.json";
+      const groups = Array.isArray(icon.groups) ? icon.groups : [];
+      const t3 = groups.findIndex((group) => group.layers?.some((layer) => layer["image-name"] === "text.svg"));
+      if (t3 === -1) throw new RuleDrift("desktop/app-icon-backdrop-layers: icon.json has no group with text.svg", { file });
+      const next = groups.map((group, i) => (i === t3 ? { ...group, layers: [...group.layers, ...BACKDROP_LAYERS] } : group));
+      return `${JSON.stringify({ ...icon, groups: next }, null, 2)}\n`;
     },
   },
   {
@@ -2163,12 +2168,12 @@ export const makeRules = ({ updater, build }) => [
     edits: [{ find: '      icon: "icon.icns",', replace: '      icon: process.env.BLACKSAND_T3_MAC_ICON ?? "icon.icns",' }],
   },
   ...[
-    ["flat-stable", "assets/prod/black-macos-1024.png", "badge-macos-1024.png", "The flat icon where Liquid Glass isn't available: no Xcode 26+, DMG volumes"],
-    ["flat-nightly", "assets/nightly/nightly-macos-1024.png", "badge-macos-1024.png", "Same, for the nightly channel"],
-    ["linux-stable", "assets/prod/black-universal-1024.png", "badge-universal-1024.png", "The Linux app and launcher icon"],
-    ["linux-nightly", "assets/nightly/nightly-universal-1024.png", "badge-universal-1024.png", "Same, for the nightly channel"],
-    ["web-stable-splash", "assets/prod/t3-black-web-apple-touch-180.png", "badge-180.png", "The startup splash (index.html shows apple-touch-icon.png)"],
-    ["web-nightly-splash", "assets/nightly/nightly-web-apple-touch-180.png", "badge-180.png", "Same, for the nightly channel"],
+    ["flat-stable", "assets/prod/black-macos-1024.png", "backdrop-macos-1024.png", "The flat icon where Liquid Glass isn't available: no Xcode 26+, DMG volumes"],
+    ["flat-nightly", "assets/nightly/nightly-macos-1024.png", "backdrop-macos-1024.png", "Same, for the nightly channel"],
+    ["linux-stable", "assets/prod/black-universal-1024.png", "backdrop-universal-1024.png", "The Linux app and launcher icon"],
+    ["linux-nightly", "assets/nightly/nightly-universal-1024.png", "backdrop-universal-1024.png", "Same, for the nightly channel"],
+    ["web-stable-splash", "assets/prod/t3-black-web-apple-touch-180.png", "backdrop-180.png", "The startup splash (index.html shows apple-touch-icon.png)"],
+    ["web-nightly-splash", "assets/nightly/nightly-web-apple-touch-180.png", "backdrop-180.png", "Same, for the nightly channel"],
   ].map(([id, file, name, why]) => ({ id: `desktop/app-icon-${id}`, why, kind: "write", overwrite: true, file, content: readBinary(name) })),
   {
     id: "desktop/updater-file",

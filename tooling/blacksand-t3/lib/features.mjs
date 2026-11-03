@@ -48,17 +48,25 @@ export const features = [
     rules: ["web/blacksand-sidebar-name"],
   },
   {
+    name: "night-sky",
+    label: "Desert night sky",
+    description: "On nightly builds, a monochrome desert night with the blacksand mark behind the sidebar header and in the send button, called Blacksand artwork in Settings → Appearance",
+    rules: ["web/blacksand-night-sky-file", "web/blacksand-night-sky", "web/blacksand-artwork-label"],
+    // blacksand.css carries its fade.
+    requires: ["styles"],
+  },
+  {
+    name: "send-button-marker",
+    label: "Version card clears the send button",
+    description: "Marks upstream's send button so the version card opens clear of it; without it the card can open over the button",
+    rules: ["web/blacksand-send-button"],
+  },
+  {
     name: "version-stamp",
     label: "Version stamp",
     description: "The build version in the window's corner, with its changes and omitted features on hover",
     rules: ["web/blacksand-version-stamp"],
     requires: ["brand-file", "styles"],
-  },
-  {
-    name: "send-button",
-    label: "Ringed send button",
-    description: "Lets blacksand.css find the send button and the composer around it",
-    rules: ["web/blacksand-send-button"],
   },
   {
     name: "interface-settings",
@@ -75,8 +83,8 @@ export const features = [
   },
   {
     name: "app-icon",
-    label: "blacksand badge on the app icon",
-    description: "Upstream's T3 Code icon with the blacksand badge in the Dock, Finder, launcher and splash, layered for Liquid Glass",
+    label: "blacksand backdrop on the app icon",
+    description: "Upstream's T3 with a night sky, a dune and the blacksand static logo behind it, in the Dock, Finder, launcher and splash, layered for Liquid Glass",
     rules: ["desktop/app-icon-*"],
   },
   {
