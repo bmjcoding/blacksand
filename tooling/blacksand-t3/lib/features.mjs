@@ -50,9 +50,9 @@ export const features = [
   {
     name: "night-sky",
     label: "Desert night sky",
-    description: "On nightly builds, a monochrome desert night with the blacksand mark behind the sidebar header, with its switch in Settings → Appearance → Interface",
-    rules: ["web/blacksand-night-sky-file", "web/blacksand-night-sky"],
-    // Its switch is in the interface file, and blacksand.css drops upstream's mask for it.
+    description: "On nightly builds, a monochrome desert night with the blacksand mark behind the sidebar header and in the send button, called Blacksand artwork in Settings → Appearance",
+    rules: ["web/blacksand-night-sky-file", "web/blacksand-night-sky", "web/blacksand-artwork-label"],
+    // blacksand.css carries its fade.
     requires: ["styles"],
   },
   {
@@ -61,12 +61,6 @@ export const features = [
     description: "The build version in the window's corner, with its changes and omitted features on hover",
     rules: ["web/blacksand-version-stamp"],
     requires: ["brand-file", "styles"],
-  },
-  {
-    name: "send-button",
-    label: "Ringed send button",
-    description: "Lets blacksand.css find the send button and the composer around it",
-    rules: ["web/blacksand-send-button"],
   },
   {
     name: "interface-settings",

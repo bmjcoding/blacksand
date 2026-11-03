@@ -1717,7 +1717,7 @@ export const makeRules = ({ updater, build }) => [
   // -------------------------------------------------------------- blacksand --
   {
     id: "web/blacksand-css",
-    why: "Ringed send button, composer glow, version stamp, accent text selection",
+    why: "The desert night's fade, the version stamp, accent text selection",
     kind: "write",
     file: "apps/web/src/blacksand.css",
     content: readFile("blacksand.css"),
@@ -1764,7 +1764,7 @@ export const makeRules = ({ updater, build }) => [
   },
   {
     id: "web/blacksand-night-sky",
-    why: "Nightly's sidebar header and send button use the desert night while its switch is on, upstream's starry sky otherwise",
+    why: "Nightly's sidebar header and send button use the desert night instead of upstream's starry sky",
     file: "apps/web/src/components/SidebarStageBackdrop.tsx",
     edits: [
       {
@@ -1773,26 +1773,19 @@ export const makeRules = ({ updater, build }) => [
       },
       {
         find: '  return variant === "nightly" ? <NightlySkyArt /> : <DevBlueprintArt />;\n',
-        replace: '  return variant === "nightly" ? <BlacksandNightSky upstream={<NightlySkyArt />} /> : <DevBlueprintArt />;\n',
+        replace: '  return variant === "nightly" ? <BlacksandNightSky /> : <DevBlueprintArt />;\n',
       },
       {
         find: '  return variant === "nightly" ? <NightlySkyArt compact /> : <DevBlueprintArt compact />;\n',
-        replace:
-          '  return variant === "nightly" ? (\n    <BlacksandNightSky compact upstream={<NightlySkyArt compact />} />\n  ) : (\n    <DevBlueprintArt compact />\n  );\n',
+        replace: '  return variant === "nightly" ? <BlacksandNightSky compact /> : <DevBlueprintArt compact />;\n',
       },
     ],
   },
   {
-    id: "web/blacksand-send-button",
-    why: "Lets blacksand.css find the send button, and the composer around it, and the stage they are drawn for",
-    file: "apps/web/src/components/chat/ComposerPrimaryActions.tsx",
-    edits: [
-      {
-        find: 'type={showResume ? "button" : "submit"}',
-        replace:
-          'type={showResume ? "button" : "submit"}\n      data-t3b-send=""\n      data-stage-art={stageBackdropVariant ?? undefined}',
-      },
-    ],
+    id: "web/blacksand-artwork-label",
+    why: "Environment identification names the nightly art for what it shows: Blacksand artwork",
+    file: "apps/web/src/components/settings/AppearanceSettingsPanel.tsx",
+    edits: [{ find: '"Nightly artwork"', replace: '"Blacksand artwork"', count: 4 }],
   },
   {
     id: "web/blacksand-build-info",
@@ -1812,7 +1805,7 @@ export const makeRules = ({ updater, build }) => [
   },
   {
     id: "web/blacksand-interface-file",
-    why: "The Blacksand interface switches (send ring, version stamp, selection), per client, on by default",
+    why: "The Blacksand interface switches (version stamp, selection), per client, on by default",
     kind: "write",
     file: "apps/web/src/blacksandInterface.ts",
     content: readFile("blacksandInterface.ts"),

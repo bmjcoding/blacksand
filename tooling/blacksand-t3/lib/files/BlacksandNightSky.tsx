@@ -1,16 +1,15 @@
 // Injected by blacksand. The nightly stage art: a monochrome desert night, with the
 // blacksand mark pressed faintly into the sky above the dunes. It replaces upstream's
-// NightlySkyArt while Settings -> Appearance -> Desert night sky is on, and hands back
-// upstream's art when it is off. Static: no motion.
+// NightlySkyArt wherever upstream draws it: the sidebar header, and the send button's
+// fill. Settings -> Appearance -> Environment identification turns it on or off
+// ("Blacksand artwork"). Static: no motion.
 //
 // Same frame as upstream's art: a 96-unit-tall viewBox, left-anchored and sliced, so a
 // unit is 80/96 css px in the sidebar's 80px header box. Everything is placed in sky
 // coordinates and never moves when the sidebar is resized. The scene is night in every
 // theme; blacksand.css fades it into the chrome, light or dark, from under the far ridge.
 
-import { useId, type ReactElement } from "react";
-
-import { useBlacksandInterface } from "../blacksandInterface";
+import { useId } from "react";
 
 const VIEW_BOX = "0 0 8192 96";
 const U = 96 / 80; // svg units per css px
@@ -58,9 +57,8 @@ function round(value: number) {
 
 // Dunes: periodic ridges (each tiles seamlessly at its own period), base and amplitude
 // in css px. The crest is lit by its fill gradient alone: no stroked rim.
-// PREVIEW: 2 ranks (C1) or 3 wind-shaped ranks (C2); the owner picks, the other goes.
-const RANKS: 2 | 3 = 2;
-const SKEW = RANKS === 3 ? 0.55 : 0;
+// Three ranks, their crests shaped by the wind: a long windward slope, a sharper crest.
+const SKEW = 0.55;
 type Ridge = { period: number; base: number; amp: number; offset: number; waves: ReadonlyArray<[number, number, number]> };
 const FAR: Ridge = { period: 384, base: 50, amp: 3.4, offset: 0, waves: [[1, 1, 0.4], [2, 0.55, 2.1], [3, 0.2, 0.9]] };
 const MIDDLE: Ridge = { period: 480, base: 54.5, amp: 3.2, offset: -60, waves: [[1, 1, 1.2], [3, 0.35, 2.2]] };
@@ -165,7 +163,7 @@ function DesertNightArt({ compact = false }: { compact?: boolean }) {
             <BlacksandMark />
           </g>
           <rect width="100%" height="96" fill={`url(#${far})`} />
-          {RANKS === 3 ? <rect width="100%" height="96" fill={`url(#${middle})`} /> : null}
+          <rect width="100%" height="96" fill={`url(#${middle})`} />
           <rect width="100%" height="96" fill={`url(#${near})`} />
         </>
       )}
@@ -194,10 +192,7 @@ function BlacksandMark() {
   );
 }
 
-/**
- * The nightly stage art: the desert night while its switch is on, otherwise upstream's
- * (`upstream`). `compact` is the send button's fill: sky and stars only.
- */
-export function BlacksandNightSky({ upstream, compact = false }: { upstream: ReactElement; compact?: boolean }) {
-  return useBlacksandInterface("sky") ? <DesertNightArt compact={compact} /> : upstream;
+/** The nightly stage art. `compact` is the send button's fill: sky and stars only. */
+export function BlacksandNightSky({ compact = false }: { compact?: boolean }) {
+  return <DesertNightArt compact={compact} />;
 }

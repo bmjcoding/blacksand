@@ -40,14 +40,19 @@ machine stays on the installed build and says why.
 The rules remove what [privacy](../security/privacy.md) lists. They also give the app
 its own name, bundle ID and data directory. The name is T3 Code (blacksand). The icon
 is upstream's, with a small blacksand badge in the corner. The sidebar logo is
-upstream's too, with a muted "blacksand" after it. A few touches follow whichever
-theme you pick: a ringed send button, a version stamp and accent text selection.
-On nightly builds, a monochrome desert night replaces upstream's starry sky behind
-the sidebar header: dunes along the bottom, and the blacksand mark pressed faintly
-into the sky under the sidebar's "blacksand". It fades into the sidebar like
-upstream's art, in light mode and dark. It is static, and it stays put when you
-resize the sidebar. Each of these has its own switch in **Settings → Appearance
-→ Interface**; with the desert night switched off, nightly shows upstream's sky.
+upstream's too, with a muted "blacksand" after it. Two touches follow whichever
+theme you pick: a version stamp and accent text selection. Each has its own switch
+in **Settings → Appearance → Interface**. The send button is upstream's.
+
+On nightly builds, the sidebar header shows Blacksand artwork instead of upstream's
+starry sky: a monochrome desert night, with dunes along the bottom and the blacksand
+mark pressed faintly into the sky under the sidebar's "blacksand". The send button
+on nightly is filled with the same sky and stars, without the mark or the dunes.
+The art fades into the sidebar like upstream's, in light mode and dark. It is
+static, and it stays put when you resize the sidebar. **Settings → Appearance →
+Environment identification** lists it as Blacksand artwork, next to upstream's
+Version pill and None.
+
 Blacksand adds no themes of its own. Use upstream's themes, or add a custom theme to
 change the accent.
 

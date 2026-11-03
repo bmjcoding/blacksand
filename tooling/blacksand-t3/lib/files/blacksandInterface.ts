@@ -9,20 +9,10 @@
 import { useSyncExternalStore } from "react";
 
 export const BLACKSAND_INTERFACE = {
-  send: {
-    title: "Send button ring",
-    description: "A ringed send button in the theme's accent, and a glow around the chat box while you type.",
-    searchTerms: "send button ring composer chat box glow accent",
-  },
   stamp: {
     title: "Version stamp",
     description: "The build version in the window's bottom-right corner, with its changes and omitted features.",
     searchTerms: "version build stamp corner changes omitted features",
-  },
-  sky: {
-    title: "Desert night sky",
-    description: "On nightly builds, a monochrome desert night with the blacksand mark replaces the starry sky behind the sidebar header.",
-    searchTerms: "desert night sky nightly sidebar header backdrop stars dunes mark",
   },
   selection: {
     title: "Accent text selection",

@@ -67,14 +67,14 @@ export const SCREENS = [
     name: "home",
     label: "Home",
     path: "/",
-    features: ["wordmark", "send-button", "styles", "names"],
+    features: ["wordmark", "night-sky", "styles", "names"],
   },
   {
     name: "composer",
     label: "Composer (close up)",
     path: "/",
     clip: ['[data-slot="composer-host"]'],
-    features: ["send-button", "styles"],
+    features: ["night-sky"],
   },
   {
     name: "version",

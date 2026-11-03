@@ -138,27 +138,30 @@ test("the sidebar logo is upstream's T3 Code with a muted, smaller blacksand aft
   assert.doesNotMatch(file("blacksandInterface.ts"), /wordmark|redact/i);
 });
 
-test("nightly's stage art is the desert night, behind its own switch, with the mark as it is", () => {
-  assert.equal(index.get("web/blacksand-night-sky-file"), "night-sky");
-  assert.equal(index.get("web/blacksand-night-sky"), "night-sky");
-  assert.ok(featureByName("night-sky").requires.includes("styles"), "its switch and its mask override load with the styles");
+test("nightly's stage art is the desert night, called Blacksand artwork, with the mark as it is", () => {
+  for (const id of ["web/blacksand-night-sky-file", "web/blacksand-night-sky", "web/blacksand-artwork-label"]) assert.equal(index.get(id), "night-sky", id);
+  assert.ok(featureByName("night-sky").requires.includes("styles"), "its fade loads with the styles");
   assert.equal(byId.get("web/blacksand-night-sky-file").file, "apps/web/src/components/BlacksandNightSky.tsx");
-  const edits = byId.get("web/blacksand-night-sky").edits;
-  assert.equal(edits.length, 3, "the import, the header art and the send button's art");
-  for (const edit of edits.slice(1)) assert.match(edit.replace, /<BlacksandNightSky (compact )?upstream=\{<NightlySkyArt( compact)? \/>\} \/>/, "upstream's art stays, for the switch's off position");
-  assert.ok(edits.every((edit) => !/DevBlueprintArt/.test(edit.replace) || /<DevBlueprintArt( compact)? \/>/.test(edit.replace)), "dev keeps upstream's blueprint");
+  const [, header, button] = byId.get("web/blacksand-night-sky").edits;
+  assert.equal(header.replace, '  return variant === "nightly" ? <BlacksandNightSky /> : <DevBlueprintArt />;\n', "dev keeps upstream's blueprint");
+  assert.equal(button.replace, '  return variant === "nightly" ? <BlacksandNightSky compact /> : <DevBlueprintArt compact />;\n', "the send button's fill too");
+  assert.deepEqual(byId.get("web/blacksand-artwork-label").edits, [{ find: '"Nightly artwork"', replace: '"Blacksand artwork"', count: 4 }], "every place the dropdown names it");
   // the mark is docs/assets/blacksand.svg's shapes, unaltered
   const sky = file("BlacksandNightSky.tsx");
-  const logo = file("blacksand.svg");
-  for (const [, d] of logo.matchAll(/ d="([^"]+)"/g)) assert.ok(sky.includes(`d="${d}"`), `the mark keeps ${d.slice(0, 24)}…`);
+  for (const [, d] of file("blacksand.svg").matchAll(/ d="([^"]+)"/g)) assert.ok(sky.includes(`d="${d}"`), `the mark keeps ${d.slice(0, 24)}…`);
   assert.match(sky, /<circle cx="512\.0" cy="623\.4" r="197\.6" fill="none" stroke="#fff" strokeWidth="34" \/>/);
-  assert.match(sky, /useBlacksandInterface\("sky"\)/);
   assert.doesNotMatch(sky, /<animate|@keyframes|requestAnimationFrame|feGaussianBlur/, "static, and nothing soft enough to fringe");
-  assert.match(file("blacksandInterface.ts"), /\n {2}sky: \{\n {4}title: "Desert night sky",/);
+  assert.doesNotMatch(sky, /--stage-fade|--app-chrome-background|useBlacksandInterface/, "night in every theme; the dropdown is its only switch");
   const css = file("blacksand.css");
   assert.match(css, /\.sidebar-stage-backdrop:has\(> \[data-stage-art="blacksand"\]\) \{\n {2}--t3b-sky-fade: linear-gradient\(\n {4}to bottom,\n {4}black 0%,\n {4}black 63%,/, "it fades into the chrome, from under the far ridge");
   assert.match(css, /mask-image: var\(--t3b-sky-fade\);\n {2}-webkit-mask-image: var\(--t3b-sky-fade\);/);
-  assert.doesNotMatch(sky, /--stage-fade|--app-chrome-background/, "the scene itself is night in every theme; only the fade meets the chrome");
+});
+
+test("the send button is upstream's: no ring, no composer glow", () => {
+  assert.ok(!byId.has("web/blacksand-send-button"));
+  assert.equal(featureByName("send-button"), undefined);
+  assert.doesNotMatch(file("blacksand.css"), /t3b-send|composer/);
+  assert.doesNotMatch(file("blacksandInterface.ts"), /\n {2}(send|sky): \{/);
 });
 
 test("the app icon is upstream's with the blacksand badge in front", () => {
