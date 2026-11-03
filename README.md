@@ -1,12 +1,10 @@
-<p align="center">
+<h1 align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/blacksand-dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="docs/assets/blacksand-light.svg">
-    <img src="docs/assets/blacksand-light.svg" alt="Blacksand logo" width="120" height="98">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/blacksand-lockup-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/blacksand-lockup-light.svg">
+    <img src="docs/assets/blacksand-lockup-light.svg" alt="Blacksand" width="371" height="80">
   </picture>
-</p>
-
-# Blacksand
+</h1>
 
 The secure ground your AI agents run on.
 

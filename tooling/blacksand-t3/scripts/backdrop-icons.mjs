@@ -21,9 +21,10 @@
 // "Behind" without upstream's layers: inside the icon's body each pixel becomes the lighter of
 // upstream's pixel and the backdrop's. Upstream's T3 is near-white on black and the backdrop is
 // darker than the T3, so the T3 stays whole and in front, and the backdrop shows where upstream
-// is black. The body is upstream's opaque area pulled in by 6 pixels (per 1024), so the glass
-// rim and shadow stay upstream's. The macOS icon's body is inset 100 of 1024 pixels on each
-// side, for its shadow; the others fill the image.
+// is black. It follows upstream's own anti-aliased edge, so the backdrop's edge is as smooth
+// as upstream's, its glass rim highlight stays on top, and its shadow stays its own. The macOS
+// icon's body is inset 100 of 1024 pixels on each side, for its shadow; the others fill the
+// image.
 
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -196,29 +197,20 @@ async function compose(baseUrl, backdropUrls, inset) {
     ctx.imageSmoothingQuality = "high";
     for (const part of parts) ctx.drawImage(part, size * inset, size * inset, body, body);
   });
-  // the body: opaque, and at least `pull` pixels from anything that isn't
-  const pull = Math.max(1, Math.round((6 * size) / 1024));
-  const opaque = new Uint8Array(size * size);
-  for (let i = 0; i < size * size; i++) opaque[i] = up.data[i * 4 + 3] >= 250 ? 1 : 0;
-  const erode = (src, horizontal) => {
-    const out = new Uint8Array(size * size);
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        let keep = 1;
-        for (let d = -pull; d <= pull && keep; d++) {
-          const xx = horizontal ? x + d : x, yy = horizontal ? y : y + d;
-          if (xx < 0 || yy < 0 || xx >= size || yy >= size || !src[yy * size + xx]) keep = 0;
-        }
-        out[y * size + x] = keep;
-      }
-    }
-    return out;
-  };
-  const inside = erode(erode(opaque, true), false);
+  // Where upstream's body is, by its own anti-aliased edge: a pixel lightens in proportion to
+  // its coverage, so the backdrop's edge is as smooth as upstream's. The lighten keeps
+  // upstream's bright rim highlight on top, and the shadow outside the body stays upstream's.
   const out = new ImageData(new Uint8ClampedArray(up.data), size, size);
   for (let i = 0; i < size * size; i++) {
-    if (!inside[i]) continue;
-    for (let c = 0; c < 3; c++) out.data[i * 4 + c] = Math.max(up.data[i * 4 + c], back.data[i * 4 + c]);
+    const a = up.data[i * 4 + 3] / 255;
+    if (a === 0) continue;
+    // upstream's macOS shadow is at most 13% opaque and stays its own; the body's anti-aliased
+    // edge (the rounded corners, 15% opaque and up) takes the backdrop in proportion
+    const k = Math.min(1, Math.max(0, (a - 0.15) / 0.35));
+    for (let c = 0; c < 3; c++) {
+      const u = up.data[i * 4 + c];
+      out.data[i * 4 + c] = Math.round(u + (Math.max(u, back.data[i * 4 + c]) - u) * k);
+    }
   }
   const c = document.createElement("canvas");
   c.width = size;
