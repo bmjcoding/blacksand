@@ -1,10 +1,24 @@
 {
-  "capturedAt": "2026-11-02T21:27:03.729447+00:00",
+  "capturedAt": "2026-11-05T18:23:13.568379+00:00",
+  "note": "Fresh public responses reduced to scanner-consumed fields; npm metadata retains the four relevant versions. OSV query and batch results are recorded verbatim.",
   "sources": [
+    "https://registry.npmjs.org/node-forge",
     "https://api.osv.dev/v1/querybatch",
-    "https://api.github.com/advisories?ecosystem=npm&per_page=100&affects=node-forge%401.4.0,node-forge%401.4.1",
-    "https://api.github.com/repos/digitalbazaar/forge/security-advisories?state=published&per_page=100",
-    "https://registry.npmjs.org/node-forge"
+    "https://api.osv.dev/v1/vulns/GHSA-4487-j8r4-4g2f",
+    "https://api.osv.dev/v1/vulns/GHSA-4642-5mcj-2rqw",
+    "https://api.osv.dev/v1/vulns/GHSA-525v-9gp9-w22h",
+    "https://api.osv.dev/v1/vulns/GHSA-5cwg-6vw7-rj6p",
+    "https://api.osv.dev/v1/vulns/GHSA-5x38-2vff-x55p",
+    "https://api.osv.dev/v1/vulns/GHSA-6wvx-3r32-xmcg",
+    "https://api.osv.dev/v1/vulns/GHSA-7wch-p9px-956x",
+    "https://api.osv.dev/v1/vulns/GHSA-86w9-cpqp-85rv",
+    "https://api.osv.dev/v1/vulns/GHSA-8hrf-8g6f-7xwp",
+    "https://api.osv.dev/v1/vulns/GHSA-h6cr-wjv9-3cpp",
+    "https://api.osv.dev/v1/vulns/GHSA-hqq3-7jhf-c5jx",
+    "https://api.osv.dev/v1/vulns/GHSA-jc66-7q78-782g",
+    "https://api.github.com/advisories?ecosystem=npm&per_page=100&affects=node-forge%401.4.0,node-forge%401.4.1,node-forge%401.4.2,node-forge%401.4.3",
+    "https://api.github.com/advisories?ecosystem=npm&per_page=100&type=malware&affects=node-forge%401.4.0,node-forge%401.4.1,node-forge%401.4.2,node-forge%401.4.3",
+    "https://api.github.com/repos/digitalbazaar/forge/security-advisories?state=published&per_page=100"
   ],
   "metadata": {
     "versions": {
@@ -12,7 +26,8 @@
         "name": "node-forge",
         "version": "1.4.0",
         "_npmUser": {
-          "name": "davidlehn"
+          "name": "davidlehn",
+          "email": "dil@lehn.org"
         },
         "repository": {
           "url": "git+https://github.com/digitalbazaar/forge.git",
@@ -37,7 +52,8 @@
         "name": "node-forge",
         "version": "1.4.1",
         "_npmUser": {
-          "name": "davidlehn"
+          "name": "davidlehn",
+          "email": "dil@lehn.org"
         },
         "repository": {
           "url": "git+https://github.com/digitalbazaar/forge.git",
@@ -61,12 +77,165 @@
           "unpackedSize": 1665553
         },
         "gitHead": "8a917370ec51731e817c2d547b7329a58f8210af"
+      },
+      "1.4.2": {
+        "name": "node-forge",
+        "version": "1.4.2",
+        "_npmUser": {
+          "name": "davidlehn",
+          "email": "dil@lehn.org"
+        },
+        "repository": {
+          "url": "git+https://github.com/digitalbazaar/forge.git",
+          "type": "git"
+        },
+        "dist": {
+          "shasum": "9988b154241e3b401a969a76cfb7aca7ddb5e70b",
+          "tarball": "https://registry.npmjs.org/node-forge/-/node-forge-1.4.2.tgz",
+          "fileCount": 59,
+          "integrity": "sha512-rRtAR5XLJ8gCKd9du4qrKAsgCG1ObGP4gLeNJMa4vYSeq4bmBMOJk5IHkrviBV0q7uoAJlVd8HEQYQSVUb4FGQ==",
+          "signatures": [
+            {
+              "sig": "MEQCIGShOwl1C3wRTsqyeqx0+ZlIZbN6Z3AhFcRCkaZd8gSDAiBokop6GL2GYbTIWJk1AJg24KryyQIi6saFakuYWklNYA==",
+              "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+            },
+            {
+              "sig": "MEYCIQCAozuu/cW+px1WOH7rHpNTxidkLeFCRMTwhj6m9I7nQwIhAK8DzeWDl6pbY5kWsU+EabIXfuheEVZqkY4g2b1PnlfP",
+              "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+            }
+          ],
+          "unpackedSize": 1665667
+        },
+        "gitHead": "7928054627d93ab8c0216b756246e8ca8d62a93e"
+      },
+      "1.4.3": {
+        "name": "node-forge",
+        "version": "1.4.3",
+        "_npmUser": {
+          "name": "davidlehn",
+          "email": "dil@lehn.org"
+        },
+        "repository": {
+          "url": "git+https://github.com/digitalbazaar/forge.git",
+          "type": "git"
+        },
+        "dist": {
+          "shasum": "5dc578529ac8e162f58038c6673337cabfab3277",
+          "tarball": "https://registry.npmjs.org/node-forge/-/node-forge-1.4.3.tgz",
+          "fileCount": 59,
+          "integrity": "sha512-P6wzfh6t70avmV8FrVEAd/36sOPJQ+hkaJVX1Laap9J/77m7M0eyozDvc8SwnDf4P7MP94gwbAAo0rg3YVXT+g==",
+          "signatures": [
+            {
+              "sig": "MEUCIDdVAacg1YBQEC7dlNdgh3zh0h6ceBMafz7zFVscMjQ/AiEAkW43BbPMxMuNYQ69I0+YsLO596bBAKHQ8XgfcoNm68M=",
+              "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+            },
+            {
+              "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+              "sig": "MEYCIQCFrH6x8sfUshdfDXYNDJUMqGSSTDydolx5429VOuj1BgIhAJOMQUcM4a1GPJJd59W5wJP2KYjnqmNBMkGSBsAw385c"
+            }
+          ],
+          "unpackedSize": 1705684
+        },
+        "gitHead": "936b24d939dc7261ee37982576f9cf2b410084ee"
       }
     },
     "time": {
       "1.4.0": "2026-03-24T21:44:34.668Z",
-      "1.4.1": "2026-10-27T04:44:07.718Z"
+      "1.4.1": "2026-10-27T04:44:07.718Z",
+      "1.4.2": "2026-10-27T14:09:15.471Z",
+      "1.4.3": "2026-11-04T01:06:47.014Z"
     }
+  },
+  "osvQuery": {
+    "queries": [
+      {
+        "package": {
+          "ecosystem": "npm",
+          "name": "node-forge"
+        },
+        "version": "1.4.0"
+      },
+      {
+        "package": {
+          "ecosystem": "npm",
+          "name": "node-forge"
+        },
+        "version": "1.4.1"
+      },
+      {
+        "package": {
+          "ecosystem": "npm",
+          "name": "node-forge"
+        },
+        "version": "1.4.2"
+      },
+      {
+        "package": {
+          "ecosystem": "npm",
+          "name": "node-forge"
+        },
+        "version": "1.4.3"
+      }
+    ]
+  },
+  "osvBatch": {
+    "results": [
+      {
+        "vulns": [
+          {
+            "id": "GHSA-4487-j8r4-4g2f",
+            "modified": "2026-10-30T23:15:05.499229Z"
+          },
+          {
+            "id": "GHSA-4642-5mcj-2rqw",
+            "modified": "2026-10-30T23:15:04.474856Z"
+          },
+          {
+            "id": "GHSA-525v-9gp9-w22h",
+            "modified": "2026-10-30T23:15:06.416126Z"
+          },
+          {
+            "id": "GHSA-5cwg-6vw7-rj6p",
+            "modified": "2026-10-30T23:15:05.406416Z"
+          },
+          {
+            "id": "GHSA-5x38-2vff-x55p",
+            "modified": "2026-10-30T23:15:08.080586Z"
+          },
+          {
+            "id": "GHSA-6wvx-3r32-xmcg",
+            "modified": "2026-10-30T23:15:05.413239Z"
+          },
+          {
+            "id": "GHSA-7wch-p9px-956x",
+            "modified": "2026-10-30T23:15:07.474415Z"
+          },
+          {
+            "id": "GHSA-86w9-cpqp-85rv",
+            "modified": "2026-10-01T21:40:55.016251Z"
+          },
+          {
+            "id": "GHSA-8hrf-8g6f-7xwp",
+            "modified": "2026-10-30T23:15:08.387649Z"
+          },
+          {
+            "id": "GHSA-h6cr-wjv9-3cpp",
+            "modified": "2026-10-30T23:15:04.479846Z"
+          },
+          {
+            "id": "GHSA-hqq3-7jhf-c5jx",
+            "modified": "2026-10-30T23:15:07.576305Z"
+          },
+          {
+            "id": "GHSA-jc66-7q78-782g",
+            "modified": "2026-10-30T23:15:04.512936Z"
+          }
+        ]
+      },
+      {},
+      {},
+      {}
+    ]
   },
   "osv": [
     {
@@ -131,13 +300,13 @@
         }
       ],
       "database_specific": {
+        "github_reviewed": true,
         "github_reviewed_at": "2026-10-30T23:02:40Z",
         "nvd_published_at": "2026-10-29T19:17:20Z",
         "cwe_ids": [
           "CWE-190"
         ],
-        "severity": "LOW",
-        "github_reviewed": true
+        "severity": "LOW"
       },
       "affected": [
         {
@@ -179,13 +348,13 @@
         }
       ],
       "database_specific": {
+        "nvd_published_at": "2026-10-29T19:17:20Z",
         "cwe_ids": [
           "CWE-476"
         ],
         "severity": "MODERATE",
         "github_reviewed": true,
-        "github_reviewed_at": "2026-10-30T23:02:30Z",
-        "nvd_published_at": "2026-10-29T19:17:20Z"
+        "github_reviewed_at": "2026-10-30T23:02:30Z"
       },
       "affected": [
         {
@@ -227,14 +396,14 @@
         }
       ],
       "database_specific": {
+        "severity": "MODERATE",
         "github_reviewed": true,
         "github_reviewed_at": "2026-10-30T23:02:09Z",
         "nvd_published_at": "2026-10-29T20:17:29Z",
         "cwe_ids": [
           "CWE-1284",
           "CWE-354"
-        ],
-        "severity": "MODERATE"
+        ]
       },
       "affected": [
         {
@@ -276,14 +445,14 @@
         }
       ],
       "database_specific": {
-        "nvd_published_at": "2026-10-29T20:17:30Z",
         "cwe_ids": [
           "CWE-295",
           "CWE-436"
         ],
         "severity": "HIGH",
         "github_reviewed": true,
-        "github_reviewed_at": "2026-10-30T23:01:46Z"
+        "github_reviewed_at": "2026-10-30T23:01:46Z",
+        "nvd_published_at": "2026-10-29T20:17:30Z"
       },
       "affected": [
         {
@@ -325,13 +494,13 @@
         }
       ],
       "database_specific": {
+        "severity": "MODERATE",
+        "github_reviewed": true,
+        "github_reviewed_at": "2026-10-30T23:02:35Z",
         "nvd_published_at": "2026-10-29T19:17:20Z",
         "cwe_ids": [
           "CWE-1321"
-        ],
-        "severity": "MODERATE",
-        "github_reviewed": true,
-        "github_reviewed_at": "2026-10-30T23:02:35Z"
+        ]
       },
       "affected": [
         {
@@ -354,8 +523,8 @@
             }
           ],
           "database_specific": {
-            "last_known_affected_version_range": "<= 1.4.0",
-            "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2026/10/GHSA-6wvx-3r32-xmcg/GHSA-6wvx-3r32-xmcg.json"
+            "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2026/10/GHSA-6wvx-3r32-xmcg/GHSA-6wvx-3r32-xmcg.json",
+            "last_known_affected_version_range": "<= 1.4.0"
           }
         }
       ]
@@ -403,8 +572,8 @@
             }
           ],
           "database_specific": {
-            "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2026/10/GHSA-7wch-p9px-956x/GHSA-7wch-p9px-956x.json",
-            "last_known_affected_version_range": "<= 1.4.0"
+            "last_known_affected_version_range": "<= 1.4.0",
+            "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2026/10/GHSA-7wch-p9px-956x/GHSA-7wch-p9px-956x.json"
           }
         }
       ]
@@ -428,13 +597,13 @@
         }
       ],
       "database_specific": {
-        "nvd_published_at": "2026-09-03T19:17:31Z",
         "cwe_ids": [
           "CWE-347"
         ],
         "severity": "HIGH",
         "github_reviewed": true,
-        "github_reviewed_at": "2026-10-01T21:09:09Z"
+        "github_reviewed_at": "2026-10-01T21:09:09Z",
+        "nvd_published_at": "2026-09-03T19:17:31Z"
       },
       "affected": [
         {
@@ -524,13 +693,13 @@
         }
       ],
       "database_specific": {
-        "github_reviewed": true,
-        "github_reviewed_at": "2026-10-30T23:02:20Z",
         "nvd_published_at": "2026-10-29T19:17:20Z",
         "cwe_ids": [
           "CWE-835"
         ],
-        "severity": "LOW"
+        "severity": "LOW",
+        "github_reviewed": true,
+        "github_reviewed_at": "2026-10-30T23:02:20Z"
       },
       "affected": [
         {
@@ -620,14 +789,14 @@
         }
       ],
       "database_specific": {
-        "severity": "HIGH",
-        "github_reviewed": true,
-        "github_reviewed_at": "2026-10-30T23:02:05Z",
         "nvd_published_at": "2026-10-29T19:17:20Z",
         "cwe_ids": [
           "CWE-1284",
           "CWE-354"
-        ]
+        ],
+        "severity": "HIGH",
+        "github_reviewed": true,
+        "github_reviewed_at": "2026-10-30T23:02:05Z"
       },
       "affected": [
         {
@@ -685,7 +854,21 @@
           "first_patched_version": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N",
+        "score": 3.7
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N",
+          "score": 3.7
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": 0.0
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-6wvx-3r32-xmcg",
@@ -714,7 +897,21 @@
           "first_patched_version": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:L",
+        "score": 4.8
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:L",
+          "score": 4.8
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": 0.0
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-525v-9gp9-w22h",
@@ -743,7 +940,21 @@
           "first_patched_version": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H",
+        "score": 5.9
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H",
+          "score": 5.9
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": 0.0
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-7wch-p9px-956x",
@@ -772,7 +983,21 @@
           "first_patched_version": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+        "score": 7.5
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+          "score": 7.5
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": 0.0
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-h6cr-wjv9-3cpp",
@@ -801,7 +1026,21 @@
           "first_patched_version": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:L/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:L",
+        "score": 2.9
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:L/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:L",
+          "score": 2.9
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": 0.0
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-4487-j8r4-4g2f",
@@ -830,7 +1069,21 @@
           "first_patched_version": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:L",
+        "score": 3.7
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:L",
+          "score": 3.7
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": 0.0
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-5cwg-6vw7-rj6p",
@@ -859,7 +1112,21 @@
           "first_patched_version": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:H/A:N",
+        "score": 5.9
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:H/A:N",
+          "score": 5.9
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": 0.0
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-jc66-7q78-782g",
@@ -888,7 +1155,21 @@
           "first_patched_version": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
+        "score": 7.5
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
+          "score": 7.5
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": 0.0
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-8hrf-8g6f-7xwp",
@@ -917,7 +1198,21 @@
           "first_patched_version": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+        "score": 7.5
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+          "score": 7.5
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": 0.0
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-hqq3-7jhf-c5jx",
@@ -946,7 +1241,21 @@
           "first_patched_version": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+        "score": 7.5
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+          "score": 7.5
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": 0.0
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-5x38-2vff-x55p",
@@ -975,7 +1284,21 @@
           "first_patched_version": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N",
+        "score": 7.4
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N",
+          "score": 7.4
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": 0.0
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-86w9-cpqp-85rv",
@@ -1004,10 +1327,181 @@
           "first_patched_version": null,
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
+        "score": 7.5
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
+          "score": 7.5
+        },
+        "cvss_v4": {
+          "vector_string": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:H/VA:N/SC:N/SI:N/SA:N",
+          "score": 8.7
+        }
+      }
     }
   ],
+  "databaseMalware": [],
   "repository": [
+    {
+      "ghsa_id": "GHSA-w4xr-hqv8-ch44",
+      "cve_id": null,
+      "identifiers": [
+        {
+          "value": "GHSA-w4xr-hqv8-ch44",
+          "type": "GHSA"
+        }
+      ],
+      "summary": "TLS client crash on an unsupported ServerHello compression method",
+      "severity": "medium",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.2",
+          "patched_versions": "1.4.3",
+          "vulnerable_functions": []
+        }
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H",
+        "score": 5.9
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H",
+          "score": 5.9
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
+    },
+    {
+      "ghsa_id": "GHSA-6cv4-p8m7-4r25",
+      "cve_id": null,
+      "identifiers": [
+        {
+          "value": "GHSA-6cv4-p8m7-4r25",
+          "type": "GHSA"
+        }
+      ],
+      "summary": "ReDoS in forge.http response header and cookie trimming",
+      "severity": "medium",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": ">= 0.1.2, <= 1.4.2",
+          "patched_versions": "1.4.3",
+          "vulnerable_functions": []
+        }
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H",
+        "score": 5.9
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H",
+          "score": 5.9
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
+    },
+    {
+      "ghsa_id": "GHSA-j8rw-jp99-435v",
+      "cve_id": null,
+      "identifiers": [
+        {
+          "value": "GHSA-j8rw-jp99-435v",
+          "type": "GHSA"
+        }
+      ],
+      "summary": "TLS client crash on a handshake record received without a session",
+      "severity": "medium",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.2",
+          "patched_versions": "1.4.3",
+          "vulnerable_functions": []
+        }
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H",
+        "score": 5.9
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H",
+          "score": 5.9
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
+    },
+    {
+      "ghsa_id": "GHSA-6889-vf6x-f3g5",
+      "cve_id": null,
+      "identifiers": [
+        {
+          "value": "GHSA-6889-vf6x-f3g5",
+          "type": "GHSA"
+        }
+      ],
+      "summary": "Ed25519 signature verification accepts small-order public keys",
+      "severity": "low",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.2",
+          "patched_versions": "1.4.3",
+          "vulnerable_functions": []
+        }
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N",
+        "score": 3.7
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N",
+          "score": 3.7
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
+    },
     {
       "ghsa_id": "GHSA-4642-5mcj-2rqw",
       "cve_id": "CVE-2026-118775",
@@ -1035,7 +1529,21 @@
           "patched_versions": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N",
+        "score": 3.7
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N",
+          "score": 3.7
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-9wg5-mj3p-v49q",
@@ -1064,7 +1572,21 @@
           "patched_versions": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N",
+        "score": 3.7
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N",
+          "score": 3.7
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-h6cr-wjv9-3cpp",
@@ -1093,7 +1615,21 @@
           "patched_versions": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:L/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:L",
+        "score": 2.9
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:L/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:L",
+          "score": 2.9
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-4487-j8r4-4g2f",
@@ -1122,7 +1658,21 @@
           "patched_versions": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:L",
+        "score": 3.7
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:L",
+          "score": 3.7
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-5cwg-6vw7-rj6p",
@@ -1151,7 +1701,21 @@
           "patched_versions": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:H/A:N",
+        "score": 5.9
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:H/A:N",
+          "score": 5.9
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-jc66-7q78-782g",
@@ -1180,7 +1744,21 @@
           "patched_versions": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
+        "score": 7.5
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
+          "score": 7.5
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-8hrf-8g6f-7xwp",
@@ -1209,7 +1787,21 @@
           "patched_versions": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+        "score": 7.5
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+          "score": 7.5
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-hqq3-7jhf-c5jx",
@@ -1238,7 +1830,21 @@
           "patched_versions": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+        "score": 7.5
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+          "score": 7.5
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-2g46-22mc-6gwp",
@@ -1267,7 +1873,21 @@
           "patched_versions": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
+        "score": 7.5
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
+          "score": 7.5
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-6qrw-m8cv-hcxf",
@@ -1296,7 +1916,21 @@
           "patched_versions": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
+        "score": 7.5
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
+          "score": 7.5
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-5x38-2vff-x55p",
@@ -1325,7 +1959,21 @@
           "patched_versions": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N",
+        "score": 7.4
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N",
+          "score": 7.4
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-rhr8-3pm8-cq29",
@@ -1354,7 +2002,21 @@
           "patched_versions": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+        "score": 7.5
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+          "score": 7.5
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-525v-9gp9-w22h",
@@ -1383,7 +2045,21 @@
           "patched_versions": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H",
+        "score": 5.9
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H",
+          "score": 5.9
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-6wvx-3r32-xmcg",
@@ -1412,7 +2088,60 @@
           "patched_versions": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:L",
+        "score": 4.8
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:L",
+          "score": 4.8
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
+    },
+    {
+      "ghsa_id": "GHSA-3cc4-3294-vgjf",
+      "cve_id": null,
+      "identifiers": [
+        {
+          "value": "GHSA-3cc4-3294-vgjf",
+          "type": "GHSA"
+        }
+      ],
+      "summary": "X.509 nameConstraints not enforced by verifyCertificateChain()",
+      "severity": "high",
+      "withdrawn_at": null,
+      "state": "published",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "node-forge"
+          },
+          "vulnerable_version_range": "<= 1.4.2",
+          "patched_versions": "1.4.3",
+          "vulnerable_functions": []
+        }
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N",
+        "score": 7.4
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N",
+          "score": 7.4
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-2vgq-wchc-25w7",
@@ -1441,7 +2170,21 @@
           "patched_versions": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N",
+        "score": 3.7
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N",
+          "score": 3.7
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-h46v-rmh6-fq4f",
@@ -1470,7 +2213,21 @@
           "patched_versions": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:H/A:N",
+        "score": 5.9
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:H/A:N",
+          "score": 5.9
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-2328-f5f3-gj25",
@@ -1499,7 +2256,21 @@
           "patched_versions": "1.4.0",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N",
+        "score": 7.4
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N",
+          "score": 7.4
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-q67f-28xg-22rw",
@@ -1528,7 +2299,21 @@
           "patched_versions": "1.4.0",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
+        "score": 7.5
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
+          "score": 7.5
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-ppp5-5v6c-4jwp",
@@ -1557,7 +2342,21 @@
           "patched_versions": "1.4.0",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
+        "score": 7.5
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
+          "score": 7.5
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-5m6q-g25r-mvwx",
@@ -1586,7 +2385,21 @@
           "patched_versions": "1.4.0",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+        "score": 7.5
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+          "score": 7.5
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-7wch-p9px-956x",
@@ -1615,7 +2428,21 @@
           "patched_versions": "1.4.1",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+        "score": 7.5
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+          "score": 7.5
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-65ch-62r8-g69g",
@@ -1644,7 +2471,21 @@
           "patched_versions": "1.3.2",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": null,
+        "score": null
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": null,
+          "score": null
+        },
+        "cvss_v4": {
+          "vector_string": "CVSS:4.0/AV:N/AC:L/AT:P/PR:N/UI:N/VC:N/VI:L/VA:N/SC:N/SI:N/SA:N",
+          "score": 6.3
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-554w-wpv2-vw27",
@@ -1673,7 +2514,21 @@
           "patched_versions": "1.3.2",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": null,
+        "score": null
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": null,
+          "score": null
+        },
+        "cvss_v4": {
+          "vector_string": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:H/SC:N/SI:N/SA:N",
+          "score": 8.7
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-5gfm-wpxj-wjgq",
@@ -1702,7 +2557,21 @@
           "patched_versions": "1.3.2",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": null,
+        "score": null
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": null,
+          "score": null
+        },
+        "cvss_v4": {
+          "vector_string": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:H/VA:N/SC:N/SI:N/SA:N",
+          "score": 8.7
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-x4jg-mjrx-434g",
@@ -1731,7 +2600,21 @@
           "patched_versions": "1.3.0",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
+        "score": 7.5
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
+          "score": 7.5
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-cfm4-qjh2-4765",
@@ -1760,7 +2643,21 @@
           "patched_versions": "1.3.0",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
+        "score": 7.5
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
+          "score": 7.5
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-2r2c-g63r-vccr",
@@ -1789,7 +2686,21 @@
           "patched_versions": "1.3.0",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N",
+        "score": 5.3
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N",
+          "score": 5.3
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-gf8q-jrpm-jvxq",
@@ -1814,7 +2725,21 @@
           "patched_versions": "1.0.0",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": null,
+        "score": null
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": null,
+          "score": null
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-5rrq-pxf6-6jx5",
@@ -1839,7 +2764,21 @@
           "patched_versions": "1.0.0",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": null,
+        "score": null
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": null,
+          "score": null
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     },
     {
       "ghsa_id": "GHSA-wxgw-qj99-44c2",
@@ -1868,7 +2807,21 @@
           "patched_versions": "0.10.0",
           "vulnerable_functions": []
         }
-      ]
+      ],
+      "cvss": {
+        "vector_string": null,
+        "score": null
+      },
+      "cvss_severities": {
+        "cvss_v3": {
+          "vector_string": null,
+          "score": null
+        },
+        "cvss_v4": {
+          "vector_string": null,
+          "score": null
+        }
+      }
     }
   ]
 }

@@ -1,5 +1,5 @@
 {
-  "note": "Security overrides applied to every build. `overrides` (rule deps/security-overrides): each replaces one exact vulnerable version with the lowest same-major version that fixes every advisory against it, chosen 2026-10-30 from OSV.dev (agent-device, 2026-10-31, from its repository's own advisories; node-forge, 2026-11-02, from OSV.dev, GitHub's database and its maintainer advisories) and checked for publisher and provenance continuity (lib/fastlane.mjs). `deviceTools` (rule server/device-tool-overrides): the same for a device tool version upstream pins in apps/server/src/device/deviceToolVersions.json, raised within its line (0.x: its minor) to the fix, which pin.json must keep a reviewed lock for (blacksand t3 device-tool-lock). Changing this file needs a commit the repository owner signs. Remove an entry once upstream ships the fix and the fix is at least 3 days old.",
+  "note": "Security overrides applied to every build. `overrides` (rule deps/security-overrides): each replaces one exact vulnerable version with the lowest same-major version that fixes every advisory against it, chosen 2026-10-30 from OSV.dev (agent-device, 2026-10-31, from its repository's own advisories; node-forge, 2026-11-05, from OSV.dev, GitHub's database and its maintainer advisories) and checked for publisher and provenance continuity (lib/fastlane.mjs). `deviceTools` (rule server/device-tool-overrides): the same for a device tool version upstream pins in apps/server/src/device/deviceToolVersions.json, raised within its line (0.x: its minor) to the fix, which pin.json must keep a reviewed lock for (blacksand t3 device-tool-lock). Changing this file needs a commit the repository owner signs. Remove an entry once upstream ships the fix and the fix is at least 3 days old.",
   "overrides": [
     {
       "selector": "@modelcontextprotocol/sdk@1.29.0",
@@ -63,7 +63,7 @@
     },
     {
       "selector": "node-forge@1.4.0",
-      "version": "1.4.1",
+      "version": "1.4.3",
       "advisories": [
         "GHSA-5x38-2vff-x55p",
         "GHSA-7wch-p9px-956x",
@@ -72,7 +72,21 @@
         "GHSA-hqq3-7jhf-c5jx",
         "GHSA-jc66-7q78-782g",
         "GHSA-6qrw-m8cv-hcxf",
-        "GHSA-rhr8-3pm8-cq29"
+        "GHSA-rhr8-3pm8-cq29",
+        "GHSA-3cc4-3294-vgjf",
+        "GHSA-6cv4-p8m7-4r25",
+        "GHSA-j8rw-jp99-435v",
+        "GHSA-w4xr-hqv8-ch44",
+        "GHSA-6889-vf6x-f3g5",
+        "GHSA-4487-j8r4-4g2f",
+        "GHSA-4642-5mcj-2rqw",
+        "GHSA-525v-9gp9-w22h",
+        "GHSA-5cwg-6vw7-rj6p",
+        "GHSA-6wvx-3r32-xmcg",
+        "GHSA-h6cr-wjv9-3cpp",
+        "GHSA-2vgq-wchc-25w7",
+        "GHSA-9wg5-mj3p-v49q",
+        "GHSA-h46v-rmh6-fq4f"
       ]
     },
     {
