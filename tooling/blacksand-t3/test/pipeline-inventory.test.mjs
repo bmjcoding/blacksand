@@ -78,12 +78,16 @@ test("the alert inventory covers the staged install and every device tool's clos
   for (const pkg of [...STAGE_ONLY, ...CLOSURE, TOOL, "newdep@3.0.0"]) assert.ok(full.packages.includes(pkg), pkg);
   assert.ok(!full.packages.includes("only-via-vuln@1.0.0"), "what the override replaced isn't installed");
   assert.deepEqual(full.gaps, []);
+  // Where each version ships (lib/inventory.mjs shipsIn; test/alerts-ships.test.mjs): the staged install's and the tools' do.
+  assert.deepEqual(full.ships(STAGE_ONLY[0]), { how: "staged", via: [] });
+  assert.deepEqual(full.ships(CLOSURE[0]), { how: "device-tool", via: [TOOL] });
   // What can't be had is said, not silently dropped.
   const partial = await alertInventory({ ...base, toolPackages: (tool) => toolClosurePackages(tool, { ...PIN, deviceToolLocks: {} }), stage: null }, net);
   assert.ok(partial.packages.includes(TOOL) && !partial.packages.includes("node-datachannel@0.32.3"));
   assert.equal(partial.gaps.length, 2);
   assert.match(partial.gaps[0], /expo-device-hub@0\.19\.0's dependencies: pin\.json has no reviewed dependency lockfile/);
   assert.match(partial.gaps[1], /no stage record for 0000000000/);
+  assert.deepEqual(partial.ships(STAGE_ONLY[0]), { how: "unknown", via: [] }, "what the staged install holds is unknown, so nothing in it is ruled out");
   const stale = await alertInventory({ ...base, toolPackages: () => [TOOL], stage: record(), blacksand: sha("c") }, net);
   assert.ok(!stale.packages.includes(STAGE_ONLY[0]));
   assert.match(stale.gaps[0], /other Blacksand build code/);
@@ -105,6 +109,7 @@ test("advisories are looked up in the staged install and the tool closures too, 
   };
   const report = await advisoryReport({ pin: PIN, channel: "nightly", overrides: OVERRIDES }, io);
   assert.deepEqual(report.gaps, []);
+  assert.deepEqual(report.open[0].packages[0].ships, { how: "staged", via: [] });
   assert.equal(report.packages, seen[0].length);
   for (const pkg of [...STAGE_ONLY, ...CLOSURE]) assert.ok(seen[0].includes(pkg), pkg);
   const gapped = await advisoryReport({ pin: { ...PIN, deviceToolLocks: {} }, channel: "nightly", overrides: OVERRIDES }, { ...io, stageRecord: () => null });

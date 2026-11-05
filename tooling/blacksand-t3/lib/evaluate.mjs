@@ -130,7 +130,8 @@ export async function baseExposure({ sha, upstreamLock, deviceToolsText, overrid
  * The alert job's report on what `channel`'s pin (main's, after the commit job)
  * is exposed to: { checkedAt, channel, release, sha, packages (how many were
  * checked), sources (each advisory source, what it was asked and when), gaps,
- * open }. Everything a build installs (lib/inventory.mjs alertInventory, the
+ * open (each advisory's packages saying where that version ships, `ships`:
+ * lib/inventory.mjs shipsIn) }. Everything a build installs (lib/inventory.mjs alertInventory, the
  * device tools as the owner's overrides raise them, from upstream at the
  * pinned commit through `io.show`): WORK's
  * graph as the evaluate job resolved it (`io.resolvedLock(sha)`), each device
@@ -144,7 +145,7 @@ export async function baseExposure({ sha, upstreamLock, deviceToolsText, overrid
 export async function advisoryReport({ pin, channel, now = () => new Date(), overrides = readOverrides(), toolOverrides = null }, io) {
   const entry = pin?.channels[channel];
   if (!entry) throw new Error(`pin.json has no ${channel} pin`);
-  const { packages, tools, gaps, notes } = await alertInventory(
+  const { packages, tools, gaps, notes, ships } = await alertInventory(
     {
       sha: entry.sha,
       show: io.show,
@@ -167,7 +168,9 @@ export async function advisoryReport({ pin, channel, now = () => new Date(), ove
     },
   });
   for (const line of [...notes, ...sources.map((s) => `checked: ${s.source} at ${s.at}`), ...gaps.map((gap) => `not covered: ${gap}`)]) io.log?.(line);
-  return { checkedAt: now().toISOString(), channel, release: entry.ref, sha: entry.sha, packages: packages.length, sources, gaps, open };
+  // Whether each vulnerable version ships in the app or is build tooling only (lib/inventory.mjs shipsIn).
+  const shipped = open.map((a) => ({ ...a, packages: a.packages.map((p) => ({ ...p, ships: ships(p.pkg) })) }));
+  return { checkedAt: now().toISOString(), channel, release: entry.ref, sha: entry.sha, packages: packages.length, sources, gaps, open: shipped };
 }
 
 /**

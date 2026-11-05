@@ -66,7 +66,7 @@ function snapshotKey(name, ref) {
 }
 
 const DEP_FIELDS = ["dependencies", "devDependencies", "optionalDependencies"];
-const IMPORTER_FIELDS = [...DEP_FIELDS, "configDependencies", "packageManagerDependencies"];
+export const IMPORTER_FIELDS = [...DEP_FIELDS, "configDependencies", "packageManagerDependencies"];
 
 /**
  * A pnpm lockfile (v9) as { packages: Set<name@version>, roots: [snapshot keys],

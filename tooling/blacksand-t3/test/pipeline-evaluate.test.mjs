@@ -168,7 +168,7 @@ test("the alert inventory is the resolved graph plus the release's own device to
   };
   const report = await advisoryReport({ pin, channel: "nightly", overrides: OVERRIDES, now: () => new Date("2026-10-30T20:00:00Z") }, io);
   const gaps = [`the staged production install: the evaluate job left no stage record for ${sha("0").slice(0, 10)}`];
-  assert.deepEqual(report, { checkedAt: "2026-10-30T20:00:00.000Z", channel: "nightly", release: PINNED, sha: sha("0"), packages: seen[0].length, sources: [], gaps, open: [{ id: "GHSA-x", severity: "HIGH", packages: [{ pkg: "newdep@3.0.0", fixed: [] }] }] });
+  assert.deepEqual(report, { checkedAt: "2026-10-30T20:00:00.000Z", channel: "nightly", release: PINNED, sha: sha("0"), packages: seen[0].length, sources: [], gaps, open: [{ id: "GHSA-x", severity: "HIGH", packages: [{ pkg: "newdep@3.0.0", fixed: [], ships: { how: "unknown", via: [] } }] }] });
   assert.ok(seen[0].includes("newdep@3.0.0") && !seen[0].includes("only-via-vuln@1.0.0"));
   assert.ok(seen[0].includes("agent-device@0.21.31") && !seen[0].includes("agent-device@0.21.20"), "an old approval isn't installed");
   // No resolved lockfile (a failed evaluation): still checked, upstream's lockfile standing in, with a gap.

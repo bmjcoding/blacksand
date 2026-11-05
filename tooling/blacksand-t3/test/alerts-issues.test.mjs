@@ -129,7 +129,8 @@ test("a package a high, critical or unrated record names gets one issue; it list
   assert.ok(dep.body.includes(`[${A}](https://osv.dev/vulnerability/${A}) (${CVE})`));
   assert.ok(dep.body.includes(`[${B}](https://github.com/advisories/${B})`));
   assert.ok(dep.body.includes(`[${R}](https://github.com/o/tool/security/advisories/${R})`), "a repository's own advisory links to that repository");
-  assert.ok(dep.body.includes("`dep@1.0.0` → fixed in `1.0.1`; `dep@1.1.0` → fixed in `1.0.1`"));
+  // A report that doesn't say where a version ships: it counts as shipping.
+  for (const pkg of ["dep@1.0.0", "dep@1.1.0"]) assert.ok(dep.body.includes(`\`${pkg}\` → fixed in \`1.0.1\`. **Ships (couldn't rule it out)**: the check couldn't trace it`), pkg);
   assert.deepEqual(readMarker(dep.body), { kind: "package", channel: "nightly", package: "dep", seen: readMarker(dep.body).seen });
   assert.deepEqual([...statedPairs(g.issue("other").body)], [[A, "HIGH"]]);
   // Only moderate and low: no issue of its own, a line in the one list, which notifies only when it opens.

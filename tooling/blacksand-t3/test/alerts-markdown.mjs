@@ -15,6 +15,8 @@ const OUR_LINKS = [
   /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/actions\/runs\/\d+$/,
 ];
 const RATINGS = new Set(["CRITICAL", "HIGH", "MODERATE", "LOW", "UNKNOWN"]);
+/** Where a version ships, as the alert job labels it (ci/reconcile.mjs shipsOf): our words, bold like a rating. */
+export const SHIPS_LABELS = new Set(["Ships in the app", "Ships (couldn't rule it out)", "Build tooling only"]);
 /** The automation's hidden lines: an issue's or comment's marker, and the line an issue's own text starts with. */
 const MARKER_BLOCK = /^<!-- blacksand (\{[^\n]*\}|text) -->\n*$/;
 
@@ -38,7 +40,7 @@ function tokensOf(markdown) {
  * Why `markdown` isn't inert, as a list (empty: it is). Outside code spans
  * and blocks, there must be no link but ours, no image, HTML (but the
  * automation's own hidden lines, blocks of their own), link definition, mention, or
- * any formatting but **RATING**; and `canary`, a string planted in every value
+ * any formatting but **RATING** and a **ships label**; and `canary`, a string planted in every value
  * from outside, appears only inside code. `codeBlocks`: a fenced block is
  * expected (the held issue's report).
  */
@@ -60,7 +62,7 @@ export function problems(markdown, { canary = null, codeBlocks = false, issueRef
         if (!MARKER_BLOCK.test(t.raw) || path.length) found.push(`HTML: ${JSON.stringify(t.raw.slice(0, 80))}`);
         break;
       case "strong":
-        if (!(t.tokens?.length === 1 && t.tokens[0].type === "text" && RATINGS.has(t.tokens[0].text))) found.push(`bold text: ${JSON.stringify(t.raw.slice(0, 80))}`);
+        if (!(t.tokens?.length === 1 && t.tokens[0].type === "text" && (RATINGS.has(t.tokens[0].text) || SHIPS_LABELS.has(t.tokens[0].text.replace(/&#39;/g, "'"))))) found.push(`bold text: ${JSON.stringify(t.raw.slice(0, 80))}`);
         break;
       case "text":
         if (t.tokens?.length) break; // its children are looked at

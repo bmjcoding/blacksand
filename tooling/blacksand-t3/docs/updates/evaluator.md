@@ -153,6 +153,19 @@ labeled `security`. GitHub sends it as an email and a push notification.
   any more. It says "No longer high or critical" if moderate or low ones still do, and
   never "Fixed" in that case. If a closed package alerts again, the job announces it
   again.
+- **Where it ships.** Each vulnerable version gets a label, with the dependency path
+  that justifies it, and the advisories whose versions ship come first:
+  - **Ships in the app**: the version is in the staged app's `node_modules`
+    (`app.asar`), is a device tool or in one's dependencies, or `apps/desktop`,
+    `apps/server` or `apps/web` reach it through `dependencies` alone.
+  - **Ships (couldn't rule it out)**: those apps reach it only through a
+    `devDependency`. They're bundled, and a bundler takes whatever the code imports,
+    whatever `package.json` calls it. A version the job can't trace gets this label too.
+  - **Build tooling only**: only projects that aren't packaged reach it (mobile,
+    marketing, infra, scripts), and the check covered everything a build installs.
+
+  The labels never change what opens, closes or notifies. `lib/inventory.mjs`
+  `shipsIn` defines them.
 - One issue, `[security] Moderate and low advisories (<channel>)`, lists the packages
   that only moderate and low advisories name. The job rewrites it each hour and never
   comments on it.

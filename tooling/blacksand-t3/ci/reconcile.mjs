@@ -22,6 +22,11 @@
 //     numbered (`n`), so a lost response is never mistaken for the one before. A
 //     closing comment empties the record, so a package that alerts
 //     again after one (a close that failed, or an owner's reopen) is said again;
+//   - each version an advisory names is labeled "ships in the app", "ships
+//     (couldn't rule it out)" or "build tooling only", with the dependency path
+//     that says so (lib/inventory.mjs shipsIn defines them; anything the report
+//     doesn't say counts as shipping), and those that ship are listed first.
+//     Labels only inform: they never change what opens, closes or notifies;
 //   - packages named only by moderate and low advisories: one list, "[security]
 //     Moderate and low advisories (<channel>)", redone each run and never
 //     commented on (an edit doesn't notify); closed once a complete check finds
@@ -255,6 +260,51 @@ const pairText = (id, rating, a) => `**${rating}** ${idRef(id, a)}`;
 const listed = ([x, s], [y, t]) => rankOf(t) - rankOf(s) || byId(x, y);
 
 /**
+ * Where a version ships, as lib/inventory.mjs shipsIn says (the report's
+ * `ships`): { rank (0 ships in the app, 1 couldn't be ruled out, 2 build
+ * tooling only), label, text (why, with the path in code spans) }. Anything the
+ * report doesn't say, or says in a way this can't read, counts as shipping.
+ */
+function shipsOf(p) {
+  const how = typeof p?.ships?.how === "string" ? p.ships.how : null;
+  const hops = Array.isArray(p?.ships?.via) ? p.ships.via.filter((hop) => typeof hop === "string").map((hop) => code(hop, 200)) : [];
+  const shown = hops.length > 6 ? [...hops.slice(0, 4), "…", hops.at(-1)] : hops;
+  const via = shown.length ? `, via ${shown.join(" ← ")}` : "";
+  switch (how) {
+    case "dependencies":
+      return { rank: 0, label: SHIPS, text: `a packaged app depends on it${via}` };
+    case "staged":
+      return { rank: 0, label: SHIPS, text: "it's in the staged app's node_modules (app.asar)" };
+    case "device-tool":
+      return { rank: 0, label: SHIPS, text: `a device tool the app installs${hops.length ? `, or in the dependencies of one${via}` : ""}` };
+    case "dev-dependencies":
+      return { rank: 1, label: MAYBE, text: `a packaged app reaches it only through a devDependency, and a bundler takes whatever the code imports${via}` };
+    case "unpackaged":
+      return { rank: 2, label: TOOLING, text: `only projects that aren't packaged reach it${via}` };
+    default:
+      return { rank: 1, label: MAYBE, text: `the check couldn't trace it to the app or away from it${via}` };
+  }
+}
+
+const SHIPS = "Ships in the app";
+const MAYBE = "Ships (couldn't rule it out)";
+const TOOLING = "Build tooling only";
+
+/** An advisory entry's place in a list: the versions that ship first (shipsOf's rank, its versions' lowest). */
+const shipsFirst = (e) => Math.min(...e.own.map((p) => shipsOf(p).rank));
+
+/** A package's place in a list, and its label: its entries' lowest rank. */
+const packageRank = (entry) => Math.min(...entry.entries.map(shipsFirst));
+
+/** What the labels mean, for the foot of every text that uses them (the definition is lib/inventory.mjs shipsIn's). */
+const SHIPS_DEFINED = [
+  "Where each version ships, traced in the lockfile a build installs from and in what it installs besides:",
+  `**${SHIPS}**: in the staged app's node_modules (app.asar), a device tool the app installs or in one's dependencies, or reached from apps/desktop, apps/server or apps/web through dependencies alone.`,
+  `**${MAYBE}**: reached from those only through a devDependency (they're bundled, and a bundler takes whatever the code imports, whatever package.json calls it), or not traceable.`,
+  `**${TOOLING}**: reached only from projects that aren't packaged (mobile, marketing, infra, scripts), by a check that covered everything a build installs.`,
+];
+
+/**
  * What names each package in `report`: Map name -> { pairs (Map id -> rating:
  * the id of every source record naming it, lib/advisories.mjs `records`, with
  * the most alarming rating any gives it; a runtime advisory's own id and
@@ -265,7 +315,7 @@ export function packageFindings(report) {
   const out = new Map();
   for (const a of report.open) {
     for (const name of new Set(a.packages.map((p) => nameOf(p.pkg)))) {
-      const own = a.packages.filter((p) => nameOf(p.pkg) === name);
+      const own = a.packages.filter((p) => nameOf(p.pkg) === name).sort((x, y) => shipsOf(x).rank - shipsOf(y).rank);
       const pairs = new Map();
       for (const p of own) {
         const records = Array.isArray(p.records) ? p.records.filter((r) => typeof r?.id === "string" && r.id) : [];
@@ -283,7 +333,7 @@ export function packageFindings(report) {
     }
   }
   for (const entry of out.values()) {
-    entry.entries.sort((x, y) => listed(x.pairs[0], y.pairs[0]) || byId(x.a.id, y.a.id));
+    entry.entries.sort((x, y) => shipsFirst(x) - shipsFirst(y) || listed(x.pairs[0], y.pairs[0]) || byId(x.a.id, y.a.id));
     entry.alerting = new Map([...entry.pairs].filter(([, rating]) => isAlerting(rating)));
   }
   return out;
@@ -293,9 +343,11 @@ export function packageFindings(report) {
 function unitFor({ a, own, pairs }, label = "") {
   const cves = (Array.isArray(a.aliases) ? a.aliases : []).filter((alias) => typeof alias === "string" && CVE.test(alias)).slice(0, 5);
   const fixes = (p) => (p.fixed.length ? p.fixed.slice(0, 5).map((v) => code(v, 40)).join(" / ") : "no fixed version yet");
+  const where = (p) => `**${shipsOf(p).label}**: ${shipsOf(p).text}.`;
   return [
     `- ${label}${pairs.map(([id, rating]) => pairText(id, rating, a)).join(", ")}${cves.length ? ` (${cves.join(", ")})` : ""}: ${code(summaryOf(pairs[0][0], a), 300, "no summary")}`,
-    `  - ${own.slice(0, 10).map((p) => `${code(p.pkg, 120)} → fixed in ${fixes(p)}`).join("; ")}${own.length > 10 ? `; and ${own.length - 10} more versions` : ""}`,
+    ...own.slice(0, 10).map((p) => `  - ${code(p.pkg, 120)} → fixed in ${fixes(p)}. ${where(p)}`),
+    ...(own.length > 10 ? [`  - and ${own.length - 10} more versions`] : []),
   ].join("\n");
 }
 
@@ -441,7 +493,9 @@ const rollingTitle = (channel) => `[security] Moderate and low advisories (${cha
 const packageText = (report, name, entry, meta, notes, complete) =>
   compose({
     head: [
-      `Advisories naming ${code(name, 120)} at its pinned ${report.channel} version, from every source the check read (${entry.pairs.size} advisory id${entry.pairs.size === 1 ? "" : "s"}):`,
+      `Where it ships: **${[SHIPS, MAYBE, TOOLING][packageRank(entry)]}** (each version below says why; the labels are defined at the end).`,
+      "",
+      `Advisories naming ${code(name, 120)} at its pinned ${report.channel} version, from every source the check read (${entry.pairs.size} advisory id${entry.pairs.size === 1 ? "" : "s"}), those that ship first:`,
       ...(complete ? [] : ["", "This check didn't cover everything (see the coverage issue): the next one that does brings this list up to date."]),
       "",
     ],
@@ -455,6 +509,8 @@ const packageText = (report, name, entry, meta, notes, complete) =>
       "age gate for the fixing version if its publisher and provenance check out; each Mac re-checks the pin",
       "itself before installing it. If upstream has no fix, adding an override (lib/overrides.json) needs a",
       "commit you sign. This text is redone by each check that covers everything; notes added above or below it are kept.",
+      "",
+      ...SHIPS_DEFINED,
     ],
     meta,
     notes,
@@ -600,20 +656,20 @@ async function reconcilePackage({ report, name, entry, issue, legacy, complete }
  */
 async function reconcileQuiet({ report, findings, issues, complete }, gh, bot) {
   const { channel } = report;
-  const quiet = [...findings].filter(([, entry]) => !entry.alerting.size).sort(([x], [y]) => byId(x, y));
+  const quiet = [...findings].filter(([, entry]) => !entry.alerting.size).sort(([x, e], [y, f]) => packageRank(e) - packageRank(f) || byId(x, y));
   const { fresh: rolling, legacy } = await sortOut(issues, gh, bot, { quietly: true });
   const title = rollingTitle(channel);
   if (quiet.length) {
     const ids = quiet.reduce((n, [, entry]) => n + entry.pairs.size, 0);
     const { body } = compose({
       head: [
-        `Packages in the pinned ${channel} release named only by moderate or low advisories: ${quiet.length} package${quiet.length === 1 ? "" : "s"}, ${ids} advisory id${ids === 1 ? "" : "s"}. This list is redone each hour and never commented on; a package gets its own issue, which notifies, once an advisory naming it is rated high, critical or unrated.`,
+        `Packages in the pinned ${channel} release named only by moderate or low advisories: ${quiet.length} package${quiet.length === 1 ? "" : "s"}, ${ids} advisory id${ids === 1 ? "" : "s"}. This list is redone each hour and never commented on; a package gets its own issue, which notifies, once an advisory naming it is rated high, critical or unrated. Those that ship in the app come first.`,
         ...(complete ? [] : ["", "This hour's check didn't cover everything (see the coverage issue): what it couldn't read may be missing here."]),
         "",
       ],
       units: quiet.flatMap(([name, entry]) => entry.entries.map((e) => unitFor(e, `${code(name, 120)}: `))),
       more: cut(report),
-      foot: ["", ...pinned(report), "", "Notes added above or below this text are kept; the rest is redone each hour."],
+      foot: ["", ...pinned(report), "", "Notes added above or below this text are kept; the rest is redone each hour.", "", ...SHIPS_DEFINED],
       meta: { kind: "rolling", channel },
       notes: notesOf(rolling),
     });

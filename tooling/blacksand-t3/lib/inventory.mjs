@@ -24,7 +24,7 @@ import { fileURLToPath } from "node:url";
 
 import { approvedToolLock, closurePackages } from "./device-tools.mjs";
 import { lockIdentities, npmMeta, substitutions } from "./gates.mjs";
-import { parseLockfile, reachablePackages, registryPackages, splitPackage, withoutPeers } from "./lockfile.mjs";
+import { IMPORTER_FIELDS, parseLockfile, reachablePackages, registryPackages, splitPackage, withoutPeers } from "./lockfile.mjs";
 import { overrideFor, raiseDeviceTools, readOverrides, readToolOverrides } from "./overrides.mjs";
 import { parseVersion, satisfies } from "./semver.mjs";
 import { parseYaml } from "./yaml.mjs";
@@ -504,7 +504,7 @@ export async function checkStageRecord(text, { sha, show, workLock, blacksand, p
  * Everything the alert job checks for advisories against the build of `sha`,
  * as far as it can be known: { packages (sorted), tools (the device tools a
  * build installs, deviceToolsInUse), gaps (what couldn't be covered, and why),
- * notes }. From upstream at that commit (`show`, git):
+ * notes, ships (where a version ships, shipsIn) }. From upstream at that commit (`show`, git):
  *   - WORK's resolved graph, the evaluate job's `resolvedLock` checked
  *     (checkedResolvedLock); missing or not checking out, upstream's lockfile
  *     with the overrides applied (trustedInventory) and a gap for what the
@@ -520,6 +520,9 @@ export async function alertInventory({ sha, show, resolvedLock, toolPackages, st
   const packages = new Set();
   const gaps = [];
   const notes = [];
+  // What ships whatever the lockfile says (shipsIn): the staged install, and each device tool's closure, by tool.
+  const staged = new Set();
+  const closures = new Map();
   let tools = [];
   try {
     tools = deviceToolsInUse(show(sha, DEVICE_TOOL_PINS), toolOverrides);
@@ -540,10 +543,14 @@ export async function alertInventory({ sha, show, resolvedLock, toolPackages, st
   }
   for (const pin of tools) {
     packages.add(pin);
+    closures.set(pin, pin);
     try {
       const closure = toolPackages(pin);
       if (!closure.includes(pin)) throw new Error(`its closure doesn't contain ${pin}`);
-      for (const pkg of closure) packages.add(pkg);
+      for (const pkg of closure) {
+        packages.add(pkg);
+        if (!closures.has(pkg)) closures.set(pkg, pin);
+      }
       notes.push(`device tool ${pin}: ${closure.length} packages in its frozen closure`);
     } catch (error) {
       gaps.push(`device tool ${pin}'s dependencies: ${error.message}`);
@@ -554,11 +561,137 @@ export async function alertInventory({ sha, show, resolvedLock, toolPackages, st
   else {
     try {
       const read = await checkStageRecord(stage, { sha, show, workLock, blacksand, overrides }, { meta });
-      for (const pkg of read.packages) packages.add(pkg);
+      for (const pkg of read.packages) {
+        packages.add(pkg);
+        staged.add(pkg);
+      }
       notes.push(`staged production install: ${read.packages.length} packages, as resolved on ${read.platform} at ${read.builtAt}`);
     } catch (error) {
       gaps.push(`the staged production install: ${error.message}`);
     }
   }
-  return { packages: [...packages].sort(), tools, gaps, notes };
+  const ships = shipsIn({ lock: workLock ?? upstreamLock, staged, tools: closures, complete: gaps.length === 0 });
+  return { packages: [...packages].sort(), tools, gaps, notes, ships };
+}
+
+// ------------------------------------------------- where a version ships --
+// Each alert issue says whether the vulnerable version ships in the app or is
+// build tooling only, so the owner can tell which alerts matter. The label must
+// never be wrong in the dangerous direction, so "build tooling only" is said
+// only when it can be shown, and everything else counts as shipping:
+//   - ships in the app: in the staged production install (app.asar's
+//     node_modules), a device tool the app installs or in one's frozen closure,
+//     or reachable in the lockfile from a packaged project (PACKAGED) through
+//     dependencies and optionalDependencies alone; a workspace project one of
+//     them links is part of it (the bundlers compile it in);
+//   - ships (couldn't rule it out): reachable from a packaged project only
+//     through a devDependency somewhere. The server, the web app and the
+//     desktop main process are bundled, and a bundler takes whatever the code
+//     imports, whatever package.json calls it: the server lists its own
+//     workspace packages as devDependencies. Or not traceable at all: not in
+//     the lockfile, or a packaged project missing from it;
+//   - build tooling only: reachable only from projects that aren't packaged
+//     (mobile, marketing, infra, scripts, the root's tooling), by a check that
+//     covered everything a build installs: a part it couldn't read (the staged
+//     install, a tool's closure, what the overrides bring in) might hold it.
+// The lockfile is WORK's checked one (overrides applied), else upstream's.
+
+/** The projects upstream packages into the app, by their folder in its workspace. */
+export const PACKAGED = ["apps/desktop", "apps/server", "apps/web"];
+
+/** The importer fields a packaged project's own dependencies are in: what it needs to run. */
+const PROD_FIELDS = ["dependencies", "optionalDependencies"];
+
+/**
+ * A breadth-first walk of `lock` from the projects `from`, through importer
+ * fields `fields` (a workspace link leads to its project, walked the same way)
+ * and every snapshot's dependencies: Map node -> [parent node, field] (null for
+ * a start), where a project's node is "/" and its folder (no npm name starts
+ * with "/"), a package's its snapshot key; `first`, Map name@version -> its
+ * nearest node; and `gap`, true when a workspace link couldn't be followed (no
+ * link record, or a folder the lockfile has no project for), so what the
+ * linked code imports is unknown.
+ */
+function walkFrom(lock, from, fields) {
+  const projects = new Map();
+  for (const [key, deps] of lock.importers) {
+    const where = key.slice(key.indexOf("/") + 1);
+    projects.set(where, [...(projects.get(where) ?? []), ...deps]);
+  }
+  const via = new Map(from.map((where) => [`/${where}`, null]));
+  const first = new Map();
+  let gap = false;
+  const queue = [...via.keys()];
+  for (let i = 0; i < queue.length; i++) {
+    const node = queue[i];
+    const next = [];
+    if (node.startsWith("/")) {
+      const where = node.slice(1);
+      for (const [dep, target] of projects.get(where) ?? []) {
+        const [field, name] = [dep.slice(0, dep.indexOf(" ")), dep.slice(dep.indexOf(" ") + 1)];
+        if (!fields.includes(field)) continue;
+        if (target) {
+          next.push([target, field]);
+          continue;
+        }
+        // A workspace link: every target any lockfile document gives it.
+        const targets = [...new Set(lock.links.filter((l) => l.importer === where && l.name === name).map((l) => l.target))];
+        if (!targets.length) gap = true;
+        for (const linked of targets) {
+          if (!projects.has(linked)) gap = true;
+          next.push([`/${linked}`, field]);
+        }
+      }
+    } else {
+      if (!first.has(withoutPeers(node))) first.set(withoutPeers(node), node);
+      for (const target of lock.deps.get(node) ?? []) next.push([target, null]);
+    }
+    for (const [target, field] of next) {
+      if (via.has(target)) continue;
+      via.set(target, [node, field]);
+      queue.push(target);
+    }
+  }
+  return { via, first, gap };
+}
+
+/** The path `walk` (walkFrom) found to name@version `pkg`: what depends on it, nearest first, a project as "folder (field)". */
+function pathTo(walk, pkg) {
+  const hops = [];
+  for (let step = walk.via.get(walk.first.get(pkg)); step; step = walk.via.get(step[0])) {
+    const [parent, field] = step;
+    hops.push(parent.startsWith("/") ? `${parent.slice(1)} (${field})` : withoutPeers(parent));
+  }
+  return hops;
+}
+
+/**
+ * Where each vulnerable version ships, as the section above defines it:
+ * returns pkg (name@version) -> { how, via }, `how` one of "dependencies",
+ * "staged", "device-tool" (ships in the app), "dev-dependencies", "unknown"
+ * (ships: couldn't rule it out), "unpackaged" (build tooling only); `via`, what
+ * depends on it, nearest first, up to the project that does (a device tool, for
+ * one's closure). `lock`: lockfile text (or null); `staged`: the staged
+ * install's packages; `tools`: Map package -> the device tool whose closure
+ * holds it; `complete`: whether the check covered everything a build installs.
+ */
+export function shipsIn({ lock, staged = new Set(), tools = new Map(), complete }) {
+  let parsed = null;
+  try {
+    parsed = lock == null ? null : parseLockfile(lock);
+  } catch {}
+  const projects = new Set([...(parsed?.importers.keys() ?? [])].map((key) => key.slice(key.indexOf("/") + 1)));
+  const traced = parsed && PACKAGED.every((where) => projects.has(where));
+  const shipped = traced ? walkFrom(parsed, PACKAGED, PROD_FIELDS) : null;
+  const bundled = traced ? walkFrom(parsed, PACKAGED, IMPORTER_FIELDS) : null;
+  const anywhere = traced ? walkFrom(parsed, [...projects], IMPORTER_FIELDS) : null;
+  return (pkg) => {
+    if (shipped?.first.has(pkg)) return { how: "dependencies", via: pathTo(shipped, pkg) };
+    if (staged.has(pkg)) return { how: "staged", via: [] };
+    if (tools.has(pkg)) return { how: "device-tool", via: tools.get(pkg) === pkg ? [] : [tools.get(pkg)] };
+    if (bundled?.first.has(pkg)) return { how: "dev-dependencies", via: pathTo(bundled, pkg) };
+    // A packaged app's walk that hit a link it couldn't follow can't rule anything out.
+    if (complete && anywhere?.first.has(pkg) && !shipped.gap && !bundled.gap) return { how: "unpackaged", via: pathTo(anywhere, pkg) };
+    return { how: "unknown", via: anywhere?.first.has(pkg) ? pathTo(anywhere, pkg) : [] };
+  };
 }
