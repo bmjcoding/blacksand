@@ -5,7 +5,6 @@ import { describe, expect, it } from "@effect/vitest";
 import { ProviderDriverKind } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
-import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientResponse from "effect/http/HttpClientResponse";
 
@@ -158,36 +157,6 @@ describe("blacksand release age", () => {
       expect(yield* offered("2.1.312")).toEqual({ version: null, action: null });
       expect(yield* offered(null)).toEqual({ version: null, action: null });
       expect(yield* offered("2.1.318", 500)).toEqual({ version: null, action: null });
-    }),
-  );
-  it.effect("asks a native install's channel with no trace, cookie or authorization headers", () =>
-    Effect.gen(function* () {
-      const sent: Array<Request> = [];
-      const fetch: typeof globalThis.fetch = async (input, init) => {
-        const request = new Request(input, init);
-        sent.push(request);
-        const body = request.url.startsWith("https://downloads.claude.ai/") ? "2.1.318\n" : JSON.stringify(nativeDocument());
-        return new Response(body, { status: 200 });
-      };
-      const version = yield* Effect.gen(function* () {
-        // ClaudeMaintenance.ts's lookup: the server's client, asked for the channel's version.
-        const client = yield* HttpClient.HttpClient;
-        const lookup = client.get("https://downloads.claude.ai/claude-code-releases/stable").pipe(
-          Effect.flatMap((response) => response.text),
-          Effect.map((text) => text.trim()),
-          Effect.orElseSucceed(() => null),
-        );
-        return yield* resolveLatestProviderVersion(nativeClaude(lookup));
-      }).pipe(
-        Effect.withSpan("parent"),
-        Effect.provide(ProviderLatestVersions.layer),
-        Effect.provide(FetchHttpClient.layer),
-        Effect.provideService(FetchHttpClient.Fetch, fetch),
-      );
-      expect(version).toBe("2.1.316");
-      const channel = sent.find((request) => request.url.startsWith("https://downloads.claude.ai/"));
-      expect(channel && new URL(channel.url).pathname).toMatch(/\/(?:latest|stable)$/);
-      for (const header of ["b3", "traceparent", "tracestate", "cookie", "authorization"]) expect(channel?.headers.has(header)).toBe(false);
     }),
   );
 });

@@ -94,9 +94,6 @@ function apply(source) {
 }
 
 // A tiny synchronous effect interpreter: an effect is a thunk, a failure a throw.
-// `provided` holds the services provideService has set while an effect runs.
-const provided = [];
-const current = (tag, fallback) => provided.findLast(([key]) => key === tag)?.[1] ?? fallback;
 class Thunk {
   constructor(run) {
     this.run = run;
@@ -129,16 +126,6 @@ const Effect = {
       }
     }),
   ),
-  provideService: dataLast((self, tag, value) =>
-    effect(() => {
-      provided.push([tag, value]);
-      try {
-        return self.run();
-      } finally {
-        provided.pop();
-      }
-    }),
-  ),
 };
 const Option = { some: (value) => ({ _tag: "Some", value }), none: () => ({ _tag: "None" }), isSome: (option) => option._tag === "Some" };
 
@@ -163,7 +150,6 @@ const releaseAge = (() => {
 })();
 
 const { out, failures } = apply(RESOLVER);
-const TracerPropagationEnabled = { key: "effect/http/HttpClient/TracerPropagationEnabled" };
 const services = {
   Effect,
   Option,
@@ -214,10 +200,9 @@ const native = (command = "/Users/me/.local/bin/claude update", args = ["update"
 function offered({ channel, name = "stable", releases = RELEASES, registryUp = true, lockKey = "claudeAgent-native" }) {
   const asked = [];
   const sent = [];
-  const send = (request) => sent.push({ url: request.url, headers: request.headers, propagation: current(TracerPropagationEnabled, true) });
+  const send = (request) => sent.push({ url: request.url, headers: request.headers });
   const document = npmDocument(releases);
   services.HttpClient = {
-    TracerPropagationEnabled,
     HttpClient: effect(() => ({
       execute: (request) =>
         effect(() => {
@@ -311,13 +296,12 @@ test("a native install is offered nothing when either lookup fails", () => {
   assert.equal(offered({ channel: "9.9.9", lockKey: "homebrew" }).version, "9.9.9");
 });
 
-test("the channel request carries no trace headers, and asks npm only after it", () => {
+test("the channel is asked first, and npm only after it", () => {
   const { sent, asked } = offer({ channel: "2.1.311" });
   assert.deepEqual(asked, [`${CHANNEL_URL}stable`], "cached under the channel's key, which a refresh clears");
   assert.deepEqual(sent.map((request) => request.url), [`${CHANNEL_URL}stable`, NPM_URL]);
-  assert.equal(sent[0].propagation, false, "HttpClient.TracerPropagationEnabled is off for the channel request");
-  // The rule turns it off around the channel lookup alone.
-  assert.match(out, /lookup\.pipe\(Effect\.provideService\(HttpClient\.TracerPropagationEnabled, false\)\)/);
+  // Trace headers are server/no-trace-headers' job, for every request (test/no-trace-headers.test.mjs).
+  assert.doesNotMatch(out, /TracerPropagationEnabled/);
 });
 
 test("Update all runs `claude install <exact version>`, never `claude update`", () => {

@@ -20,9 +20,16 @@ The [strip rules](../updates/upstream-rules.md) remove these from every build:
 | the Electron auto-updater, and upstream's stock app and server downloads | `desktop/updater-*`, `desktop/no-publish-feed`, `server/no-stock-runtime*`, `ssh/runner-installed-blacksand-only` |
 | upstream's background service (`t3 up`, `t3 status`); a stock service's hidden launcher refuses to start | `server/no-t3-up*`, `server/no-stock-service-launcher`, `server/no-stock-service-install` |
 | text that sends you to stock T3 (`npx t3 …`, t3.codes downloads, upstream's release pages) | the `web/no-stock-*` and `server/no-stock-commands-*` rules; `stock/no-stock-guidance` fails the build on any left |
+| tracing headers (`b3`, `traceparent`, `tracestate`) on outgoing requests | `server/no-trace-headers`, `desktop/no-trace-headers` |
 
 The app also gets its own name, bundle ID and data directory (`~/.blacksand/t3`). The
 welcome screen and **Settings → About** say it collects no usage data.
+
+Outbound requests carry no tracing headers. By default, Effect, the library T3 is
+built on, adds `b3` and `traceparent` to every HTTP request. They hold random IDs, not
+account data, but they're no use outside the app. The server and the desktop app
+turn them off once, for every request they make. Tracing inside the app is
+unchanged.
 
 ## The agent CLIs
 
@@ -88,7 +95,7 @@ A CSP doesn't cover WebRTC, so the boot environment closes that route too.
 | What | Where to | Why, and how to stop it |
 |---|---|---|
 | Agent CLI traffic | each provider's API | the agents' job. What they reach is up to their sandboxes or yours. Cursor's SDK runs inside T3's server and reports usage events to Cursor's API, the host it needs for everything else. Antigravity's telemetry is controlled only by your Google account's settings |
-| Provider CLI version checks | npm registry; Meta's release channel for Muse; Anthropic's release channel (downloads.claude.ai) for a natively installed Claude Code | so Update can offer versions at least 3 days old. For a native Claude Code, the channel's version is only a ceiling: Update offers the newest npm release at or below it whose own npm publish date is at least 3 days old. The channel request names only the channel and sends no trace headers. On by default; **Settings → Maintenance → Provider update checks** turns them off ([provider updates](../updates/provider-updates.md)) |
+| Provider CLI version checks | npm registry; Meta's release channel for Muse; Anthropic's release channel (downloads.claude.ai) for a natively installed Claude Code | so Update can offer versions at least 3 days old. For a native Claude Code, the channel's version is only a ceiling: Update offers the newest npm release at or below it whose own npm publish date is at least 3 days old. The channel request names only the channel. On by default; **Settings → Maintenance → Provider update checks** turns them off ([provider updates](../updates/provider-updates.md)) |
 | GitHub images in chat | github.com | the server fetches them so they render. Other remote images don't render |
 | Updates | github.com (this repository, upstream), registry.npmjs.org, Electron's and native packages' prebuilt binaries, raw.githubusercontent.com (LiteLLM's pricing table, pinned to a commit), api.osv.dev, api.github.com, releases.electronjs.org, nodejs.org | building and checking a release. Only update checks you start, and the scheduled updater, touch the network ([how updates arrive](../updates/how-updates-arrive.md)) |
 | Device tools | registry.npmjs.org, and one prebuilt WebRTC library from GitHub | installing the device hub, only when you turn device support on ([device tools](../building/device-tools.md)) |
@@ -136,8 +143,9 @@ These tests cover the enforcement:
 - `tooling/blacksand-t3/test/app-webrtc.test.mjs`
 - `tooling/blacksand-t3/test/app-stock-guidance.test.mjs`
 - `tooling/blacksand-t3/test/privacy-text.test.mjs`
-- `tooling/blacksand-t3/test/stripped/blacksand*Csp.test.ts`, which runs inside the stripped
-  checkout
+- `tooling/blacksand-t3/test/no-trace-headers.test.mjs`
+- `tooling/blacksand-t3/test/stripped/blacksand*Csp.test.ts` and `blacksandTraceHeaders.test.ts`,
+  which run inside the stripped checkout
 
 ## Check it yourself
 

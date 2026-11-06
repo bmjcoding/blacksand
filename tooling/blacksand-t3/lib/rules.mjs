@@ -376,6 +376,33 @@ export const makeRules = ({ updater, build }) => [
     ],
   },
   {
+    // Effect's HTTP client writes the request's span IDs into each request unless
+    // HttpClient.TracerPropagationEnabled is false, which it reads from the running fiber.
+    // runCli is the root the server (`t3 serve`, which the desktop app starts) and every
+    // `t3` command run under, so this one setting reaches server.ts's shared client and
+    // every client built on its own. Spans are still made here; only the headers go.
+    id: "server/no-trace-headers",
+    why: "Every outgoing HTTP request (npm, GitHub, provider APIs) carries b3 and traceparent trace IDs",
+    file: "apps/server/src/binCli.ts",
+    edits: [
+      {
+        find: 'import * as Layer from "effect/Layer";\n',
+        replace: 'import * as Layer from "effect/Layer";\nimport * as HttpClient from "effect/http/HttpClient";\n',
+      },
+      {
+        find: "export const cli = makeCli();\n",
+        replace:
+          "export const cli = makeCli();\n\n" +
+          "/** blacksand: no HTTP request from this process carries b3, traceparent or tracestate. */\n" +
+          "export const blacksandWithoutTraceHeaders = Effect.provideService(HttpClient.TracerPropagationEnabled, false);\n",
+      },
+      {
+        find: "    Effect.provide(layerCliRuntime),\n    NodeRuntime.runMain,\n",
+        replace: "    Effect.provide(layerCliRuntime),\n    blacksandWithoutTraceHeaders,\n    NodeRuntime.runMain,\n",
+      },
+    ],
+  },
+  {
     id: "ssh/runner-installed-blacksand-only",
     why: "The SSH route downloads stock T3 from pingdotgg's GitHub releases; run only the Blacksand build installed on the host",
     file: "packages/ssh/src/tunnel.ts",
@@ -784,7 +811,7 @@ export const makeRules = ({ updater, build }) => [
     // version numbers, so the offered version is an npm release whose own publish
     // time proves its age; the channel's version is only a ceiling.
     id: "provider/claude-native-updates-minimum-age",
-    why: "Update all on a native Claude Code install runs `claude install <version>`, never `claude update`. The version is the newest npm release at least 3 days old by its own publish time and no higher than the channel's version; nothing when either lookup fails. The channel request sends no trace headers",
+    why: "Update all on a native Claude Code install runs `claude install <version>`, never `claude update`. The version is the newest npm release at least 3 days old by its own publish time and no higher than the channel's version; nothing when either lookup fails",
     file: "packages/provider-core/src/server/maintenanceResolver.ts",
     edits: [
       {
@@ -841,11 +868,9 @@ export const makeRules = ({ updater, build }) => [
           "    if (!installerKey || !lookup) {\n" +
           "      return yield* latestVersions.cached(npmPackage, fetchNpmLatestVersion(npmPackage));\n" +
           "    }\n" +
-          "    // The channel request names only the channel: no b3 or traceparent header.\n" +
-          "    const channel = lookup.pipe(Effect.provideService(HttpClient.TracerPropagationEnabled, false));\n" +
           "    return yield* latestVersions.cached(\n" +
           "      installerKey,\n" +
-          "      Effect.flatMap(channel, (version) =>\n" +
+          "      Effect.flatMap(lookup, (version) =>\n" +
           "        version !== null && /^\\d+\\.\\d+\\.\\d+$/.test(version)\n" +
           "          ? fetchNpmLatestVersion(npmPackage, version)\n" +
           "          : Effect.succeed(null),\n" +
@@ -2317,6 +2342,28 @@ export const makeRules = ({ updater, build }) => [
           'import * as ElectronUpdater from "./electron/ElectronUpdater.ts";\nimport * as BlacksandUpdater from "./electron/BlacksandUpdater.ts";',
       },
       { find: "\n  ElectronUpdater.layer,\n", replace: "\n  BlacksandUpdater.layer,\n" },
+    ],
+  },
+  {
+    // The desktop process has its own client (NodeHttpClient), outside server/no-trace-headers.
+    id: "desktop/no-trace-headers",
+    why: "The desktop app's requests (to its servers, local, over Tailscale or SSH) carry b3 and traceparent trace IDs",
+    file: "apps/desktop/src/main.ts",
+    edits: [
+      {
+        find: 'import * as NodeHttpClient from "@effect/platform-node/NodeHttpClient";\n',
+        replace: 'import * as NodeHttpClient from "@effect/platform-node/NodeHttpClient";\nimport * as HttpClient from "effect/http/HttpClient";\n',
+      },
+      {
+        find: "DesktopApp.program.pipe(Effect.provide(layerDesktopRuntime), NodeRuntime.runMain);\n",
+        replace:
+          "DesktopApp.program.pipe(\n" +
+          "  Effect.provide(layerDesktopRuntime),\n" +
+          "  // blacksand: no HTTP request from this process carries b3, traceparent or tracestate.\n" +
+          "  Effect.provideService(HttpClient.TracerPropagationEnabled, false),\n" +
+          "  NodeRuntime.runMain,\n" +
+          ");\n",
+      },
     ],
   },
   {
