@@ -2,6 +2,7 @@
 // (rules acp-registry/installs-minimum-age, acp-registry/no-prebuilt-binaries, acp-registry/no-prebuilt-binaries-message).
 import * as NodeFs from "node:fs";
 import * as NodePath from "node:path";
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { describe, expect, it } from "@effect/vitest";
 import * as HostProcess from "@t3tools/shared/HostProcess";
@@ -55,7 +56,9 @@ it.layer(NodeServices.layer)("blacksand ACP Registry binaries", (it) => {
   const layer = (registry: AcpRegistrySupport.AcpRegistryAgent) =>
     Layer.mergeAll(
       NodeServices.layer,
-      TestProviderHost.layer().pipe(Layer.provide(NodeServices.layer)),
+      // The catalog takes SecureRandom and Digest (upstream's own AcpRegistrySupport.test.ts provides them the same way).
+      NodeCrypto.layer,
+      TestProviderHost.layer().pipe(Layer.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
       Layer.succeed(HostProcess.Platform, "linux"),
       Layer.succeed(HostProcess.Architecture, "x64"),
       Layer.succeed(HostProcess.Environment, process.env),
@@ -80,17 +83,25 @@ it.layer(NodeServices.layer)("blacksand ACP Registry binaries", (it) => {
       yield* fs.makeDirectory(NodePath.dirname(cached), { recursive: true });
       yield* fs.writeFileString(cached, "#!/bin/sh\necho stale\n");
       yield* fs.chmod(cached, 0o755);
+      const entries = () => fs.readDirectory(cacheDir, { recursive: true }).pipe(Effect.map((names) => [...names].sort()));
+      const before = yield* entries();
       const catalog = yield* AcpRegistrySupport.makeAcpRegistryCatalog({ cacheDir, toolsDir, registryUrl });
 
       const prepared = yield* Effect.flip(catalog.prepare({ agentId: "example-agent" }));
+      const refusal = "ACP Registry agent example-agent has no npx or uvx package for linux-x64, so it isn't supported in T3 Code (blacksand) (it doesn't install prebuilt binaries).";
       expect(prepared.reason).toBe("unsupported_distribution");
-      expect(prepared.detail).toContain("isn't supported in T3 Code (blacksand)");
+      expect(prepared.detail).toBe(refusal);
       for (const distribution of ["auto", "binary"] as const) {
         const resolved = yield* Effect.flip(catalog.resolve(settings({ distribution }), "/workspace"));
         expect(resolved.reason).toBe("unsupported_distribution");
+        expect(resolved.detail).toBe(refusal);
         expect(yield* catalog.inspect(settings({ distribution }))).toMatchObject({ status: "unsupported" });
       }
+      // Nothing downloaded: no request but the registry index, and nothing written but its cached copy.
       expect(requests.filter((url) => url !== registryUrl)).toEqual([]);
+      expect(requests).toContain(registryUrl);
+      expect(yield* entries()).toEqual([...before, "acp-registry", "acp-registry/registry.json"].sort());
+      expect(yield* fs.readFileString(cached)).toBe("#!/bin/sh\necho stale\n");
 
       const onPath = yield* AcpRegistrySupport.acpRegistryManagedBinaryDirectories({ cacheDir, toolsDir, platform: "linux", architecture: "x64" });
       expect(onPath.filter((directory) => directory.includes("linux-x86_64"))).toEqual([]);
