@@ -2,9 +2,9 @@
   "version": 1,
   "channels": {
     "nightly": {
-      "ref": "v0.1.7-nightly.20261102.4093",
-      "sha": "84537c4dd976a89b6ec094f43ae3ef7bee12cb1a",
-      "evaluatedAt": "2026-11-03T01:03:25.675Z",
+      "ref": "v0.1.8-nightly.20261104.4179",
+      "sha": "9e85538535c8553901351112ab02dd1dd62db5ee",
+      "evaluatedAt": "2026-11-06T03:35:49.801Z",
       "leftOut": []
     }
   },
