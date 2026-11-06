@@ -7,7 +7,7 @@ import { test } from "node:test";
 import { AGENTS } from "../src/agents.ts";
 import { runSpec } from "../src/command.ts";
 import { sha256 } from "../src/policy.ts";
-import type { RunSpec } from "../src/run.ts";
+import { requestDigest, type RunSpec } from "../src/run.ts";
 
 const TOOLS = `blacksand.local/agent-tools@sha256:${"c".repeat(64)}`;
 const args = (agent: "claude" | "codex" | "fake", route: string) => ["--repo", "/repo", "--prompt", "p", "--agent", agent, "--route", route, "--tools-image", TOOLS, "--out", "/tmp/never-made"];
@@ -22,6 +22,16 @@ const error = (a: string[]) => {
   const parsed = runSpec(a);
   return "error" in parsed ? parsed.error : null;
 };
+
+test("--replay-only requires a key and leaves the immutable request digest unchanged", () => {
+  const args = ["--agent", "command", "--argv", '["true"]', "--key", "check/known"];
+  const original = spec(args);
+  const replay = spec([...args, "--replay-only"]);
+  assert.equal(replay.replayOnly, true);
+  assert.equal(original.replayOnly, undefined);
+  assert.equal(requestDigest(replay), requestDigest(original));
+  assert.match(error(["--agent", "command", "--argv", '["true"]', "--out", "/tmp/never-made", "--replay-only"]) ?? "", /needs --key/);
+});
 
 test("each adapter renders its defaults: codex gpt-6.1-sol at medium reasoning effort, claude claude-sonnet-5-5 at medium effort", () => {
   assert.deepEqual([spec(codex).model, spec(codex).models], ["gpt-6.1-sol", ["gpt-6.1-sol"]]);

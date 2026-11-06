@@ -182,6 +182,7 @@ The defaults:
 | `--max-model-requests N` | The proxy's request budget for the run: 2000 by default, at most 100000. Past it, the proxy refuses model requests. |
 | `--key KEY` | Your own ID for the run, copied into the record. The output directory becomes the key's receipt. See [Receipts](#receipts-one-launch-per-key). Use it instead of `--out`. |
 | `--receipts DIR` | Where receipts live. The default is `$BLACKSAND_RECEIPTS`, else `$XDG_STATE_HOME/blacksand/k8s-receipts`. |
+| `--replay-only` | With `--key`, read a matching completed receipt. Never provision, claim or launch. |
 
 Exit code 0 means the run completed with all its evidence, the agent exited 0, and
 Blacksand verified the cleanup. Anything else exits 4. Ctrl-C cancels the run. Teardown
@@ -259,6 +260,14 @@ Running setup again completes a root that a dead setup left without `READY`.
 | `completed`, with the record | The run ended, whatever its status. A failed record is final too. | With the same request, it returns the record and launches nothing. With a changed request, it refuses with `request-changed`. |
 | `claimed`, with no record | **Unknown.** The runner stopped after its claim and before its record. Never relaunch it. | It refuses with `claimed`, or with `request-changed` if the request changed. |
 | `unclaimed` | There's no receipt. | It runs. |
+
+Recovery callers use `k8s run` with the original request arguments, `--key` and
+`--replay-only`. That flag does not change the request digest. It reads an existing
+matching receipt, including a persisted failed run, without constructing another run
+or contacting Kubernetes. A missing root/key, incomplete or malformed receipt, or a
+receipt removed after a status read is refused; no directory is created. A missing
+answer means unknown, not proof that the original run did nothing. Never fall back
+to ordinary `run` after this refusal.
 
 For a claimed key, `status` also reports the claim's deadline, whether this runner's
 clock has passed it, and the run's objects still in the cluster. These facts don't

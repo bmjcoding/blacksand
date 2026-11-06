@@ -31,7 +31,7 @@ import * as path from "node:path";
 import { census } from "./lifecycle.ts";
 import type { Kubectl } from "./kubectl.ts";
 import { sha256 } from "./policy.ts";
-import type { RunRecord } from "./record.ts";
+import { recordProblems, type RunRecord } from "./record.ts";
 
 export const CLAIM_SCHEMA = "blacksand.claim/1";
 /** In the receipts root, published last by provisionReceipts: every directory above it is on disk. */
@@ -176,6 +176,23 @@ export function answerFromReceipt(dir: string, key: string, request: string): Ru
   if (!record) throw new ReceiptError("claimed", `key ${JSON.stringify(key)} is claimed with no record (${dir}): its outcome is unknown, so it won't be launched again`);
   if (!claim) throw new ReceiptError("claimed", `key ${JSON.stringify(key)} has a record but no claim (${dir}): it can't be matched to this request`);
   return record;
+}
+
+/** A recovery read never provisions, claims, generates a run or contacts the cluster. */
+export function replayReceipt(dir: string, key: string, request: string): RunRecord {
+  try {
+    if (!fs.existsSync(path.join(path.dirname(dir), READY))) throw new Error("unprovisioned receipts root");
+    const record = answerFromReceipt(dir, key, request);
+    const claim = readJson<Claim>(path.join(dir, "claim.json"));
+    if (!claim || claim.schema !== CLAIM_SCHEMA || claim.key !== key || claim.run_id !== record.run.id
+        || record.run.key !== key || record.run.request_sha256 !== request || recordProblems(record).length) {
+      throw new Error("receipt identity or record is inconsistent");
+    }
+    return record;
+  } catch (error) {
+    if (error instanceof ReceiptError) throw error;
+    throw new ReceiptError("claimed", `key ${JSON.stringify(key)} has no readable matching receipt: its outcome is unknown`);
+  }
 }
 
 export interface ReceiptStatus extends Receipt {

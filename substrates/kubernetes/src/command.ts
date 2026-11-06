@@ -29,13 +29,14 @@ const USAGE = [
   "blacksand k8s run --repo PATH|URL (--prompt TEXT | --prompt-file FILE) --agent fake|claude|codex [--model ID]",
   "    --route KIND=URL@SECRET [--grant-model ID …] [--allow HOST:PORT …] [--allow-private HOST:PORT …] (--out DIR | --key KEY)",
   "    [--image IMAGE@sha256:…] [--tools-image IMAGE@sha256:…] [--proxy-image IMAGE@sha256:…] [--timeout SECONDS]",
-  "    [--max-model-requests N] [--receipts DIR] [--json]",
+  "    [--max-model-requests N] [--receipts DIR] [--replay-only] [--json]",
   "blacksand k8s run --agent command --argv JSON [--input PATH=FILE …] [--route KIND=URL@SECRET --model ID [--grant-model ID …]]",
-  "    [--allow HOST:PORT …] (--out DIR | --key KEY) [--image IMAGE@sha256:…] [--timeout SECONDS] [--receipts DIR] [--json]",
+  "    [--allow HOST:PORT …] (--out DIR | --key KEY) [--image IMAGE@sha256:…] [--timeout SECONDS] [--receipts DIR] [--replay-only] [--json]",
   "blacksand k8s status --key KEY [--receipts DIR] [--json]",
   "  defaults: codex gpt-6.1-sol, claude claude-sonnet-5-5, both at medium effort; fake needs --model; --max-model-requests 2000.",
   "  --key KEY: the output directory is KEY's receipt under --receipts (default $BLACKSAND_RECEIPTS, else",
   "    $XDG_STATE_HOME/blacksand/k8s-receipts); the same key never launches twice. One runner per cluster.",
+  "  --replay-only: requires --key; read a matching completed receipt, never claim or launch a run.",
 ].join("\n");
 
 const kubectl = () => processKubectl(kubectlPrefix(process.env.BLACKSAND_KUBECTL));
@@ -107,6 +108,7 @@ export function runSpec(args: readonly string[], env: NodeJS.ProcessEnv = proces
       "max-model-requests": { type: "string", default: String(DEFAULT_LIMITS.requests_total) },
       timeout: { type: "string", default: "1800" },
       key: { type: "string" },
+      "replay-only": { type: "boolean" },
       receipts: { type: "string" },
       argv: { type: "string" },
       input: { type: "string", multiple: true, default: [] },
@@ -115,6 +117,7 @@ export function runSpec(args: readonly string[], env: NodeJS.ProcessEnv = proces
     },
   });
   const { repo, agent: agentName, key } = values;
+  if (values["replay-only"] && key === undefined) return { error: "--replay-only needs --key" };
   if (values.out !== undefined && key !== undefined) return { error: "--key names the run's output directory (its receipt): give --key or --out, not both" };
   if (!agentName || (values.out === undefined && key === undefined)) return { error: null };
   if (values.receipts !== undefined && key === undefined) return { error: "--receipts needs --key" };
@@ -155,6 +158,7 @@ export function runSpec(args: readonly string[], env: NodeJS.ProcessEnv = proces
     timeoutSeconds: Number(values.timeout),
     maxModelRequests: budget,
     key: key ?? null,
+    ...(values["replay-only"] ? { replayOnly: true } : {}),
     out,
     ...(isCommand && argv ? { command: { argv, inputs } } : {}),
     ...(agent.name === "fake" ? { fake: { allowed: allow[0] ? `${allow[0].host}:${allow[0].port}` : "", denied: values["fake-denied"], direct: values["fake-direct"] } } : {}),

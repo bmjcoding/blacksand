@@ -31,7 +31,7 @@ import { getJson, must, type Kubectl, type KubectlOptions, type KubectlResult } 
 import { COMMAND_INPUTS, LABEL, NS, assertPinned, list, proxyObjects, runNames, sandboxObjects } from "./manifests.ts";
 import { FLOOR, FLOOR_ID } from "./node.ts";
 import { assertModel, canonical, DEFAULT_LIMITS, proxyConfig, sha256, type Allow, type Limits, type RouteSpec } from "./policy.ts";
-import { answerFromReceipt, CLAIM_SCHEMA, publishDurable, takeClaim, writeDurable } from "./receipt.ts";
+import { answerFromReceipt, CLAIM_SCHEMA, publishDurable, replayReceipt, takeClaim, writeDurable } from "./receipt.ts";
 import { recordProblems, RUN_SCHEMA, type Artifact, type RunRecord } from "./record.ts";
 
 const SANDBOX_DIR = new URL("../sandbox/", import.meta.url);
@@ -67,6 +67,8 @@ export interface RunSpec {
   slackSeconds?: number;
   /** The caller's own id for the run, recorded as given. With a key, `out` is its receipt (receiptDir): claimed with one mkdir, and a claim already there is answered from, never run again. */
   key: string | null;
+  /** Execution control only: read a matching receipt without claiming or touching the cluster. */
+  replayOnly?: boolean;
   /** Directory for the record and artifacts: with a key, receiptDir(root, key); without one, a directory that doesn't exist yet. */
   out: string;
   /** For the command adapter. */
@@ -223,7 +225,7 @@ export function checkSpec(spec: RunSpec): void {
  * which commit it was.)
  */
 export function requestDigest(spec: RunSpec): string {
-  const { out: _out, key: _key, prompt, command, ...rest } = spec;
+  const { out: _out, key: _key, replayOnly: _replayOnly, prompt, command, ...rest } = spec;
   const request = {
     ...rest,
     maxModelRequests: spec.maxModelRequests ?? DEFAULT_LIMITS.requests_total,
@@ -240,6 +242,10 @@ export { reconcile };
 
 export async function runOnce(spec: RunSpec, deps: RunDeps): Promise<RunRecord> {
   checkSpec(spec);
+  if (spec.replayOnly) {
+    if (spec.key === null) throw new Error("replay-only needs a run key");
+    return replayReceipt(spec.out, spec.key, requestDigest(spec));
+  }
   const agent = agentNamed(spec.agent);
   const route = routeOf(spec);
   const request = requestDigest(spec);

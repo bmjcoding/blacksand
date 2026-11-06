@@ -12,6 +12,7 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 
+import { EXIT } from "../../../src/core/envelope.ts";
 import { k8s, runSpec } from "../src/command.ts";
 import { proxyObjects, runNames, sandboxObjects } from "../src/manifests.ts";
 import { parseRoute, sha256 } from "../src/policy.ts";
@@ -48,6 +49,92 @@ function runner(spec: RunSpec, mode: "race" | "crash", startAt = 0): Promise<{ o
 }
 
 const files = (dir: string) => fs.readdirSync(dir, { recursive: true, withFileTypes: true }).filter((e) => e.isFile()).map((e) => path.relative(dir, path.join(e.parentPath, e.name))).sort();
+
+/** A replay must not even construct a new run's identity or use its clock. */
+function noDispatch(): RunDeps {
+  const forbidden = (): never => { throw new Error("recovery called a dispatch dependency"); };
+  return { kubectl: forbidden, now: forbidden, randomHex: forbidden, bundle: forbidden, progress: forbidden, sleep: forbidden };
+}
+
+test("replay-only reads successful and failed receipts without any dispatch dependency or disk write", async () => {
+  for (const failed of [false, true]) {
+    const { root, spec } = receipt(`replay/${failed}`);
+    const cluster = failed ? fakeCluster("", WORKSPACE, { "exec observe": { status: 1, stderr: "no" } }) : fakeCluster("", WORKSPACE);
+    const record = await runOnce(spec, deps(cluster));
+    const snapshot = () => files(root).map((file) => [file, sha256(fs.readFileSync(path.join(root, file)))]);
+    const before = snapshot();
+    assert.deepEqual(await runOnce({ ...spec, replayOnly: true }, noDispatch()), record);
+    await assert.rejects(runOnce({ ...spec, replayOnly: true, timeoutSeconds: 61 }, noDispatch()),
+      (error: unknown) => error instanceof ReceiptError && error.code === "request-changed");
+    assert.deepEqual(snapshot(), before);
+  }
+});
+
+test("replay-only never creates a missing root or key, including a receipt removed after completed status", async () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), "substrate-k8s-replay-missing-"));
+  const missing = path.join(parent, "new", "receipts");
+  const spec = commandSpec(receiptDir(missing, "missing"), { key: "missing", replayOnly: true });
+  await assert.rejects(runOnce(spec, noDispatch()), (error: unknown) => error instanceof ReceiptError && error.code === "claimed");
+  assert.deepEqual(fs.readdirSync(parent), []);
+  provisionReceipts(missing);
+  await assert.rejects(runOnce(spec, noDispatch()), ReceiptError);
+  assert.deepEqual(fs.readdirSync(missing), ["READY"]);
+  const completed = await runOnce({ ...spec, replayOnly: false }, deps());
+  assert.equal((await receiptStatus(missing, "missing", noDispatch().kubectl, Date.now())).record?.run.id, completed.run.id);
+  fs.rmSync(spec.out, { recursive: true }); // remove this isolated fixture between status and recovery
+  await assert.rejects(runOnce(spec, noDispatch()), ReceiptError);
+  assert.deepEqual(fs.readdirSync(missing), ["READY"], "the read never reclaims the vanished receipt");
+});
+
+test("replay-only refuses incomplete, malformed and misbound receipts without changing them", async () => {
+  const corruptions: [string, (dir: string) => void][] = [
+    ["no claim", (dir) => fs.unlinkSync(path.join(dir, "claim.json"))],
+    ["no record", (dir) => fs.unlinkSync(path.join(dir, "record.json"))],
+    ["claim JSON", (dir) => fs.writeFileSync(path.join(dir, "claim.json"), "{")],
+    ["record JSON", (dir) => fs.writeFileSync(path.join(dir, "record.json"), "{")],
+    ["record shape", (dir) => fs.writeFileSync(path.join(dir, "record.json"), "{}")],
+    ["claim identity", (dir) => {
+      const claim = JSON.parse(fs.readFileSync(path.join(dir, "claim.json"), "utf8")) as Claim;
+      fs.writeFileSync(path.join(dir, "claim.json"), JSON.stringify({ ...claim, key: "another-key" }));
+    }],
+    ["record identity", (dir) => {
+      const record = JSON.parse(fs.readFileSync(path.join(dir, "record.json"), "utf8"));
+      record.run.id = "111111111111";
+      fs.writeFileSync(path.join(dir, "record.json"), JSON.stringify(record));
+    }],
+  ];
+  for (const [name, damage] of corruptions) {
+    const { root, spec } = receipt(`replay-corrupt/${name}`);
+    await runOnce(spec, deps());
+    damage(spec.out);
+    const before = files(root).map((file) => [file, sha256(fs.readFileSync(path.join(root, file)))]);
+    await assert.rejects(runOnce({ ...spec, replayOnly: true }, noDispatch()),
+      (error: unknown) => error instanceof ReceiptError && error.code === "claimed", name);
+    assert.deepEqual(files(root).map((file) => [file, sha256(fs.readFileSync(path.join(root, file)))]), before, name);
+  }
+});
+
+test("the CLI's replay-only path reads without a working kubectl and refuses a vanished receipt", async () => {
+  const root = provisionReceipts(fs.mkdtempSync(path.join(os.tmpdir(), "substrate-k8s-cli-replay-")));
+  const args = ["--agent", "command", "--argv", '["true"]', "--key", "cli-replay", "--receipts", root];
+  const spec = runSpec(args) as RunSpec;
+  const record = await runOnce(spec, deps());
+  const output: string[] = [];
+  const ctx = { json: true, io: { out: (text: string) => output.push(text), err: () => {} } } as unknown as Parameters<typeof k8s.run>[1];
+  const previousKubectl = process.env.BLACKSAND_KUBECTL;
+  process.env.BLACKSAND_KUBECTL = JSON.stringify(["/a/kubectl/that/does/not/exist"]);
+  try {
+    assert.equal(await k8s.run(["run", ...args, "--replay-only"], ctx), 0);
+    assert.deepEqual(JSON.parse(output.pop() ?? ""), record);
+    fs.rmSync(spec.out, { recursive: true });
+    assert.equal(await k8s.run(["run", ...args, "--replay-only"], ctx), EXIT.refused);
+    assert.equal(JSON.parse(output.pop() ?? "").error.code, "claimed");
+    assert.deepEqual(fs.readdirSync(root), ["READY"]);
+  } finally {
+    if (previousKubectl === undefined) delete process.env.BLACKSAND_KUBECTL;
+    else process.env.BLACKSAND_KUBECTL = previousKubectl;
+  }
+});
 
 test("racing runner processes: exactly one claims the key and launches; every other is answered or refused, none launches", async () => {
   const { root, spec } = receipt();
