@@ -1,7 +1,8 @@
 // node --test: a native Claude Code install (lock key claudeAgent-native) keeps to the
-// 3-day minimum release age (rule provider/claude-native-updates-minimum-age). The
-// rule is applied to upstream's resolver code as it reads at 0.1.7-nightly.20261102.4093
-// (the pin) and 0.1.8-nightly.20261104.4179 (identical in these functions), and the
+// 3-day minimum release age (rules provider/claude-native-updates-minimum-age, for the
+// version offered, and provider/updates-exact-version, for the command). The rules are
+// applied to upstream's resolver code as it reads at 0.1.7-nightly.20261102.4093 and
+// 0.1.8-nightly.20261104.4179 (identical in these functions), and the
 // result runs in a vm with lib/files/blacksandReleaseAge.ts and fake services: no
 // upstream package, network or CLI. test/stripped/blacksandReleaseAge.test.ts runs the
 // same rule in upstream's checkout, with Effect's real HTTP client.
@@ -19,17 +20,20 @@ import { featureIndex } from "../lib/features.mjs";
 import { isKnownHost } from "../lib/build.mjs";
 
 const ID = "provider/claude-native-updates-minimum-age";
+const EXACT = "provider/updates-exact-version";
 const rules = makeRules({ updater: { node: "/usr/bin/node", launcher: "/opt/blacksand/bin/t3", path: "/usr/bin" }, build: null });
-const rule = rules.find((candidate) => candidate.id === ID);
+const applied = rules.filter((candidate) => candidate.id === ID || candidate.id === EXACT);
 
-// Upstream's code, with the npm check as provider/updates-minimum-age leaves it.
+// Upstream's code, with the npm check as provider/updates-minimum-age leaves it (the update
+// action is upstream's own: provider/updates-exact-version replaces it whole).
 const RESOLVER =
+  'import * as ProviderLatestVersions from "./ProviderLatestVersions.ts";\n\n' +
   "export function resolveLatestProviderUpdateAction(\n" +
   "  capabilities: ProviderMaintenanceCapabilities,\n" +
   "  latestVersion: string | null,\n" +
   "): ProviderMaintenanceCommandAction | null {\n" +
   "  const update = capabilities.update;\n" +
-  '  if (!/^(?:pnpm-global$|npm-global:)/.test(update?.lockKey ?? "") || latestVersion === null) return update;\n' +
+  '  if (update?.lockKey !== "pnpm-global" || latestVersion === null) return update;\n' +
   "  return makeTargetedProviderUpdateAction(capabilities, latestVersion) ?? update;\n" +
   "}\n\n" +
   'const fetchNpmLatestVersion = Effect.fn("fetchNpmLatestVersion")(function* (packageName: string) {\n' +
@@ -75,18 +79,29 @@ const RESOLVER =
   "    return null;\n" +
   "  }\n\n" +
   "  return yield* latestVersions.cached(packageName, fetchNpmLatestVersion(packageName));\n" +
+  "});\n\n" +
+  "export const resolveProviderMaintenanceCapabilitiesEffect = Effect.fn(\n" +
+  '  "resolveProviderMaintenanceCapabilitiesEffect",\n' +
+  ")(function* (\n" +
+  "  resolver: ProviderMaintenanceCapabilitiesResolver,\n" +
+  "  options?: {\n" +
+  "    readonly binaryPath?: string | null;\n" +
+  "    readonly env?: NodeJS.ProcessEnv;\n" +
+  "  },\n" +
+  ") {\n" +
+  "  return yield* resolver.resolve(null);\n" +
   "});\n";
 
 function apply(source) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "t3b-claude-native-"));
   const log = console.log;
   try {
-    const file = path.join(root, rule.file);
+    const file = path.join(root, applied[0].file);
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, source);
     console.log = () => {};
-    const failures = applyRules(root, [rule]);
-    return { failures: failures.map((failure) => failure.message), out: fs.readFileSync(file, "utf8") };
+    const failures = applyRules(root, applied);
+    return { failures: failures.map((failure) => failure.id), out: fs.readFileSync(file, "utf8") };
   } finally {
     console.log = log;
     fs.rmSync(root, { recursive: true, force: true });
@@ -145,7 +160,7 @@ class FixedDate extends Date {
 const releaseAge = (() => {
   const source = fs.readFileSync(new URL("../lib/files/blacksandReleaseAge.ts", import.meta.url), "utf8");
   const context = { Effect, Date: FixedDate };
-  vm.runInNewContext(`${script(source)}\nthis.exports = { newestSettledVersion };`, context);
+  vm.runInNewContext(`${script(source)}\nthis.exports = { newestSettledVersion, exactUpdateAction, onlyExactUpdates };`, context);
   return context.exports;
 })();
 
@@ -155,6 +170,8 @@ const services = {
   Option,
   LATEST_VERSION_TIMEOUT_MS: 30_000,
   newestSettledVersion: releaseAge.newestSettledVersion,
+  exactUpdateAction: releaseAge.exactUpdateAction,
+  onlyExactUpdates: releaseAge.onlyExactUpdates,
   makeTargetedProviderUpdateAction: () => "targeted",
   HttpClientRequest: {
     get: (url) => ({ url, headers: {}, pipe: Thunk.prototype.pipe }),
@@ -244,7 +261,7 @@ const offer = (input) => {
   return result;
 };
 
-test("the rule applies to upstream's resolver at the pin and at 4179", () => {
+test("the rules apply to upstream's resolver at 4093 and at 4179", () => {
   assert.deepEqual(failures, []);
   assert.doesNotMatch(out, /claude update|"update"\]/);
 });
@@ -314,21 +331,24 @@ test("Update all runs `claude install <exact version>`, never `claude update`", 
   }
   // An updater upstream changed (other arguments): stop rather than guess.
   assert.equal(resolver.resolveLatestProviderUpdateAction(native("claude update --force", ["update", "--force"]), "2.1.316"), null);
-  // npm and pnpm keep their targeted install.
-  const npm = { packageName: "x", update: { lockKey: "npm-global:/usr/local", args: [], command: "npm" } };
-  assert.equal(resolver.resolveLatestProviderUpdateAction(npm, "1.0.0"), "targeted");
+  // npm and pnpm keep their targeted install, and with no version, or none targeted, run nothing.
+  for (const lockKey of ["npm-global:/usr/local", "pnpm-global"]) {
+    const npm = { packageName: "x", update: { lockKey, args: [], command: "npm" } };
+    assert.equal(resolver.resolveLatestProviderUpdateAction(npm, "1.0.0"), "targeted");
+    assert.equal(resolver.resolveLatestProviderUpdateAction(npm, null), null);
+  }
 });
 
 test("the rule stops when upstream's code moves", () => {
-  for (const [from, to] of [
-    ["  latestVersion: string | null,\n): ProviderMaintenanceCommandAction | null {\n", "  version: string | null,\n): ProviderMaintenanceCommandAction | null {\n"],
-    ["  const installerKey = installerLatestVersionKey(maintenanceCapabilities);\n", "  const installerKey = installerKeyOf(maintenanceCapabilities);\n"],
-    ["(function* (packageName: string) {\n", "(function* (name: string) {\n"],
-    ["newestSettledVersion(payload.value) : null;\n", "newestSettledVersion(payload) : null;\n"],
+  for (const [from, to, id] of [
+    ["  latestVersion: string | null,\n): ProviderMaintenanceCommandAction | null {\n", "  version: string | null,\n): ProviderMaintenanceCommandAction | null {\n", EXACT],
+    ["  const installerKey = installerLatestVersionKey(maintenanceCapabilities);\n", "  const installerKey = installerKeyOf(maintenanceCapabilities);\n", ID],
+    ["(function* (packageName: string) {\n", "(function* (name: string) {\n", ID],
+    ["newestSettledVersion(payload.value) : null;\n", "newestSettledVersion(payload) : null;\n", ID],
   ]) {
-    assert.equal(apply(RESOLVER.replace(from, to)).failures.length, 1, to);
+    assert.deepEqual(apply(RESOLVER.replace(from, to)).failures, [id], to);
   }
-  assert.equal(apply(RESOLVER + RESOLVER).failures.length, 1);
+  assert.deepEqual(apply(RESOLVER + RESOLVER).failures, [ID, EXACT]);
 });
 
 test("the native channel lookup and the ADMX namespace are listed, and the rule is strict", () => {

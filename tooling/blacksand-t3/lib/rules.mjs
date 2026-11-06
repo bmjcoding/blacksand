@@ -695,14 +695,6 @@ export const makeRules = ({ updater, build }) => [
           '["outdated", "-g", `--config.minimum-release-age=${MIN_RELEASE_AGE_MINUTES}`, "--reporter=silent", "--format", "json", packageName],',
       },
       {
-        // npm, like pnpm, installs exactly the version the check reported and the runner
-        // checked; npm's --before still refuses it if it's under 3 days old.
-        find: '  const update = capabilities.update;\n  if (update?.lockKey !== "pnpm-global" || latestVersion === null) return update;\n',
-        replace:
-          '  const update = capabilities.update;\n' +
-          '  if (!/^(?:pnpm-global$|npm-global:)/.test(update?.lockKey ?? "") || latestVersion === null) return update;\n',
-      },
-      {
         // Any exact version npm accepts, prereleases included, and only on installers whose
         // whole install keeps to the minimum age.
         find: "  if (!/^\\d+\\.\\d+\\.\\d+$/.test(version)) return null;\n",
@@ -809,35 +801,12 @@ export const makeRules = ({ updater, build }) => [
     // user's channel (ClaudeMaintenance.ts, the installer's own lookup here); before
     // that it had none, and the npm check stands alone. Native and npm releases share
     // version numbers, so the offered version is an npm release whose own publish
-    // time proves its age; the channel's version is only a ceiling.
+    // time proves its age; the channel's version is only a ceiling. Update all then
+    // runs `claude install <that version>` (provider/updates-exact-version).
     id: "provider/claude-native-updates-minimum-age",
-    why: "Update all on a native Claude Code install runs `claude install <version>`, never `claude update`. The version is the newest npm release at least 3 days old by its own publish time and no higher than the channel's version; nothing when either lookup fails",
+    why: "A native Claude Code install is offered the newest npm release at least 3 days old by its own publish time and no higher than the channel's version; nothing when either lookup fails",
     file: "packages/provider-core/src/server/maintenanceResolver.ts",
     edits: [
-      {
-        find:
-          "export function resolveLatestProviderUpdateAction(\n" +
-          "  capabilities: ProviderMaintenanceCapabilities,\n" +
-          "  latestVersion: string | null,\n" +
-          "): ProviderMaintenanceCommandAction | null {\n",
-        replace:
-          "/** blacksand: `claude install <version>`, exactly the version the check offered; none without one. */\n" +
-          "function blacksandNativeClaudeInstall(\n" +
-          "  update: ProviderMaintenanceCommandAction,\n" +
-          "  version: string | null,\n" +
-          "): ProviderMaintenanceCommandAction | null {\n" +
-          '  if (version === null || !/^\\d+\\.\\d+\\.\\d+$/.test(version)) return null;\n' +
-          '  if (update.args.join(" ") !== "update" || !update.command.endsWith(" update")) return null;\n' +
-          '  return { ...update, args: ["install", version], command: `${update.command.slice(0, -"update".length)}install ${version}` };\n' +
-          "}\n\n" +
-          "export function resolveLatestProviderUpdateAction(\n" +
-          "  capabilities: ProviderMaintenanceCapabilities,\n" +
-          "  latestVersion: string | null,\n" +
-          "): ProviderMaintenanceCommandAction | null {\n" +
-          '  if (capabilities.update?.lockKey === "claudeAgent-native") {\n' +
-          "    return blacksandNativeClaudeInstall(capabilities.update, latestVersion);\n" +
-          "  }\n",
-      },
       {
         // The npm check (provider/updates-minimum-age), optionally at or below a ceiling.
         find: 'const fetchNpmLatestVersion = Effect.fn("fetchNpmLatestVersion")(function* (packageName: string) {\n',
@@ -881,6 +850,71 @@ export const makeRules = ({ updater, build }) => [
     ],
   },
   {
+    // Every one-click updater installs exactly the version the check showed 3 days old,
+    // or nothing. npm and pnpm take it as an exact package spec, never upstream's
+    // `@latest` fallback (their --before and minimum-release-age stay, as defense in
+    // depth); Codex's and OpenCode's native updaters and native Claude Code take it too
+    // (blacksandReleaseAge.ts: exactUpdateAction). One that can't (Homebrew's
+    // `brew upgrade`, Pi's `pi update --self`, Muse's launcher, native Grok, any
+    // upstream adds) is left to the user, saying why (onlyExactUpdates), at the one
+    // place every provider's capabilities are resolved.
+    id: "provider/updates-exact-version",
+    why: "Update all installs exactly the version the check showed at least 3 days old, with every installer, or nothing; one that can't install a specific version is left to the user, saying why",
+    file: "packages/provider-core/src/server/maintenanceResolver.ts",
+    edits: [
+      {
+        find: 'import * as ProviderLatestVersions from "./ProviderLatestVersions.ts";\n',
+        replace:
+          'import * as ProviderLatestVersions from "./ProviderLatestVersions.ts";\n' +
+          'import { exactUpdateAction, onlyExactUpdates } from "./blacksandReleaseAge.ts";\n',
+      },
+      {
+        find:
+          "export function resolveLatestProviderUpdateAction(\n" +
+          "  capabilities: ProviderMaintenanceCapabilities,\n" +
+          "  latestVersion: string | null,\n" +
+          "): ProviderMaintenanceCommandAction | null {\n" +
+          "  const update = capabilities.update;\n" +
+          '  if (update?.lockKey !== "pnpm-global" || latestVersion === null) return update;\n' +
+          "  return makeTargetedProviderUpdateAction(capabilities, latestVersion) ?? update;\n" +
+          "}\n",
+        replace:
+          "export function resolveLatestProviderUpdateAction(\n" +
+          "  capabilities: ProviderMaintenanceCapabilities,\n" +
+          "  latestVersion: string | null,\n" +
+          "): ProviderMaintenanceCommandAction | null {\n" +
+          "  // blacksand: exactly the version the check offered, or nothing.\n" +
+          "  const update = capabilities.update;\n" +
+          "  if (update === null || latestVersion === null) return null;\n" +
+          '  if (!/^(?:npm-global:|pnpm-global$)/.test(update.lockKey)) return exactUpdateAction(update, latestVersion);\n' +
+          "  return makeTargetedProviderUpdateAction(capabilities, latestVersion);\n" +
+          "}\n",
+      },
+      {
+        find:
+          ")(function* (\n" +
+          "  resolver: ProviderMaintenanceCapabilitiesResolver,\n" +
+          "  options?: {\n" +
+          "    readonly binaryPath?: string | null;\n" +
+          "    readonly env?: NodeJS.ProcessEnv;\n" +
+          "  },\n" +
+          ") {\n",
+        replace:
+          ")(function* (\n" +
+          "  providerResolver: ProviderMaintenanceCapabilitiesResolver,\n" +
+          "  options?: {\n" +
+          "    readonly binaryPath?: string | null;\n" +
+          "    readonly env?: NodeJS.ProcessEnv;\n" +
+          "  },\n" +
+          ") {\n" +
+          "  // blacksand: an updater that can't install an exact version is left to the user.\n" +
+          "  const resolver: ProviderMaintenanceCapabilitiesResolver = {\n" +
+          "    resolve: (context) => Effect.map(providerResolver.resolve(context), onlyExactUpdates),\n" +
+          "  };\n",
+      },
+    ],
+  },
+  {
     id: "provider/updates-manual-reason",
     why: "Carries why an install is left to the user (provider/updates-minimum-age), so the settings and the update say so",
     file: "packages/provider-core/src/server/maintenance.ts",
@@ -896,83 +930,137 @@ export const makeRules = ({ updater, build }) => [
   },
   {
     id: "server/provider-update-manual-reason",
-    why: "A provider update refused because its installer can't age-gate its dependencies says why",
+    why: "A provider update refused because its installer can't age-gate its dependencies, or because no release is old enough yet (provider/updates-exact-version), says why",
     file: "apps/server/src/provider/providerMaintenanceRunner.ts",
     edits: [
       {
         find: '        reason: "This provider does not support one-click updates.",\n',
         replace: '        reason: capabilities.manualReason ?? "This provider does not support one-click updates.",\n',
       },
+      {
+        find: 'import { collectUint8StreamText } from "@t3tools/provider-core/server/collectStreamText";\n',
+        replace:
+          'import { collectUint8StreamText } from "@t3tools/provider-core/server/collectStreamText";\n' +
+          'import { MIN_RELEASE_AGE_DAYS } from "@t3tools/provider-core/server/blacksandReleaseAge";\n',
+      },
+      {
+        // No command (provider/updates-exact-version): no release is old enough yet, or the
+        // updater can't be made to install exactly that one.
+        find: '                      : "The latest provider version is incompatible with this T3 Code release. Review provider settings.",\n',
+        replace:
+          "                      : !rejected\n" +
+          "                        ? candidateVersion === null\n" +
+          "                          ? `T3 Code (blacksand) found no release at least ${MIN_RELEASE_AGE_DAYS} days old to install. Try again later.`\n" +
+          "                          : `T3 Code (blacksand) can't make \\`${fresh.update.command}\\` install exactly ${candidateVersion}, so it ran nothing. Run it yourself when you choose to update.`\n" +
+          '                        : "The latest provider version is incompatible with this T3 Code release. Review provider settings.",\n',
+      },
     ],
   },
   {
-    // Muse's automatic check is part of the same accepted exception, and its channel
-    // names a version with no release date: the age counts from when this server
-    // first saw it there (settledSinceFirstSeen in blacksandReleaseAge.ts).
-    id: "provider/muse-updates-minimum-age",
-    why: "Muse's version check reports its channel's version the moment it changes; report one only after this server has seen it there for 3 days",
+    // Muse's launcher can't install a specific version, so Muse updates are left to the
+    // user (provider/updates-exact-version). Its channel names a version with no
+    // publish date, so nothing shows that version is 3 days old: the check asks no
+    // channel and reports nothing, rather than show a release the user might install
+    // the hour it's out.
+    id: "provider/muse-version-check-off",
+    why: "Muse's version check reports its channel's version the moment it changes, with no publish date to age it by; it asks nothing",
     file: "packages/provider-muse/src/server/maintenance.ts",
     edits: [
       {
-        find: 'import * as ProviderLatestVersions from "@t3tools/provider-core/server/ProviderLatestVersions";\n',
-        replace:
-          'import * as ProviderLatestVersions from "@t3tools/provider-core/server/ProviderLatestVersions";\n' +
-          'import { settledSinceFirstSeen } from "@t3tools/provider-core/server/blacksandReleaseAge";\n',
+        find: 'const MUSE_CHANNELS = new Set(["muse-stable", "muse-canary"]);\n',
+        replace: "// blacksand: no channel is asked (latestMuseVersion reports nothing).\nconst MUSE_CHANNELS = new Set<string>();\n",
       },
-      {
-        find: '  options?: { readonly fresh?: boolean },\n) {\n  const channel = environment.MUSE_CHANNEL || "muse-stable";\n',
-        replace:
-          '  options?: { readonly fresh?: boolean },\n' +
-          "  // blacksand: where this server keeps when it first saw each channel's version; without it, none is reported.\n" +
-          "  firstSeenFile?: string,\n" +
-          ') {\n  const channel = environment.MUSE_CHANNEL || "muse-stable";\n  if (firstSeenFile === undefined) return null;\n',
-      },
-      { find: "  return yield* latestVersions.cached(\n    `muse:${channelUrl}`,\n", replace: "  const channelVersion = yield* latestVersions.cached(\n    `muse:${channelUrl}`,\n" },
-      {
-        find: "    options,\n  );\n});\n",
-        replace:
-          "    options,\n  );\n" +
-          "  return yield* settledSinceFirstSeen({ file: firstSeenFile, channel, version: channelVersion });\n" +
-          "});\n",
-      },
-      {
-        find: "  readonly environment: NodeJS.ProcessEnv;\n}) {\n",
-        replace: "  readonly environment: NodeJS.ProcessEnv;\n  readonly firstSeenFile?: string;\n}) {\n",
-      },
-      { find: "      ? yield* latestMuseVersion(input.environment)\n", replace: "      ? yield* latestMuseVersion(input.environment, undefined, input.firstSeenFile)\n" },
     ],
   },
+  // An agent CLI that updates itself in the background installs its channel's newest
+  // release, however young, with no Update pressed. Each switch below is set after the
+  // environment the child is given, so neither the host's nor an instance's env turns
+  // it back on. Codex's and Pi's servers only notify.
   {
-    id: "provider/muse-updates-first-seen-file",
-    why: "The Muse driver keeps when it first saw each channel version in the server's state directory (provider/muse-updates-minimum-age)",
+    // Muse's launcher updates itself and its runtime on any launch, `serve` included,
+    // unless MUSE_NO_AUTO_UPDATE=1. Upstream's makeMuseEnvironment sets it, but the
+    // instance's env is merged over it, so an instance value of 0 turned it back on.
+    id: "provider/muse-autoupdate-off",
+    why: "Every Muse process T3 starts runs with MUSE_NO_AUTO_UPDATE=1, so a Muse session never updates Muse behind Update all's 3-day gate",
     file: "packages/provider-muse/src/server/driver.ts",
     edits: [
       {
-        find: "    const { cwd } = host.paths;\n",
-        replace: '    const { cwd } = host.paths;\n    const museFirstSeenFile = path.join(host.paths.stateDir, "blacksand-muse-first-seen.json");\n',
+        find:
+          "    const processEnvironment = yield* mergeProviderInstanceEnvironment(\n" +
+          "      environment,\n      makeMuseEnvironment(hostEnvironment),\n    );\n",
+        replace:
+          "    const processEnvironment = {\n" +
+          "      ...(yield* mergeProviderInstanceEnvironment(\n" +
+          "        environment,\n        makeMuseEnvironment(hostEnvironment),\n      )),\n" +
+          "      // blacksand: Muse never updates itself in the background (provider/muse-autoupdate-off).\n" +
+          '      MUSE_NO_AUTO_UPDATE: "1",\n    };\n',
+      },
+    ],
+  },
+  {
+    // `grok agent stdio` on a managed install starts a background update unless
+    // GROK_DISABLE_AUTOUPDATER is set. Upstream sets it for status and skills probes
+    // only; this is the one spawn builder for sessions, text generation and probes alike.
+    id: "provider/grok-autoupdater-off",
+    why: "Every `grok agent stdio` T3 starts runs with GROK_DISABLE_AUTOUPDATER=1, so a Grok session never updates Grok behind Update all's 3-day gate",
+    file: "packages/provider-grok/src/server/acpSupport.ts",
+    edits: [
+      {
+        find: "      ...environment,\n      [GROK_OAUTH2_REFERRER_ENV]: T3_CODE_OAUTH_REFERRER,\n    },\n",
+        replace:
+          "      ...environment,\n      [GROK_OAUTH2_REFERRER_ENV]: T3_CODE_OAUTH_REFERRER,\n" +
+          "      // blacksand: Grok never updates itself in the background (provider/grok-autoupdater-off).\n" +
+          '      GROK_DISABLE_AUTOUPDATER: "1",\n    },\n',
+      },
+    ],
+  },
+  {
+    // OpenCode's updater honours OPENCODE_DISABLE_AUTOUPDATE. Its automatic install is in
+    // the interactive handler, not `serve`, so this guards against a future change.
+    id: "provider/opencode-autoupdate-off",
+    why: "Every OpenCode process T3 starts runs with OPENCODE_DISABLE_AUTOUPDATE=1, so it never updates OpenCode behind Update all's 3-day gate",
+    file: "packages/provider-opencode/src/server/OpenCodeRuntime.ts",
+    edits: [
+      {
+        // Version probes (`opencode --version`).
+        find: "          ...(input.environment ? { env: input.environment } : { extendEnv: true }),\n",
+        replace:
+          "          // blacksand: OpenCode never updates itself in the background (provider/opencode-autoupdate-off).\n" +
+          '          env: { ...input.environment, OPENCODE_DISABLE_AUTOUPDATE: "1" },\n' +
+          "          extendEnv: input.environment === undefined,\n",
       },
       {
-        find:
-          "        ? yield* latestMuseVersion(processEnvironment, { fresh: true }).pipe(\n" +
-          "            Effect.provideService(HttpClient.HttpClient, httpClient),\n",
+        // `opencode serve`.
+        find: "            OPENCODE_CONFIG_CONTENT: resolveOpenCodeConfigContent(input.environment),\n          },\n",
         replace:
-          "        ? yield* latestMuseVersion(processEnvironment, { fresh: true }, museFirstSeenFile).pipe(\n" +
-          "            Effect.provideService(HttpClient.HttpClient, httpClient),\n" +
-          "            Effect.provideService(FileSystem.FileSystem, fileSystem),\n",
+          "            OPENCODE_CONFIG_CONTENT: resolveOpenCodeConfigContent(input.environment),\n" +
+          "            // blacksand: OpenCode never updates itself in the background (provider/opencode-autoupdate-off).\n" +
+          '            OPENCODE_DISABLE_AUTOUPDATE: "1",\n          },\n',
       },
+    ],
+  },
+  {
+    // The server sets CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1, which includes
+    // DISABLE_AUTOUPDATER (apps/server/src/binCli.ts), but an instance's env can set it
+    // to 0. Every Claude process (sessions, probes, text generation, `claude install`)
+    // takes its env from mergeClaudeProcessEnvironment, after the instance's.
+    id: "provider/claude-autoupdater-off",
+    why: "Every Claude Code process T3 starts runs with DISABLE_AUTOUPDATER=1, whatever an instance's env says, so it never updates Claude Code behind Update all's 3-day gate",
+    file: "apps/server/src/provider/Drivers/ClaudeHome.ts",
+    edits: [
       {
         find:
-          "              environment: processEnvironment,\n" +
-          "            }),\n" +
-          "          ),\n" +
-          "          Effect.provideService(HttpClient.HttpClient, httpClient),\n",
+          "  return settingsEntrypoint\n" +
+          "    ? { ...environment, CLAUDE_CODE_ENTRYPOINT: settingsEntrypoint }\n" +
+          "    : environment;\n",
         replace:
-          "              environment: processEnvironment,\n" +
-          "              firstSeenFile: museFirstSeenFile,\n" +
-          "            }),\n" +
-          "          ),\n" +
-          "          Effect.provideService(HttpClient.HttpClient, httpClient),\n" +
-          "          Effect.provideService(FileSystem.FileSystem, fileSystem),\n",
+          "  // blacksand: Claude Code never updates itself in the background (provider/claude-autoupdater-off).\n" +
+          "  const processEnvironment: NodeJS.ProcessEnv = {\n" +
+          "    ...environment,\n" +
+          "    ...(settingsEntrypoint ? { CLAUDE_CODE_ENTRYPOINT: settingsEntrypoint } : {}),\n" +
+          '    DISABLE_AUTOUPDATER: "1",\n' +
+          "  };\n" +
+          "  return processEnvironment;\n",
       },
     ],
   },

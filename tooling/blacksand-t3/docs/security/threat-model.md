@@ -156,8 +156,12 @@ These are out of scope by design. Nothing in the code tries to cover them.
 - **Agents within one account.** Everything running as one agent account can read
   that account's tokens and files.
 - **Vendor self-updaters.** `claude update`, `codex update` and the CLIs'
-  auto-updates install the vendors' newest builds, without the 3-day wait. This is an
-  accepted risk.
+  auto-updates install the vendors' newest builds, without the 3-day wait. The app's
+  Update never runs them that way, and the Claude Code, Grok, OpenCode and Muse processes
+  blacksand-t3 starts run with their background updaters off
+  ([provider updates](../updates/provider-updates.md)). You can still run an updater
+  yourself, and a CLI you start outside blacksand-t3 updates as its own settings say.
+  This is an accepted risk.
 - **Hand-made configuration.** This covers unusual things the owner configures by
   hand, such as Serve mappings or foreground sessions on the scripts' ports, and edited
   plists or state files.

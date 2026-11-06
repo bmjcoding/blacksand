@@ -1,5 +1,6 @@
 // Copied to packages/provider-core/src/server/ in a stripped upstream checkout and run there
-// (rules provider/release-age-file, provider/updates-minimum-age, provider/updates-manual-reason).
+// (rules provider/release-age-file, provider/updates-minimum-age, provider/updates-exact-version,
+// provider/updates-manual-reason).
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { describe, expect, it } from "@effect/vitest";
 import { ProviderDriverKind } from "@t3tools/contracts";
@@ -88,9 +89,13 @@ describe("blacksand release age", () => {
     const npm = codex("npm", ["install", "-g", before, "@openai/codex@latest"], "npm-global:/usr/local");
     expect(resolveLatestProviderUpdateAction(npm, "1.2.3")?.args).toEqual(["install", "-g", before, "@openai/codex@1.2.3"]);
     expect(resolveLatestProviderUpdateAction(npm, "1.3.0-rc.2")?.args.at(-1)).toBe("@openai/codex@1.3.0-rc.2");
-    expect(resolveLatestProviderUpdateAction(npm, null)?.args.at(-1)).toBe("@openai/codex@latest");
     const pnpm = codex("pnpm", ["add", "-g", `--config.minimum-release-age=${MIN_RELEASE_AGE_MINUTES}`, "@openai/codex@latest"], "pnpm-global");
     expect(resolveLatestProviderUpdateAction(pnpm, "1.3.0-rc.2")?.args.at(-1)).toBe("@openai/codex@1.3.0-rc.2");
+    // No version reported, or one that isn't exact: nothing, never `@latest`.
+    for (const version of [null, "latest", "^1.2.3"]) {
+      expect(resolveLatestProviderUpdateAction(npm, version)).toBeNull();
+      expect(resolveLatestProviderUpdateAction(pnpm, version)).toBeNull();
+    }
     expect(createProviderVersionAdvisory({ driver: ProviderDriverKind.make("codex"), currentVersion: "1.0.0", latestVersion: "1.2.3", maintenanceCapabilities: npm }).updateCommand).toContain("@openai/codex@1.2.3");
   });
   it.effect("asks the registry for the full document and reports the settled version", () =>
