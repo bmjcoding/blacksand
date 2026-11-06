@@ -217,8 +217,8 @@ export async function pool(items, limit, worker) {
  * is a pnpm-lock.yaml's text or name@version entries. A version without a readable
  * publish time is unknown, which fails the gate too. Where lockfiles state
  * integrity, a version both have must keep its integrity and a new one must have
- * the registry's (else substituted, which fails). `waive(pkg)` (lib/fastlane.mjs)
- * may let a young version through with a reason: a security fix.
+ * the registry's (else substituted, which fails). `waive(pkg, { publishedAt })`
+ * (lib/fastlane.mjs) may let a young version through with a reason: a security fix.
  */
 export async function dependencyAgeGate(baseLock, newLock, { minDays = MIN_AGE_DAYS, now = Date.now(), waive = null } = {}) {
   ageSetting(minDays);
@@ -245,7 +245,7 @@ export async function dependencyAgeGate(baseLock, newLock, { minDays = MIN_AGE_D
     }
     if (time === null) unknown.push(pkg);
     else if (ageDays(time, now) < minDays) {
-      const reason = waive ? await waive(pkg) : null;
+      const reason = waive ? await waive(pkg, { publishedAt }) : null;
       if (reason) waived.push({ pkg, publishedAt, reason });
       else young.push({ pkg, publishedAt });
     }

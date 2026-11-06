@@ -117,6 +117,48 @@ test("every candidate held: exit 3, the pin stays, each reason reported", async 
   assert.deepEqual([...result.resolved.keys()], [sha("0")], "the pinned release's lockfile still goes to the alert job");
 });
 
+test("the run's metrics: what the age gate held per candidate and what the fast lane decided, reported only", async () => {
+  const at = "2026-11-05T01:00:00Z";
+  const files = { [sha("a")]: { "pnpm-lock.yaml": "lock-a" } };
+  // The newest has a young fix the lane refuses and a young version besides; the older one nothing young.
+  const gate = async (base, lock, { waive } = {}) => {
+    if (lock !== "lock-a") return clean;
+    assert.equal(await waive("dep@1.0.1", { publishedAt: at }), null);
+    return { ...clean, ok: false, young: [{ pkg: "dep@1.0.1", publishedAt: at }, { pkg: "fresh@2.0.0", publishedAt: at }] };
+  };
+  const { io } = fakeIo({ files, gate });
+  // A lane that refuses, recording its decision as lib/fastlane.mjs does: the evaluator reads them once it's done.
+  io.makeFastLane = () => {
+    const seen = [];
+    const waive = async (pkg, { publishedAt }) => {
+      seen.push({ pkg, publishedAt, admitted: false, code: "publisher-changed", reason: "published by mallory", advisories: ["GHSA-2222-3333-4444"], replaces: ["dep@1.0.0"] });
+      return null;
+    };
+    waive.decisions = () => structuredClone(seen);
+    return waive;
+  };
+  const result = await evaluateChannel({ channel: "nightly", pin: PIN, now: () => new Date("2026-11-05T02:00:00Z") }, io);
+  assert.equal(result.pin.channels.nightly.ref, OLDER, "the decision is the evaluator's as before");
+  assert.deepEqual(result.metrics, {
+    v: 1,
+    channel: "nightly",
+    at: "2026-11-05T02:00:00.000Z",
+    minAgeDays: 3,
+    pinned: PINNED,
+    pinnedTo: OLDER,
+    fastLane: true,
+    candidates: [
+      { ref: NEWEST, held: true, young: [{ pkg: "dep@1.0.1", publishedAt: at }, { pkg: "fresh@2.0.0", publishedAt: at }] },
+      { ref: OLDER, held: false, young: [] },
+    ],
+    decisions: [{ pkg: "dep@1.0.1", publishedAt: at, admitted: false, code: "publisher-changed", reason: "published by mallory", advisories: ["GHSA-2222-3333-4444"], replaces: ["dep@1.0.0"] }],
+  });
+  // A candidate that couldn't be evaluated: the age gate's word on it is unknown, not "nothing young".
+  const broken = fakeIo({ gate: async () => { throw new Error("npm registry answered 500"); } });
+  const failed = await evaluateChannel({ channel: "nightly", pin: PIN }, broken.io);
+  assert.deepEqual(failed.metrics.candidates.map((c) => [c.held, c.young]), [[true, null], [true, null]]);
+});
+
 test("nothing newer: exit 0, no pin, the pinned release resolved for the alert job", async () => {
   const { io, calls } = fakeIo();
   io.tags = () => [PINNED, "v0.1.5-nightly.20261029.3877"];

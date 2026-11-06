@@ -21,7 +21,7 @@
 //                                      `schedule`); without --unisolated-build, only the build account builds
 //   blacksand t3 signing adopt|import|init|status [--vault V]   macOS: shared signing identity via 1Password
 //   blacksand t3 evaluate [--channel nightly] [--ref TAG] [--baseline TAG] [--build] [--write] [--report FILE] [--resolved DIR]
-//                       [--stage-from DIR]
+//                       [--stage-from DIR] [--metrics FILE]
 //                                      CI: pin the newest upstream release that passes every gate
 //   blacksand t3 pin-check [--candidate FILE --channel C --resolved DIR --result FILE]
 //                                      CI: re-derive a candidate pin's gates before it is signed
@@ -936,7 +936,9 @@ const saveEvaluationIn = (dir) => {
  * the lockfiles it resolved and the stage records of what it built, as it goes
  * (saveEvaluationIn), for the check and alert jobs. --stage-from DIR: the last
  * evaluation's --resolved, whose stage record of the pinned release is reused
- * when it still checks out, instead of building that release again.
+ * when it still checks out, instead of building that release again. --metrics
+ * FILE: what the age gate held and the fast lane decided, as JSON, for the
+ * alert job's metrics issue (ci/metrics.mjs).
  * Exit 0: pinned or already current. Exit 3: every candidate was held.
  */
 async function cmdEvaluate(opts) {
@@ -959,6 +961,14 @@ async function cmdEvaluate(opts) {
   }
   if (opts.write && result.pin) writePin(result.pin);
   if (opts.report) fs.writeFileSync(opts.report, `${result.report}\n`);
+  // The age gate's figures for the alert job's metrics issue (ci/metrics.mjs); never part of the decision.
+  if (opts.metrics) {
+    try {
+      fs.writeFileSync(opts.metrics, `${JSON.stringify(result.metrics)}\n`);
+    } catch (error) {
+      log(`couldn't write the metrics (${error.message}); the evaluation stands`);
+    }
+  }
   console.log(result.report);
   process.exitCode = result.exitCode;
 }
@@ -1303,6 +1313,7 @@ const { positionals, values } = parseArgs({
     report: { type: "string" },
     resolved: { type: "string" },
     "stage-from": { type: "string" },
+    metrics: { type: "string" },
     result: { type: "string" },
     out: { type: "string" },
     unpinned: { type: "boolean", default: false },

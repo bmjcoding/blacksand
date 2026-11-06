@@ -52,3 +52,17 @@ test("both handoffs select immutable artifact IDs and the credential job uses on
   assert.doesNotMatch(push, /--force|--delete|\brebase\b|\bmerge\b/);
   assert.ok(commit.steps.indexOf(app) > commit.steps.findIndex(step => step.id === "proposal"));
 });
+
+test("the age gate's metrics run last in the alerts job and never fail it; the evaluate job hands them over in its artifact", () => {
+  assert.ok(evaluate.steps.find(step => step.id === "evaluate").run.includes('--metrics "$RUNNER_TEMP/out/metrics.json"'));
+  const metrics = alerts.steps.at(-1);
+  assert.equal(metrics.name, "Age gate metrics");
+  assert.equal(metrics.if, "always()");
+  assert.equal(metrics["continue-on-error"], true, "a metrics failure is a warning, never the job's");
+  assert.ok(metrics["timeout-minutes"] > 0 && metrics["timeout-minutes"] < alerts["timeout-minutes"], "and it can't use up the job's time");
+  assert.match(metrics.run, /^node ci\/security-issues\.mjs metrics --channel "\$CHANNEL" --run "\$RUNNER_TEMP\/evaluation\/metrics\.json"$/);
+  assert.ok(!metrics.run.includes("${{"), "no expression-to-shell interpolation");
+  // The security work comes first, and doesn't depend on it.
+  const names = alerts.steps.map(step => step.name).filter(Boolean);
+  assert.deepEqual(names.slice(-3), ["Security advisories", "Held releases", "Age gate metrics"]);
+});

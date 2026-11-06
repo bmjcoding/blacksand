@@ -187,6 +187,36 @@ code formatting, it can't mention anyone, link anywhere or change the issue's
 formatting. If GitHub refuses to update one issue, the job still updates the others.
 The run still fails and names that issue.
 
+### Age gate metrics
+
+The `alerts` job's last step measures what the 72-hour dependency age gate costs, so a
+future change to its length can rest on our own data (`ci/metrics.mjs`). The evaluate
+job writes the run's figures to `metrics.json` in its artifact (`bin/t3 evaluate
+--metrics`). It only reports them: nothing held, admitted, alerted or published depends
+on them. The step keeps one issue, `[metrics] Age gate and fast lane (<channel>)`. The
+issue has the label `metrics`, never `security`. The step edits it in place and never
+comments, so it notifies only when it opens. It records:
+
+- **Holds:** each candidate release the age gate held, with the young dependency
+  versions behind the hold and their publish times. A hold runs from the first run that
+  held the release to the first run where it passed the gate, or that no longer
+  evaluated it (superseded).
+- **Held security fixes:** a young version that fixes an advisory open against the
+  version it replaces. The step records how the fix got in and when: by the fast lane,
+  by an owner override (`lib/overrides.json` on `main` covers every vulnerable version
+  the fix replaces, matched as the build matches them), or by aging out. That span is how long the gate kept us on the vulnerable version.
+- **Fast-lane decisions:** each admission, and each refusal with its reason, such as a
+  publisher change, a provenance mismatch or no curated fix. Each is recorded once per
+  version and reason, with the time since the fix was published.
+
+The issue shows the totals and the last 30 events. Its hidden marker carries the state,
+capped at 30,000 characters: the oldest listed events go first, and the totals keep
+every event. The run's own figures also go to its step summary. The figures come from
+the job that ran upstream code, so the step checks their shape and renders them inert.
+A metrics failure is a warning (`continue-on-error`): it never fails the job or blocks
+its security work. Device tool versions have their own review and aren't counted yet.
+Closing the issue starts the figures over.
+
 ## Checks on every change
 
 - **`ci.yml`** runs on every push and pull request. It runs the repository's tests,

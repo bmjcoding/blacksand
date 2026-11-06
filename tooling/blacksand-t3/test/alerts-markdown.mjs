@@ -42,9 +42,10 @@ function tokensOf(markdown) {
  * automation's own hidden lines, blocks of their own), link definition, mention, or
  * any formatting but **RATING** and a **ships label**; and `canary`, a string planted in every value
  * from outside, appears only inside code. `codeBlocks`: a fenced block is
- * expected (the held issue's report).
+ * expected (the held issue's report). `layout`: our headings and tables are
+ * expected (the metrics issue's); what's in them is held to the same rules.
  */
-export function problems(markdown, { canary = null, codeBlocks = false, issueRefs = false } = {}) {
+export function problems(markdown, { canary = null, codeBlocks = false, issueRefs = false, layout = false } = {}) {
   const found = [];
   const leaf = (s) => typeof s === "string" && canary && s.includes(canary);
   for (const { t, path } of tokensOf(markdown)) {
@@ -69,6 +70,10 @@ export function problems(markdown, { canary = null, codeBlocks = false, issueRef
         if (leaf(t.text)) found.push(`outside text as Markdown: ${JSON.stringify(t.text.slice(0, 120))}`);
         if (/(^|[^\w`])@[A-Za-z0-9]/.test(t.text)) found.push(`a mention: ${JSON.stringify(t.text.slice(0, 120))}`);
         if (!issueRefs && /(^|\W)#\d/.test(t.text)) found.push(`an issue reference: ${JSON.stringify(t.text.slice(0, 120))}`);
+        break;
+      case "heading":
+      case "table":
+        if (!layout) found.push(`${t.type}: ${JSON.stringify(String(t.raw).slice(0, 80))}`);
         break;
       case "paragraph":
       case "list":

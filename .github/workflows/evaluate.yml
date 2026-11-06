@@ -21,6 +21,8 @@
 #             a coverage gap, and upstream's lockfile stands in for it. The held
 #             issue closes only on a pin the commit job pushed, or when upstream
 #             (read here, bin/t3 releases) has nothing newer than main's pin.
+#             Last, the age gate's metrics issue (ci/metrics.mjs): figures only,
+#             and a failure there is a warning, never the job's.
 # All of this is advisory. Every machine's self-update accepts the evaluator's
 # key only for pin.json-only commits that move no channel backward
 # (lib/selfupdate.mjs), and then re-checks the pin itself before installing it,
@@ -135,7 +137,7 @@ jobs:
           set +e
           mkdir -p "$RUNNER_TEMP/out"
           node bin/t3 evaluate --channel "$CHANNEL" --build --write --stage-from "$RUNNER_TEMP/previous/resolved" \
-            --report "$RUNNER_TEMP/out/report.md" --resolved "$RUNNER_TEMP/out/resolved"
+            --report "$RUNNER_TEMP/out/report.md" --resolved "$RUNNER_TEMP/out/resolved" --metrics "$RUNNER_TEMP/out/metrics.json"
           echo "exit=$?" >> "$GITHUB_OUTPUT"
           cp pin.json "$RUNNER_TEMP/out/pin.json" 2>/dev/null || true
 
@@ -360,3 +362,16 @@ jobs:
           node ci/security-issues.mjs held --channel "$CHANNEL" --exit "$EXIT" --published "$PUBLISHED" \
             --pinned "$pinned" --newer "$RUNNER_TEMP/newer.json" --report "$RUNNER_TEMP/evaluation/report.md"
           exit "$releases"
+
+      # Last, after the security work, and never failing the job: what the age gate
+      # held and the fast lane decided this run (the evaluate job's metrics.json,
+      # if it left one), kept in one "[metrics]" issue that doesn't notify, and in
+      # this run's summary. Its problems show as warnings.
+      - name: Age gate metrics
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 5
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: node ci/security-issues.mjs metrics --channel "$CHANNEL" --run "$RUNNER_TEMP/evaluation/metrics.json"

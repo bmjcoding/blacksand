@@ -4,12 +4,17 @@
 //       (written by bin/t3 advisories, against the pin on main)
 //   node tooling/blacksand-t3/ci/security-issues.mjs held --channel C --exit N --published REF --pinned REF --newer FILE --report FILE
 //       (--published: the ref the commit job pushed, if any; --newer: bin/t3 releases --out)
+//   node tooling/blacksand-t3/ci/security-issues.mjs metrics --channel C --run FILE
+//       (--run: bin/t3 evaluate --metrics, if the evaluation left it; metrics.mjs). Its
+//       problems are warnings and exit 1, which the workflow step doesn't fail the job on.
 // GH_TOKEN and GH_REPO set; DRY_RUN=1 reads issues but only prints what it would change.
 
 import * as fs from "node:fs";
 import { parseArgs } from "node:util";
 
+import { readOverrides } from "../lib/overrides.mjs";
 import { githubClient } from "./github.mjs";
+import { metricsStep } from "./metrics.mjs";
 import { reconcileAdvisories, reconcileHeld } from "./reconcile.mjs";
 
 const { positionals, values } = parseArgs({
@@ -21,6 +26,7 @@ const { positionals, values } = parseArgs({
     pinned: { type: "string" },
     report: { type: "string" },
     newer: { type: "string" },
+    run: { type: "string" },
   },
 });
 
@@ -48,7 +54,14 @@ if (positionals[0] === "advisories" && positionals[1]) {
   if (values.exit !== "0" && values.exit !== "3") console.log(report);
   const newer = readNewer(values.newer, values.channel);
   await reconcileHeld({ channel: values.channel, exit: values.exit, published: values.published ?? "", pinned: values.pinned ?? "", newer, report }, gh);
+} else if (positionals[0] === "metrics") {
+  // Main's own overrides (this checkout), never the evaluate job's word: a held fix they cover was taken by the owner.
+  const { problems } = await metricsStep({ channel: values.channel, runFile: values.run ?? null, summaryFile: process.env.GITHUB_STEP_SUMMARY || null, overrides: readOverrides }, gh);
+  // A workflow command's data, escaped, so no text in a problem can end the line and start another command.
+  const escaped = (text) => text.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+  for (const problem of problems) console.log(`::warning title=Age gate metrics::${escaped(problem)}`);
+  if (problems.length) process.exitCode = 1;
 } else {
-  console.error("usage: security-issues.mjs advisories <advisories.json> | held --channel C --exit N --published REF --pinned REF --newer FILE --report FILE");
+  console.error("usage: security-issues.mjs advisories <advisories.json> | held --channel C --exit N --published REF --pinned REF --newer FILE --report FILE | metrics --channel C --run FILE");
   process.exit(2);
 }

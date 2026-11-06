@@ -214,9 +214,12 @@ async function evaluateCandidate({ ref, sha }, ctx, io) {
   }
   // Dependencies new since the pinned release must have been public a while.
   const lock = io.show(sha, "pnpm-lock.yaml");
+  // What the age gate held, for the metrics: null when it couldn't tell.
+  let young = null;
   if (!lock || !ctx.baseLock) reasons.push(`no pnpm-lock.yaml at ${lock ? ctx.baseRef : ref}`);
   else {
     const deps = await io.dependencyAgeGate(ctx.baseLock, lock, { waive: ctx.waive });
+    young = deps.young.map(({ pkg, publishedAt }) => ({ pkg, publishedAt }));
     for (const { pkg, publishedAt } of deps.young) reasons.push(`dependency ${pkg} published ${publishedAt}, under ${MIN_AGE_DAYS} days ago`);
     for (const { pkg, reason } of deps.waived) fastLaned.push(`${pkg}: ${reason}`);
     for (const pkg of deps.unknown) reasons.push(`dependency ${pkg} has no publish time on npm`);
@@ -245,7 +248,7 @@ async function evaluateCandidate({ ref, sha }, ctx, io) {
       reasons.push(...lines(error.message).slice(0, 20));
     }
   }
-  return { reasons, cleared, locks, fastLaned, leftOut, resolvedLock, stageLocks };
+  return { reasons, cleared, locks, fastLaned, leftOut, resolvedLock, stageLocks, young };
 }
 
 /**
@@ -269,10 +272,15 @@ async function stageOfPinned({ baseRef, baseSha }, io, report) {
  * held), pin (the new pin, or null when it stays), report (Markdown), resolved
  * (Map sha -> resolved lockfile, for the pinned release and any new pin), stages
  * (Map sha -> stage record, lib/inventory.mjs: the staged production install of
- * each release built here, and the pinned release's, carried over or built) }.
- * Each lockfile and record also goes to `io.save(kind, sha, value)` ("resolved"
- * or "stage") as soon as it's known, so a run that fails or times out later still
- * hands on what it had. `ref` evaluates that one release as is; `baseline` stands
+ * each release built here, and the pinned release's, carried over or built),
+ * metrics (what the age gate held and the fast lane decided this run, for
+ * ci/metrics.mjs: { v, channel, at, minAgeDays, pinned, pinnedTo, fastLane
+ * (whether it could run), candidates: [{ ref, held, young: [{ pkg,
+ * publishedAt }] or null when unknown }], decisions (lib/fastlane.mjs
+ * waive.decisions(), read once every candidate is done, one per version) };
+ * only reported, never decided on) }. Each lockfile and record also goes to
+ * `io.save(kind, sha, value)` ("resolved" or "stage") as soon as it's known, so
+ * a run that fails or times out later still hands on what it had. `ref` evaluates that one release as is; `baseline` stands
  * in for a missing pin.
  */
 export async function evaluateChannel({ channel, pin, ref = null, baseline = null, build = false, now = () => new Date() }, io) {
@@ -306,6 +314,9 @@ export async function evaluateChannel({ channel, pin, ref = null, baseline = nul
     report.push(`The pinned release's dependencies couldn't be resolved here, so the advisory check can't cover what the security overrides bring in or its staged install: ${lines(error.message)[0] ?? error}`, "");
   }
   const toolOverrides = io.toolOverrides ?? readToolOverrides();
+  // The run's figures for the age gate's metrics (ci/metrics.mjs): reported, never decided on.
+  const started = now().toISOString();
+  const evaluated = [];
   const exposure = await baseExposure({ sha: baseSha, upstreamLock: baseLock, deviceToolsText: io.show(baseSha, DEVICE_TOOL_PINS), toolOverrides }, io);
   if (exposure.problem) report.push(`What the pinned release is exposed to couldn't be worked out, so no security fix skips the age gate: ${exposure.problem}`, "");
   const ctx = {
@@ -338,7 +349,19 @@ export async function evaluateChannel({ channel, pin, ref = null, baseline = nul
       const record = await stageOfPinned(ctx, io, report);
       if (record) keepStage(baseSha, record);
     }
-    return { ...result, report: report.join("\n"), resolved, stages };
+    const metrics = {
+      v: 1,
+      channel,
+      at: started,
+      minAgeDays: MIN_AGE_DAYS,
+      pinned: baseRef,
+      pinnedTo: result.pin?.channels[channel]?.ref ?? null,
+      fastLane: Boolean(ctx.waive),
+      candidates: evaluated,
+      // Read after every gate decision is made, and only data: the last word on each version.
+      decisions: [...new Map((ctx.waive?.decisions?.() ?? []).map((d) => [d.pkg, d])).values()],
+    };
+    return { ...result, report: report.join("\n"), resolved, stages, metrics };
   };
 
   const candidates = ref ? [{ ref, sha: io.revParse(ref) }] : releaseCandidates(io.tags(), channel, pinned?.ref).map((tag) => ({ ref: tag, sha: io.revParse(tag) }));
@@ -366,6 +389,7 @@ export async function evaluateChannel({ channel, pin, ref = null, baseline = nul
       // One candidate failing to evaluate holds it, not the evaluation.
       result = { ...result, reasons: [`couldn't be evaluated: ${lines(error.message)[0] ?? error}`] };
     }
+    evaluated.push({ ref: candidate.ref, held: result.reasons.length > 0, young: result.young ?? null });
     if (result.reasons.length) {
       held.push({ ref: candidate.ref, reasons: result.reasons });
       io.log(`holding ${candidate.ref}: ${result.reasons[0]}`);

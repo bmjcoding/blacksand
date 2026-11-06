@@ -212,6 +212,10 @@ test("publisher continuity is anchored to accepted, aged versions, deprecated on
   assert.match((await publisherContinuity("trust-burst", "1.0.6", { accepted: ["1.0.0"], now: NOW })).summary, /published by attacker/);
   assert.equal((await publisherContinuity("trust-burst", "1.0.6", { accepted: ["1.0.5"], now: NOW })).ok, false, "a young accepted version isn't a baseline");
   assert.match((await publisherContinuity("trust-burst", "1.0.7", { accepted: [], now: NOW })).summary, /no version .* to compare with/);
+  // Each refusal names its reason for the metrics issue (ci/metrics.mjs), beside the summary.
+  assert.equal((await publisherContinuity("trust-burst", "1.0.6", { accepted: ["1.0.0"], now: NOW })).code, "publisher-changed");
+  assert.equal((await publisherContinuity("trust-burst", "1.0.7", { accepted: [], now: NOW })).code, "no-aged-baseline");
+  assert.equal((await publisherContinuity("trust-burst", "9.9.9", { accepted: ["1.0.0"], now: NOW })).code, "not-on-npm");
   assert.deepEqual(await publisherContinuity("trust-burst", "1.0.7", { accepted: ["1.0.0"], now: NOW }), { ok: true, summary: "publisher maint, no provenance (none before either)" });
 });
 
@@ -255,6 +259,7 @@ test("provenance must come from the accepted versions' repository and name this 
   // Unverified provenance never earns trust: a switch to trusted publishing waits out the minimum age.
   assert.match((await check("2.0.4")).summary, /published by GitHub Actions, not by maint/);
   assert.match((await check("2.0.5")).summary, /doesn't name this tarball/);
+  assert.deepEqual(await Promise.all(["2.0.1", "2.0.2", "2.0.4", "2.0.5"].map(async (v) => (await check(v)).code)), ["repository-changed", "provenance-mismatch", "publisher-changed", "provenance-mismatch"]);
   assert.equal(repoOf("git@github.com:Owner/Repo.git"), "https://github.com/owner/repo");
   assert.equal(repoOf("owner/repo"), "https://github.com/owner/repo");
   assert.equal(repoOf({ url: "git+ssh://git@github.com/owner/repo.git" }), "https://github.com/owner/repo");

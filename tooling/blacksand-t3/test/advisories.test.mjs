@@ -216,6 +216,49 @@ test("the fast lane: a fix for an advisory is waived, a repository's own only wh
   assert.equal(await aliased("agent-device@0.21.35"), null, "the same vulnerability under another id still flags it");
 });
 
+test("the fast lane records each decision on a fix as plain data, and reading them changes no decision", async () => {
+  const open = [{ id: "GHSA-6845-fcpx-jc45", aliases: ["CVE-2026-9"], severity: "HIGH", packages: [{ pkg: "agent-device@0.21.31", fixed: ["0.21.35"] }] }];
+  const lane = (o = {}) => makeFastLane({ basePackages: ["agent-device@0.21.31"], openAdvisories: open, continuity: async () => ({ ok: true, summary: "publisher maint" }), advisories: async () => [], ...o });
+  const publishedAt = "2026-11-05T01:00:00.000Z";
+  // Admitted; refused by continuity, with its code; a fix only a repository states; one a source still flags.
+  const cases = [
+    [{}, "fixes GHSA-6845-fcpx-jc45 (publisher maint)", "admitted", "fixes GHSA-6845-fcpx-jc45 (publisher maint)"],
+    [{ continuity: async () => ({ ok: false, code: "publisher-changed", summary: "published by mallory, not by maint" }) }, null, "publisher-changed", "published by mallory, not by maint"],
+    [{ openAdvisories: [{ ...open[0], sources: ["github-repository"] }] }, null, "no-curated-fix", "no curated source states this fix"],
+    [{ advisories: async () => [{ id: "OSV-2026-1", aliases: ["CVE-2026-9"], packages: [] }] }, null, "still-flagged", "a source still flags it"],
+  ];
+  // A fix, then no fix at all (below it, another line, another package), then the fix again.
+  const PKGS = ["agent-device@0.21.35", "agent-device@0.21.34", "agent-device@0.22.0", "left-pad@1.3.1", "agent-device@0.21.35"];
+  for (const [options, expected, code, reason] of cases) {
+    // Two lanes alike: one nobody reads, one read before each call, its copies tampered with.
+    const unread = lane(options);
+    const read = lane(options);
+    const results = { unread: [], read: [] };
+    for (const pkg of PKGS) {
+      results.unread.push(await unread(pkg, { publishedAt }));
+      for (const d of read.decisions()) Object.assign(d, { admitted: !d.admitted, code: "tampered" }).replaces.push("x@0.0.0");
+      results.read.push(await read(pkg, { publishedAt }));
+    }
+    assert.deepEqual(results.read, results.unread);
+    assert.deepEqual(results.unread, [expected, null, null, null, expected]);
+    // One record per decision on the fix, nothing for the rest; plain JSON data, untouched by the tampering.
+    const record = { pkg: "agent-device@0.21.35", publishedAt, admitted: code === "admitted", code, reason, advisories: ["GHSA-6845-fcpx-jc45"], replaces: ["agent-device@0.21.31"] };
+    const records = read.decisions();
+    assert.deepEqual(records, [record, record]);
+    assert.deepEqual(unread.decisions(), records);
+    assert.deepEqual(JSON.parse(JSON.stringify(records)), records, "only JSON values");
+    for (const r of records) assert.equal(Object.getPrototypeOf(r), Object.prototype);
+  }
+  // No publish time given: recorded as unknown.
+  const untimed = lane();
+  await untimed("agent-device@0.21.35");
+  assert.equal(untimed.decisions()[0].publishedAt, null);
+  // A check that throws is thrown as before, and isn't recorded.
+  const failing = lane({ continuity: async () => { throw new Error("npm registry answered 500"); } });
+  await assert.rejects(failing("agent-device@0.21.35"), /answered 500/);
+  assert.deepEqual(failing.decisions(), []);
+});
+
 test("the alert job's report says which sources it read and when, with the vendor gaps; issues link where the advisory is", async () => {
   mockFetch(recorded);
   const pins = JSON.stringify({ "agent-device": "0.21.31" });

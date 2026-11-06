@@ -36,6 +36,9 @@
 //     drops nothing; it still opens issues and says what's new. What it
 //     couldn't cover is one more issue, "[security] Advisory coverage incomplete
 //     (<channel>)", until it can;
+//   - "[metrics] Age gate and fast lane (<channel>)": the age gate's figures
+//     (ci/metrics.mjs), edited in place each run, labelled `metrics`, never
+//     commented on; the reconcilers here leave it alone;
 //   - "Upstream <channel> releases held": open while the evaluator holds every
 //     newer release; closed once the commit job has pushed a pin that is now
 //     main's, or upstream itself (read by the alert job) has nothing newer than
@@ -62,7 +65,7 @@ import { RANKED, isAlerting, rankOf } from "../lib/advisories.mjs";
 
 export const BOT = "github-actions[bot]";
 const CHANNELS = new Set(["nightly", "preview", "stable"]);
-const ISSUE_KINDS = new Set(["package", "rolling", "coverage", "held"]);
+const ISSUE_KINDS = new Set(["package", "rolling", "coverage", "held", "metrics"]);
 /** The comments that tell the owner where a package issue stands: what changed, and why it closed. */
 const LIFECYCLE = new Set(["notify", "fixed", "no-longer-alerting"]);
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,99}$/;
@@ -161,9 +164,10 @@ function toUnsent(pairs) {
   return [...byId].map(([id, rating]) => `${LETTER[rating]}${id}`).filter((entry) => UNSENT.test(entry)).slice(0, MAX_TOLD);
 }
 
-/** An issue marker's meta as this file reads it (an older marker's kind, channel and package, nothing else it held), or null. */
+/** An issue marker's meta as this file reads it (an older marker's kind, channel and package, nothing else it held; a metrics issue's `state` as it is, for ci/metrics.mjs to check), or null. */
 function issueMeta(meta) {
   if (!ISSUE_KINDS.has(meta.kind) || !CHANNELS.has(meta.channel)) return null;
+  if (meta.kind === "metrics") return { kind: "metrics", channel: meta.channel, state: meta.state ?? null };
   if (meta.kind !== "package") return { kind: meta.kind, channel: meta.channel };
   if (typeof meta.package !== "string" || !meta.package || meta.package.length > 300) return null;
   const unsent = unsentOf(meta.unsent);
@@ -422,7 +426,7 @@ async function commentOnce(gh, number, meta, text, bot) {
 }
 
 /** Opens an issue whose body carries `meta`'s marker; a retried request first looks for it by that marker (never an older, undelimited one's). */
-function createOnce(gh, fields, meta, bot) {
+export function createOnce(gh, fields, meta, bot) {
   const same = (issue) => ["kind", "channel", "package"].every((key) => issue.meta[key] === meta[key]) && delimited(issue);
   const landed = async () => ownedIssues(await gh.openIssues(), { bot }).find(same) ?? null;
   return gh.createIssue(fields, { landed });
@@ -447,16 +451,16 @@ async function keepOne(issues, gh, bot, { quietly = false } = {}) {
 }
 
 /** `issues` (one kind's) as { fresh: the oldest delimited one, closing any others as its duplicates; legacy: the rest, never rewritten }. */
-async function sortOut(issues, gh, bot, { quietly = false } = {}) {
+export async function sortOut(issues, gh, bot, { quietly = false } = {}) {
   return { fresh: await keepOne(issues.filter(delimited), gh, bot, { quietly }), legacy: issues.filter((issue) => !delimited(issue)) };
 }
 
 /** Writes `body` and `title` to `issue` unless it reads so already (GitHub may hand a body back with CRLFs). */
-async function rewrite(gh, issue, title, body) {
+export async function rewrite(gh, issue, title, body) {
   if (String(issue.body ?? "").replace(/\r\n/g, "\n") !== body || issue.title !== title) await gh.updateIssue(issue.number, { title, body });
 }
 
-const notesOf = (issue) => readIssue(issue?.body)?.notes ?? null;
+export const notesOf = (issue) => readIssue(issue?.body)?.notes ?? null;
 
 const groupBy = (items, key) => {
   const map = new Map();

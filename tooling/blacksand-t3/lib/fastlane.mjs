@@ -82,34 +82,34 @@ async function provenanceOf(name, version, info) {
  * { ok, summary } on whether `name@version` looks like its usual publisher shipped
  * it, against `accepted`: versions of `name` the pinned release already uses. Only
  * those at least `minDays` old count, so a run of fresh releases can't vouch for
- * the next one.
+ * the next one. A refusal also has a `code` (REFUSALS), which only reports why.
  */
 export async function publisherContinuity(name, version, { accepted = [], now = Date.now(), minDays = MIN_AGE_DAYS } = {}) {
   ageSetting(minDays);
-  const no = (summary) => ({ ok: false, summary });
+  const no = (code, summary) => ({ ok: false, code, summary });
   const meta = await npmMeta(name);
   const info = meta?.versions?.[version];
-  if (!info) return no("not on npm");
+  if (!info) return no("not-on-npm", "not on npm");
   const cutoff = now - minDays * 86_400_000;
   const baseline = [...new Set(accepted)].filter((v) => v !== version && meta.versions[v] && (publishedTime(meta.time?.[v]) ?? Infinity) <= cutoff);
-  if (!baseline.length) return no(`no version of ${name} the pinned release uses is ${minDays} days old to compare with`);
+  if (!baseline.length) return no("no-aged-baseline", `no version of ${name} the pinned release uses is ${minDays} days old to compare with`);
   const publisher = info._npmUser?.name ?? null;
   const usual = new Set(baseline.map((v) => meta.versions[v]._npmUser?.name).filter(Boolean));
   const repos = new Set(baseline.map((v) => repoOf(meta.versions[v].repository)).filter(Boolean));
   const declared = repoOf(info.repository);
-  if (repos.size && !repos.has(declared)) return no(`declares repository ${declared ?? "none"}, not ${[...repos].join(", ")}`);
-  if (!usual.has(publisher)) return no(`published by ${publisher ?? "an unknown account"}, not by ${[...usual].join(", ") || "a known account"}`);
+  if (repos.size && !repos.has(declared)) return no("repository-changed", `declares repository ${declared ?? "none"}, not ${[...repos].join(", ")}`);
+  if (!usual.has(publisher)) return no("publisher-changed", `published by ${publisher ?? "an unknown account"}, not by ${[...usual].join(", ") || "a known account"}`);
   const hadProvenance = baseline.some((v) => meta.versions[v].dist?.attestations);
   if (!info.dist?.attestations) {
-    return hadProvenance ? no("no npm provenance, though earlier versions had it") : { ok: true, summary: `publisher ${publisher}, no provenance (none before either)` };
+    return hadProvenance ? no("provenance-dropped", "no npm provenance, though earlier versions had it") : { ok: true, summary: `publisher ${publisher}, no provenance (none before either)` };
   }
-  if (!repos.size) return no("has provenance, but no earlier version names a repository to check it against");
+  if (!repos.size) return no("provenance-unchecked", "has provenance, but no earlier version names a repository to check it against");
   const provenance = await provenanceOf(name, version, info);
-  if (provenance.problem) return no(provenance.problem);
-  if (!repos.has(repoOf(provenance.repository))) return no(`provenance from ${provenance.repository || "no repository"}, not ${[...repos].join(", ")}`);
+  if (provenance.problem) return no("provenance-mismatch", provenance.problem);
+  if (!repos.has(repoOf(provenance.repository))) return no("provenance-mismatch", `provenance from ${provenance.repository || "no repository"}, not ${[...repos].join(", ")}`);
   // A tag, the default branch, or a maintenance branch for an older line (v7.x).
   if (!/^refs\/(tags\/|heads\/(main|master|v\d+(\.\d+)?\.x)$)/.test(provenance.ref)) {
-    return no(`provenance built from ${provenance.ref || "no ref"}, not a tag, the default branch or a vN.x branch`);
+    return no("provenance-ref", `provenance built from ${provenance.ref || "no ref"}, not a tag, the default branch or a vN.x branch`);
   }
   return { ok: true, summary: `publisher ${publisher}, provenance (unverified) names ${provenance.repository} ${provenance.ref}` };
 }
@@ -184,6 +184,12 @@ export async function runtimeAdvisories(packages) {
  * hijacked release could also publish, or edit, one that "fixes" it; what the
  * owner signed is the version, not the advisory's word. Such an advisory still
  * counts against a candidate (still flagged), and for alerts.
+ *
+ * `waive.decisions()`, for the evaluator's metrics only (ci/metrics.mjs), read
+ * after the age gate is done: a copy of each decision so far on a version that
+ * would fix an advisory open against the one it replaces, admitted or not, as
+ * plain data: { pkg, publishedAt (as `waive`'s caller gave it, or null),
+ * admitted, code ("admitted" or a REFUSALS key), reason, advisories, replaces }.
  */
 export function makeFastLane({ basePackages, openAdvisories, now = Date.now(), minDays = MIN_AGE_DAYS, watch = [], vouched = [], advisories = findAdvisories, continuity = publisherContinuity }) {
   const accepted = new Map();
@@ -211,14 +217,23 @@ export function makeFastLane({ basePackages, openAdvisories, now = Date.now(), m
     }
   }
   const baseElectron = (accepted.get("electron") ?? []).sort(compareVersions).at(-1) ?? null;
-  return async (pkg) => {
+  // Each decision on a version that would fix something open, as data, for the evaluator's metrics.
+  const decisions = [];
+  const waive = async (pkg, { publishedAt = null } = {}) => {
     const { name, version } = split(pkg);
     if (!parseVersion(version)) return null;
     let why = null;
-    if (name === "electron" && baseElectron) why = await electronSecurityReason(baseElectron, version);
-    else {
+    // What it would fix, for the record: { advisories, replaces }, null while it's unknown or nothing.
+    let fixing = null;
+    let refusal = "no-curated-fix";
+    if (name === "electron" && baseElectron) {
+      why = await electronSecurityReason(baseElectron, version);
+      if (why) fixing = { advisories: (advisoriesByName.get(name) ?? []).filter(({ from }) => from === baseElectron).map(({ id }) => id), replaces: [`electron@${baseElectron}`] };
+    } else {
       const line = lineOf(version);
       const sameLine = (v) => parseVersion(v) !== null && lineOf(v) === line;
+      const reaches = (advisoriesByName.get(name) ?? []).filter(({ from, fixed }) => sameLine(from) && fixed.some((f) => sameLine(f) && compareVersions(version, f) >= 0));
+      if (reaches.length) fixing = { advisories: [...new Set(reaches.map(({ id }) => id))], replaces: [...new Set(reaches.map(({ from }) => `${name}@${from}`))] };
       const fixes = (advisoriesByName.get(name) ?? []).filter(
         ({ names, curatedFixed, from, fixed }) =>
           sameLine(from) && fixed.some((f) => sameLine(f) && compareVersions(version, f) >= 0 && (curatedFixed.includes(f) || vouchedFor(pkg, names))),
@@ -228,10 +243,33 @@ export function makeFastLane({ basePackages, openAdvisories, now = Date.now(), m
         const still = new Set((await advisories([pkg], { watch })).flatMap((a) => [a.id, ...(a.aliases ?? [])]));
         const resolved = fixes.filter((fix) => !fix.names.some((id) => still.has(id)));
         if (resolved.length) why = `fixes ${[...new Set(resolved.map((fix) => fix.id))].join(", ")}`;
+        else refusal = "still-flagged";
       }
     }
-    if (!why) return null;
+    const record = (code, reason) => fixing && decisions.push({ pkg, publishedAt, admitted: code === "admitted", code, reason, ...fixing });
+    if (!why) {
+      record(refusal, refusal === "still-flagged" ? "a source still flags it" : "no curated source states this fix");
+      return null;
+    }
     const trust = await continuity(name, version, { accepted: accepted.get(name) ?? [], now, minDays });
+    record(trust.ok ? "admitted" : (trust.code ?? "continuity"), trust.ok ? `${why} (${trust.summary})` : trust.summary);
     return trust.ok ? `${why} (${trust.summary})` : null;
   };
+  waive.decisions = () => structuredClone(decisions);
+  return waive;
 }
+
+/** The codes a fast-lane refusal is recorded with (`waive.decisions()`), besides "admitted". */
+export const REFUSALS = Object.freeze({
+  "no-curated-fix": "no curated source states the fix",
+  "still-flagged": "a source still flags it",
+  "not-on-npm": "not on npm",
+  "no-aged-baseline": "no aged version to compare with",
+  "repository-changed": "declares another repository",
+  "publisher-changed": "another npm publisher",
+  "provenance-dropped": "provenance dropped",
+  "provenance-unchecked": "provenance with no repository to check",
+  "provenance-mismatch": "provenance mismatch",
+  "provenance-ref": "provenance from another branch",
+  continuity: "publisher continuity",
+});
