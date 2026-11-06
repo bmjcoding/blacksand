@@ -6,7 +6,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { lockEntry } from "../lib/device-tools.mjs";
-import { advisoryReport, evaluateChannel, releaseCandidates } from "../lib/evaluate.mjs";
+import { advisoryReport, evaluateChannel, MAX_FALLBACK, MAX_LOOKBACK, releaseCandidates } from "../lib/evaluate.mjs";
+import { dependencyAgeGate, lockPackages } from "../lib/gates.mjs";
+import { ago, mockFetch } from "./trust-fixtures.mjs";
 import { OVERRIDES, RESOLVED, UPSTREAM, npmMeta } from "./pipeline-fixtures.mjs";
 
 const sha = (c) => c.repeat(40);
@@ -103,7 +105,7 @@ test("a candidate that fails to evaluate is held, the next is still evaluated, a
   const result = await evaluateChannel({ channel: "nightly", pin: PIN }, io);
   assert.equal(result.exitCode, 0);
   assert.equal(result.pin.channels.nightly.ref, OLDER);
-  assert.match(result.report, /Passed over v0\.1\.7-nightly\.20261031\.4001:\n- couldn't be evaluated: npm registry answered 500/);
+  assert.match(result.report, /Passed over v0\.1\.7-nightly\.20261031\.4001 \(held at the age prefilter; no other gate ran\):\n- couldn't be evaluated: npm registry answered 500/);
 });
 
 test("every candidate held: exit 3, the pin stays, each reason reported", async () => {
@@ -112,8 +114,8 @@ test("every candidate held: exit 3, the pin stays, each reason reported", async 
   const result = await evaluateChannel({ channel: "nightly", pin: PIN }, io);
   assert.equal(result.exitCode, 3);
   assert.equal(result.pin, null);
-  assert.match(result.report, /## v0\.1\.7-nightly\.20261031\.4001\n- dependency fresh@1\.0\.0 published/);
-  assert.match(result.report, /## v0\.1\.7-nightly\.20261031\.4000\n/);
+  assert.match(result.report, /## v0\.1\.7-nightly\.20261031\.4001 \(held at the age prefilter; no other gate ran\)\n- dependency fresh@1\.0\.0 published/);
+  assert.match(result.report, /## v0\.1\.7-nightly\.20261031\.4000 \(held at the age prefilter; no other gate ran\)\n/);
   assert.deepEqual([...result.resolved.keys()], [sha("0")], "the pinned release's lockfile still goes to the alert job");
 });
 
@@ -157,6 +159,104 @@ test("the run's metrics: what the age gate held per candidate and what the fast 
   const broken = fakeIo({ gate: async () => { throw new Error("npm registry answered 500"); } });
   const failed = await evaluateChannel({ channel: "nightly", pin: PIN }, broken.io);
   assert.deepEqual(failed.metrics.candidates.map((c) => [c.held, c.young]), [[true, null], [true, null]]);
+});
+
+const FRESH = ago(1);
+
+/** `n` nightly tags newer than PINNED, newest first, each with its own sha (index i -> "1" + i padded). */
+function nightlies(n) {
+  const tags = Array.from({ length: n }, (_, i) => `v0.1.8-nightly.20261104.${5000 - i}`);
+  const shas = Object.fromEntries(tags.map((tag, i) => [tag, `1${String(i).padStart(39, "0")}`]));
+  return { tags, shas };
+}
+
+/** fakeIo over `tags` (and PINNED), the age gate holding the releases in `young`. */
+function lookbackIo(tags, shas, young) {
+  const gate = async (base, lock, opts) => (opts?.waive !== undefined && young.has(lock) ? { ...clean, ok: false, young: [{ pkg: "@effect/tsgo@0.67.1", publishedAt: "2026-11-04T12:19:00Z" }] } : clean);
+  // A young release's lockfile is its tag, which the fake gate holds; every other is the fixture.
+  const files = Object.fromEntries([...young].map((tag) => [shas[tag], { "pnpm-lock.yaml": tag }]));
+  const { io, calls } = fakeIo({ files, gate });
+  io.tags = () => [PINNED, ...tags];
+  io.revParse = (ref) => shas[ref] ?? sha("0");
+  return { io, calls };
+}
+
+test("five newest held by a young dependency, an older one eligible: the age prefilter skips them and the older one is pinned", async () => {
+  const { tags, shas } = nightlies(MAX_FALLBACK + 3);
+  const { io, calls } = lookbackIo(tags, shas, new Set(tags.slice(0, MAX_FALLBACK + 1)));
+  const result = await evaluateChannel({ channel: "nightly", pin: PIN }, io);
+  const chosen = tags[MAX_FALLBACK + 1];
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.pin.channels.nightly.ref, chosen, "the newest release past the young ones, outside the old five-release window");
+  assert.deepEqual(calls.checkRules.map((c) => c.ref), [PINNED, chosen], "no other gate ran on a release the age gate held");
+  for (const tag of tags.slice(0, MAX_FALLBACK + 1)) assert.match(result.report, new RegExp(`Passed over ${tag.replaceAll(".", "\\.")} \\(held at the age prefilter; no other gate ran\\):\n- dependency @effect/tsgo@0\\.67\\.1 published`));
+  // The metrics still count each age hold; the release older than the new pin isn't a candidate.
+  assert.deepEqual(result.metrics.candidates.map((c) => [c.ref, c.held, c.young?.length]), [...tags.slice(0, MAX_FALLBACK + 1).map((tag) => [tag, true, 1]), [chosen, false, 0]]);
+});
+
+test("every release held: those the age gate held at the prefilter, and every gate only on the newest MAX_FALLBACK that pass it", async () => {
+  const { tags, shas } = nightlies(12);
+  // Young: 0, 1, 3. The rest pass the age gate, and the strict rules hold them all.
+  const { io, calls } = lookbackIo(tags, shas, new Set([tags[0], tags[1], tags[3]]));
+  io.checkRules = (ref, at) => (at === sha("0") ? { ok: true, skipped: [] } : (calls.checkRules.push({ ref }), { ok: false, message: "1 strict rule(s) no longer match upstream." }));
+  const result = await evaluateChannel({ channel: "nightly", pin: PIN }, io);
+  assert.deepEqual([result.exitCode, result.pin], [3, null]);
+  const tried = tags.filter((_, i) => ![0, 1, 3].includes(i)).slice(0, MAX_FALLBACK);
+  assert.deepEqual(calls.checkRules.map((c) => c.ref), tried, "every gate on the newest five the age gate passed, newest first");
+  assert.match(result.report, new RegExp(`## ${tags[3].replaceAll(".", "\\.")} \\(held at the age prefilter; no other gate ran\\)\n- dependency @effect/tsgo`));
+  assert.match(result.report, new RegExp(`## ${tried[0].replaceAll(".", "\\.")}\n- 1 strict rule`));
+  assert.match(result.report, new RegExp(`Not evaluated further, though the age gate passed them \\(at most 5 are, newest first\\): ${tags.slice(-4).join(", ").replaceAll(".", "\\.")}\\.`));
+  assert.deepEqual(result.metrics.candidates.map((c) => [c.ref, c.held, c.young?.length]), tags.map((tag, i) => [tag, true, [0, 1, 3].includes(i) ? 1 : 0]), "every release the age check saw, held this run");
+  // Every release held by age, none passing it: no other gate runs at all.
+  const all = lookbackIo(tags, shas, new Set(tags));
+  const none = await evaluateChannel({ channel: "nightly", pin: PIN }, all.io);
+  assert.deepEqual([none.exitCode, all.calls.checkRules.map((c) => c.ref)], [3, [PINNED]]);
+  assert.equal(none.metrics.candidates.length, tags.length);
+});
+
+test("the look-back is bounded: only the newest MAX_LOOKBACK releases newer than the pin get the age check", async () => {
+  const { tags, shas } = nightlies(MAX_LOOKBACK + 7);
+  assert.deepEqual(releaseCandidates(tags, "nightly", PINNED), tags.slice(0, MAX_LOOKBACK));
+  const seen = [];
+  const { io, calls } = lookbackIo(tags, shas, new Set(tags));
+  const inner = io.dependencyAgeGate;
+  io.dependencyAgeGate = (base, lock, opts) => (opts?.waive !== undefined && seen.push(lock), inner(base, lock, opts));
+  const result = await evaluateChannel({ channel: "nightly", pin: PIN }, io);
+  assert.deepEqual(seen, tags.slice(0, MAX_LOOKBACK), "the age gate once per release, newest first, none past the bound");
+  assert.deepEqual([result.exitCode, calls.checkRules.length], [3, 1]);
+  // Even an eligible release past the bound isn't looked at.
+  const late = lookbackIo(tags, shas, new Set(tags.slice(0, MAX_LOOKBACK)));
+  assert.equal((await evaluateChannel({ channel: "nightly", pin: PIN }, late.io)).exitCode, 3);
+});
+
+test("the prefilter is the age gate: on the same candidate the same young versions and verdict, and the gate called once", async () => {
+  // The real gate (lib/gates.mjs), npm faked: a release adding one young and one old version.
+  const fetch = globalThis.fetch;
+  mockFetch({
+    "https://registry.npmjs.org/prefilter-fresh": () => new Response(JSON.stringify({ versions: { "1.0.0": {} }, time: { "1.0.0": FRESH } }), { status: 200 }),
+    "https://registry.npmjs.org/prefilter-old": () => new Response(JSON.stringify({ versions: { "1.0.0": {} }, time: { "1.0.0": ago(30) } }), { status: 200 }),
+  });
+  try {
+    const youngLock = [...lockPackages(UPSTREAM), "prefilter-fresh@1.0.0", "prefilter-old@1.0.0"];
+    const { tags, shas } = nightlies(2);
+    const { io, calls } = lookbackIo(tags, shas, new Set());
+    io.show = (at, file) => (file === "pnpm-lock.yaml" ? (at === shas[tags[0]] ? youngLock : UPSTREAM) : TOOLS("0.21.31"));
+    const gated = [];
+    io.dependencyAgeGate = (base, lock, opts) => (gated.push(lock), dependencyAgeGate(base, lock, opts));
+    const result = await evaluateChannel({ channel: "nightly", pin: PIN }, io);
+    const direct = await dependencyAgeGate(UPSTREAM, youngLock);
+    assert.deepEqual([direct.ok, direct.young], [false, [{ pkg: "prefilter-fresh@1.0.0", publishedAt: FRESH }]]);
+    assert.deepEqual(result.metrics.candidates, [
+      { ref: tags[0], held: true, young: direct.young },
+      { ref: tags[1], held: false, young: [] },
+    ]);
+    assert.match(result.report, new RegExp(`Passed over ${tags[0].replaceAll(".", "\\.")} \\(held at the age prefilter; no other gate ran\\):\n- dependency prefilter-fresh@1\\.0\\.0 published`));
+    assert.equal(result.pin.channels.nightly.ref, tags[1], "the other passes the same gate and is pinned");
+    assert.equal(gated.filter((lock) => lock === youngLock).length, 1, "one gate call per release: the full evaluation reuses the prefilter's");
+    assert.deepEqual(calls.checkRules.map((c) => c.ref), [PINNED, tags[1]]);
+  } finally {
+    globalThis.fetch = fetch;
+  }
 });
 
 test("nothing newer: exit 0, no pin, the pinned release resolved for the alert job", async () => {

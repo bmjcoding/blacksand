@@ -11,7 +11,8 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { EVENTS, STATE_MAX, emptyState, mergeRun, metricsBody, metricsStep, readRun, readState, reconcileMetrics, runSummary } from "../ci/metrics.mjs";
+import { MAX_LOOKBACK } from "../lib/evaluate.mjs";
+import { EVENTS, MAX_CANDIDATES, STATE_MAX, emptyState, mergeRun, metricsBody, metricsStep, readRun, readState, reconcileMetrics, runSummary } from "../ci/metrics.mjs";
 import { BOT, markerOf, readIssue, readMarker, reconcileAdvisories, reconcileHeld } from "../ci/reconcile.mjs";
 import { problems } from "./alerts-markdown.mjs";
 
@@ -245,6 +246,16 @@ test("the evaluate job's metrics are checked for shape: another channel, a bad t
     ...emptyState(),
     totals: { ...emptyState().totals, refused: { "publisher-changed": 2 } },
   });
+});
+
+test("a run's every candidate is read, up to the evaluator's look-back: none dropped, so no hold is closed as superseded by mistake", () => {
+  assert.equal(MAX_CANDIDATES, MAX_LOOKBACK);
+  const refs = Array.from({ length: MAX_LOOKBACK + 1 }, (_, i) => `v0.1.8-nightly.20261104.${5000 - i}`);
+  const read = readRun(run(0, { candidates: refs.map((ref) => held(ref, ["@effect/tsgo@0.67.1", -1])) }), "nightly", T0 + HOUR);
+  assert.deepEqual(read.candidates.map((c) => c.ref), refs.slice(0, MAX_LOOKBACK));
+  const { state } = merge(emptyState(), run(0, { candidates: refs.slice(0, MAX_LOOKBACK).map((ref) => held(ref, ["@effect/tsgo@0.67.1", -1])) }), 0);
+  assert.equal(state.holds.length, MAX_LOOKBACK);
+  assert.equal(readState(readIssue(metricsBody(state, "nightly").body).meta.state).holds.length, MAX_LOOKBACK, "the marker keeps them all");
 });
 
 test("hostile package names stay inert in the issue, the run's summary and the marker, and read back whole", () => {

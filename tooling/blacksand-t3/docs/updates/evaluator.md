@@ -17,7 +17,7 @@ upstream code or mutable repository scripts.
 
 | Job | What it runs | Token and secrets | Output |
 |---|---|---|---|
-| `evaluate` | `blacksand t3 evaluate` on each new upstream nightly release, newest first. It builds and smoke-tests each one. | Read-only `contents`, and `actions: read` to fetch the last run's stage records. No secrets. | A proposed `pin.json`, a report, resolved lockfiles and stage records. The job uploads them as an artifact on every run, pass or fail. |
+| `evaluate` | `blacksand t3 evaluate` on new upstream nightly releases, newest first ([how far back](#how-far-back-it-looks)). It builds and smoke-tests each one it fully evaluates. | Read-only `contents`, and `actions: read` to fetch the last run's stage records. No secrets. | A proposed `pin.json`, a report, resolved lockfiles and stage records. The job uploads them as an artifact on every run, pass or fail. |
 | `check` | A fresh runner runs `blacksand t3 pin-check --candidate`, re-deriving every gate it can without executing upstream or npm code. | `contents: read`, no secrets or environment. | A checked pin and the exact main SHA, uploaded as a separate immutable artifact. |
 | `commit` | A fresh runner uses only inline workflow shell and pinned GitHub-owned actions. It checks the exact main SHA, builds a pin-only tree without filters or hooks, then signs and pushes fast-forward only. | Read-only workflow token; the main-only `evaluator` environment supplies the signing key and repository-scoped Contents-write App credential. | An evaluator-signed commit changing `tooling/blacksand-t3/pin.json` alone. Requires explicit publication opt-in. |
 | `alerts` | It checks advisories against the pin that is on `main`. | `contents: read` and `issues: write`. | GitHub issues. |
@@ -91,6 +91,19 @@ release that does any of the following:
 - It breaks a strict rule, names an unknown network host, fails to typecheck, leaks a
   forbidden endpoint, or makes any network call in the offline smoke test
   ([build pipeline](../building/pipeline.md)).
+
+### How far back it looks
+
+The evaluator looks at up to 40 releases newer than the pin, newest first. It runs the
+dependency age gate on each one first. That check reads only git and npm metadata and
+never runs upstream code. The gate is the same one as in the full evaluation, not a
+copy. A release the age gate holds would be held anyway, so no other gate runs on it.
+The report lists it as "held at the age prefilter", and the metrics count it as held.
+
+Then the evaluator runs every gate on the newest five releases that passed the age
+gate. The first one that passes everything becomes the pin. So a burst of releases that
+each add a young dependency can't hide an older release that passes. If the pin falls
+more than 40 releases behind, the evaluator looks only at the newest 40.
 
 The secret-free `check` job independently checks the following:
 

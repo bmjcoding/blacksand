@@ -1,7 +1,10 @@
 // The evaluator (bin/t3 evaluate, run by .github/workflows/evaluate.yml):
 // picks the newest release on a channel, newer than pin.json's, that passes every
-// gate. Newest first in release order, up to MAX_FALLBACK back. A release is held
-// when it:
+// gate. It looks at up to MAX_LOOKBACK releases newer than the pin, newest first
+// in release order. Each gets the age gate first (ageCheck: git and npm metadata
+// only), and the newest MAX_FALLBACK that pass it get every other gate. A release
+// the age gate holds would be held anyway, so this only skips work, and a run of
+// young releases can't hide an older one that passes. A release is held when it:
 //   - pins a device tool version (as the owner's device tool overrides raise it,
 //     lib/overrides.json) whose code or dependency closure fails review
 //     (lib/gates.mjs, lib/device-tools.mjs),
@@ -30,15 +33,22 @@ import { readOverrides, readToolOverrides } from "./overrides.mjs";
 import { compareRefs, isReleaseTag, validatePin } from "./pin.mjs";
 import { checkResolution } from "./resolution.mjs";
 
-/** How many releases back the evaluator looks for one that passes. */
+/** How many releases, among those the age gate passes, the evaluator puts through every gate. */
 export const MAX_FALLBACK = 5;
+
+/**
+ * How many releases newer than the pin the evaluator looks at, newest first: each
+ * gets the age gate. Forty is about two weeks of nightlies at upstream's pace, and
+ * bounds a run's git and npm reads; a pin further behind catches up from the newest forty.
+ */
+export const MAX_LOOKBACK = 40;
 
 /**
  * Release tags on `channel` newer than `pinnedRef`, newest first by release
  * order (not tag or commit dates), at most `limit`. Tags outside the channel's
  * release grammar (pin.mjs) are never candidates.
  */
-export function releaseCandidates(tags, channel, pinnedRef, limit = MAX_FALLBACK) {
+export function releaseCandidates(tags, channel, pinnedRef, limit = MAX_LOOKBACK) {
   return [...new Set(tags)]
     .filter((tag) => isReleaseTag(tag, channel))
     .filter((tag) => !pinnedRef || compareRefs(tag, pinnedRef) > 0)
@@ -174,15 +184,42 @@ export async function advisoryReport({ pin, channel, now = () => new Date(), ove
 }
 
 /**
- * Evaluates one candidate: { reasons (empty when it passes), cleared (device
- * tool versions it newly needs approved), locks (the dependency lockfiles to keep
- * for them, and for any tool it pins that was reviewed without one), fastLaned,
- * leftOut, resolvedLock, stageLocks (the build's checked staged lockfiles) }.
- * Approvals are this candidate's alone; a held candidate's never carry over.
+ * The age gate on one candidate: dependencies new since the pinned release must
+ * have been public a while. { lock (its pnpm-lock.yaml), reasons (empty when it
+ * passes), young (what held it, for the metrics: null when it couldn't tell),
+ * fastLaned }. Reads git and npm metadata (the fast lane's checks too, for a young
+ * version that would fix an open advisory), never upstream code, so it runs on
+ * every candidate before any is evaluated in full (evaluateChannel).
  */
-async function evaluateCandidate({ ref, sha }, ctx, io) {
+async function ageCheck({ ref, sha }, ctx, io) {
   const reasons = [];
   const fastLaned = [];
+  const lock = io.show(sha, "pnpm-lock.yaml");
+  let young = null;
+  if (!lock || !ctx.baseLock) reasons.push(`no pnpm-lock.yaml at ${lock ? ctx.baseRef : ref}`);
+  else {
+    const deps = await io.dependencyAgeGate(ctx.baseLock, lock, { waive: ctx.waive });
+    young = deps.young.map(({ pkg, publishedAt }) => ({ pkg, publishedAt }));
+    for (const { pkg, publishedAt } of deps.young) reasons.push(`dependency ${pkg} published ${publishedAt}, under ${MIN_AGE_DAYS} days ago`);
+    for (const { pkg, reason } of deps.waived) fastLaned.push(`${pkg}: ${reason}`);
+    for (const pkg of deps.unknown) reasons.push(`dependency ${pkg} has no publish time on npm`);
+    for (const { pkg, why } of deps.substituted ?? []) reasons.push(`dependency ${pkg} ${why}`);
+    if (deps.ok) io.log(`${ref}: ${deps.added} new dependency version(s), all at least ${MIN_AGE_DAYS} days old`);
+  }
+  return { lock, reasons, young, fastLaned };
+}
+
+/**
+ * Evaluates one candidate, with `age` its ageCheck: { reasons (empty when it
+ * passes), cleared (device tool versions it newly needs approved), locks (the
+ * dependency lockfiles to keep for them, and for any tool it pins that was
+ * reviewed without one), fastLaned, leftOut, resolvedLock, stageLocks (the
+ * build's checked staged lockfiles), young }. Approvals are this candidate's
+ * alone; a held candidate's never carry over.
+ */
+async function evaluateCandidate({ ref, sha }, age, ctx, io) {
+  const reasons = [...age.reasons];
+  const fastLaned = [...age.fastLaned];
   const cleared = [];
   const locks = {};
   // Device tools: each version a build installs (upstream's pins, the owner's
@@ -212,20 +249,7 @@ async function evaluateCandidate({ ref, sha }, ctx, io) {
       reasons.push(`device tool ${tool}: no dependency lockfile to keep for it: ${lines(error.message)[0] ?? error}`);
     }
   }
-  // Dependencies new since the pinned release must have been public a while.
-  const lock = io.show(sha, "pnpm-lock.yaml");
-  // What the age gate held, for the metrics: null when it couldn't tell.
-  let young = null;
-  if (!lock || !ctx.baseLock) reasons.push(`no pnpm-lock.yaml at ${lock ? ctx.baseRef : ref}`);
-  else {
-    const deps = await io.dependencyAgeGate(ctx.baseLock, lock, { waive: ctx.waive });
-    young = deps.young.map(({ pkg, publishedAt }) => ({ pkg, publishedAt }));
-    for (const { pkg, publishedAt } of deps.young) reasons.push(`dependency ${pkg} published ${publishedAt}, under ${MIN_AGE_DAYS} days ago`);
-    for (const { pkg, reason } of deps.waived) fastLaned.push(`${pkg}: ${reason}`);
-    for (const pkg of deps.unknown) reasons.push(`dependency ${pkg} has no publish time on npm`);
-    for (const { pkg, why } of deps.substituted ?? []) reasons.push(`dependency ${pkg} ${why}`);
-    if (deps.ok) io.log(`${deps.added} new dependency version(s), all at least ${MIN_AGE_DAYS} days old`);
-  }
+  const lock = age.lock;
   let leftOut = [];
   let resolvedLock = null;
   let stageLocks = null;
@@ -248,7 +272,7 @@ async function evaluateCandidate({ ref, sha }, ctx, io) {
       reasons.push(...lines(error.message).slice(0, 20));
     }
   }
-  return { reasons, cleared, locks, fastLaned, leftOut, resolvedLock, stageLocks, young };
+  return { reasons, cleared, locks, fastLaned, leftOut, resolvedLock, stageLocks, young: age.young };
 }
 
 /**
@@ -266,6 +290,9 @@ async function stageOfPinned({ baseRef, baseSha }, io, report) {
     return null;
   }
 }
+
+/** How the report marks a release held at the age check (ageCheck), before any other gate ran. */
+const BY_AGE = " (held at the age prefilter; no other gate ran)";
 
 /**
  * Evaluates `channel`: { exitCode (0 pinned or already current, 3 every candidate
@@ -369,13 +396,35 @@ export async function evaluateChannel({ channel, pin, ref = null, baseline = nul
     report.push("Already on the newest release.");
     return done({ exitCode: 0, pin: null });
   }
+  // Newest first: the age gate on each, then every gate on the newest MAX_FALLBACK it passes.
   const held = [];
+  const untried = [];
+  let tried = 0;
   for (const candidate of candidates) {
+    let age;
+    try {
+      age = await ageCheck(candidate, ctx, io);
+    } catch (error) {
+      age = { reasons: [`couldn't be evaluated: ${lines(error.message)[0] ?? error}`], young: null };
+    }
+    if (age.reasons.length) {
+      evaluated.push({ ref: candidate.ref, held: true, young: age.young });
+      held.push({ ref: candidate.ref, reasons: age.reasons, byAge: true });
+      io.log(`holding ${candidate.ref} at the age check: ${age.reasons[0]}`);
+      continue;
+    }
+    if (tried === MAX_FALLBACK) {
+      // Passed the age gate but not evaluated further: held this run, though not by age.
+      evaluated.push({ ref: candidate.ref, held: true, young: age.young });
+      untried.push(candidate.ref);
+      continue;
+    }
+    tried++;
     io.log(`evaluating ${candidate.ref}`);
     let result;
     let next;
     try {
-      result = await evaluateCandidate(candidate, ctx, io);
+      result = await evaluateCandidate(candidate, age, ctx, io);
       if (!result.reasons.length) {
         const locks = { ...ctx.locks, ...result.locks };
         next = validatePin({
@@ -387,7 +436,7 @@ export async function evaluateChannel({ channel, pin, ref = null, baseline = nul
       }
     } catch (error) {
       // One candidate failing to evaluate holds it, not the evaluation.
-      result = { ...result, reasons: [`couldn't be evaluated: ${lines(error.message)[0] ?? error}`] };
+      result = { young: age.young, reasons: [`couldn't be evaluated: ${lines(error.message)[0] ?? error}`] };
     }
     evaluated.push({ ref: candidate.ref, held: result.reasons.length > 0, young: result.young ?? null });
     if (result.reasons.length) {
@@ -401,11 +450,12 @@ export async function evaluateChannel({ channel, pin, ref = null, baseline = nul
     if (result.cleared.length) report.push("", `Device tools cleared: ${result.cleared.join(", ")}.`);
     if (result.fastLaned.length) report.push("", "Security fixes taken ahead of the age gate:", ...result.fastLaned.map((line) => `- ${line}`));
     if (result.leftOut.length) report.push("", `Features left out (rules need updating): ${result.leftOut.join(", ")}.`);
-    for (const h of held) report.push("", `Passed over ${h.ref}:`, ...h.reasons.map((reason) => `- ${reason}`));
+    for (const h of held) report.push("", `Passed over ${h.ref}${h.byAge ? BY_AGE : ""}:`, ...h.reasons.map((reason) => `- ${reason}`));
     return done({ exitCode: 0, pin: next });
   }
   report.push("Every newer release was held; the pin stays put.");
-  for (const h of held) report.push("", `## ${h.ref}`, ...h.reasons.map((reason) => `- ${reason}`));
+  for (const h of held) report.push("", `## ${h.ref}${h.byAge ? BY_AGE : ""}`, ...h.reasons.map((reason) => `- ${reason}`));
+  if (untried.length) report.push("", `Not evaluated further, though the age gate passed them (at most ${MAX_FALLBACK} are, newest first): ${untried.join(", ")}.`);
   const alerting = (exposure.open ?? []).filter((a) => isAlerting(a.severity));
   if (alerting.length) report.push("", `The pinned release has ${alerting.length} high or critical advisories open; see the security issues.`);
   return done({ exitCode: 3, pin: null });

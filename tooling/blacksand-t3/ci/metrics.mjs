@@ -45,6 +45,8 @@ export const EVENTS = 30;
 /** The marker's size limit, in characters: half of GitHub's, so the text above it always has room. */
 export const STATE_MAX = 30_000;
 const MAX_TEXT = 300;
+/** The most candidates a run reports: lib/evaluate.mjs MAX_LOOKBACK (kept equal by test/age-gate-metrics.test.mjs). */
+export const MAX_CANDIDATES = 40;
 const HOW_FIX = { "fast-lane": "fast lane", override: "owner override", aged: "aged out" };
 const HOW_SAID = { "fast-lane": "by the fast lane", override: "by an owner override", aged: "by aging out" };
 const HOW_HOLD = new Set(["passed", "superseded"]);
@@ -75,7 +77,7 @@ const tally = (v, keys) => (v && typeof v === "object" ? Object.fromEntries([...
 export function readRun(raw, channel, now = Date.now()) {
   if (!raw || typeof raw !== "object" || raw.v !== 1 || raw.channel !== channel || !isTime(raw.at) || !Array.isArray(raw.candidates) || !Array.isArray(raw.decisions)) return null;
   const tag = (ref) => (isReleaseTag(ref, channel) ? ref : null);
-  const candidates = listOf(raw.candidates, 20, (c) => tag(c?.ref) && typeof c.held === "boolean" && (c.young === null || Array.isArray(c.young))).map((c) => ({
+  const candidates = listOf(raw.candidates, MAX_CANDIDATES, (c) => tag(c?.ref) && typeof c.held === "boolean" && (c.young === null || Array.isArray(c.young))).map((c) => ({
     ref: c.ref,
     held: c.held,
     // How many young versions held it (every one the run named, whatever its text), and those this can show.
