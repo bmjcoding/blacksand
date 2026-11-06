@@ -42,7 +42,7 @@ export function serviceObjects(p: ServiceManifestInput): Obj[] {
           volumeMounts: [{ name: "code", mountPath: "/app", readOnly: true }, { name: "audit", mountPath: "/audit" }],
         }],
         containers: [{ name: "proxy", image: assertPinned(p.image), command: ["timeout", "-s", "TERM", "-k", "10", "930", "node", "/app/src/service.ts", "serve", "/app/config.json"], securityContext: security,
-          ports: [{ name: "https", containerPort: p.port }], readinessProbe: { tcpSocket: { port: "https" }, periodSeconds: 1 },
+          ports: [{ name: "https", containerPort: p.port }], readinessProbe: { exec: { command: ["node", "-e", "const s=require('node:net').connect({host:'127.0.0.1',port:Number(process.argv[1])},()=>{s.destroy();process.exit(0)});s.setTimeout(1000,()=>process.exit(1));s.on('error',()=>process.exit(1));", String(p.port)] }, periodSeconds: 1, timeoutSeconds: 2 },
           resources: { requests: { cpu: "100m", memory: "64Mi", "ephemeral-storage": "8Mi" }, limits: { cpu: "1", memory: "256Mi", "ephemeral-storage": "32Mi" } },
           volumeMounts: [{ name: "code", mountPath: "/app", readOnly: true }, { name: "control", mountPath: "/control", readOnly: true }, { name: "audit", mountPath: "/audit" }, ...p.secrets.map((s, i) => ({ name: `secret-${i}`, mountPath: s.mount, readOnly: true }))],
         }],
