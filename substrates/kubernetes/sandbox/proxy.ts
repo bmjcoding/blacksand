@@ -23,11 +23,11 @@
 
 import { createHash, timingSafeEqual } from "node:crypto";
 import { lookup } from "node:dns/promises";
-import { readFileSync, realpathSync } from "node:fs";
+import { readFileSync, realpathSync, statSync } from "node:fs";
 import * as http from "node:http";
 import * as https from "node:https";
 import { BlockList, connect, isIP, type AddressInfo, type Socket } from "node:net";
-import type { Duplex, Writable } from "node:stream";
+import { Transform, type Duplex, type Writable } from "node:stream";
 
 export interface Allow {
   host: string;
@@ -56,6 +56,39 @@ export interface Route {
   secret_file: string;
   /** The run's grant: the only model ids a request may name. */
   models: string[];
+  /** Service-only transport constraints; run defaults are unchanged. */
+  private?: boolean;
+  ca_file?: string | null;
+}
+
+/** One call an intranet endpoint allows: a method, a path template (`*` one segment, a last `**` the rest), and whether a query string passes. */
+export interface IntranetOperation {
+  id: string;
+  method: string;
+  path: string;
+  query: boolean;
+  /** Closed JSON fields and value restrictions, checked before reading credentials. */
+  body?: JsonGrant;
+}
+
+export interface IntranetEndpoint {
+  name: string;
+  /** scheme://host[:port], as for a route: https in a run (the tests use http on loopback). */
+  origin: string;
+  base_path: string;
+  private: boolean;
+  ca_file: string | null;
+  auth: { kind: "public" } | { kind: "bearer"; token_file: string; audience: string; issuer: string; subject: string; scopes: string[] }
+    | { kind: "oidc"; client_id: string; client_secret_file: string; redirect_uri: string };
+  operations: IntranetOperation[];
+}
+
+/** A deliberately small JSON boundary; the receiver still authorizes every operation. */
+export interface JsonGrant {
+  fields: string[];
+  required: string[];
+  values: Record<string, string[]>;
+  prefixes: Record<string, string>;
 }
 
 export interface Limits {
@@ -78,6 +111,7 @@ export interface ProxyConfig {
   limits: Limits;
   connect: { port: number; allow: Allow[] };
   model: { port: number; routes: Route[] };
+  intranet?: { endpoints: IntranetEndpoint[] };
 }
 
 /** The provider operations a grant can cover, one per route: method, path and the query strings accepted with it. */
@@ -305,6 +339,153 @@ export function backendUrl(route: Route, query: string): URL {
   return url;
 }
 
+// ---- Intranet targets: an endpoint, a path of plain segments, a query ----
+//
+// A segment is plain RFC 3986 pchar characters: no "." or ".." segment, no
+// empty one but a trailing slash, no ";" (servlet servers drop path
+// parameters, so "..;" reads as ".."), and no percent-encoding at all. Any
+// escape is something a server, or a proxy in front of it, decodes before it
+// routes ("%3b", "%2e", "%2f", "%25"…), so the path it acts on wouldn't be the
+// one checked here. A path that needs one isn't supported. The query is RFC
+// 3986 query characters, escapes included: what it means is the endpoint's.
+const SEGMENT = "(?!\\.\\.?(?:[/?]|$))[A-Za-z0-9._~!$&'()*+,=:@-]+";
+const INTRANET_TARGET = new RegExp(`^/intranet/([a-z][a-z0-9-]{0,30})((?:/${SEGMENT})+/?|/)(?:\\?((?:[A-Za-z0-9._~!$&'()*+,;=:@/?-]|%[0-9A-Fa-f]{2})*))?$`);
+
+/** The endpoint, path and query (null without a "?") an intranet request target names; null unless it has exactly that form. */
+export function intranetTarget(target: string): { name: string; path: string; query: string | null } | null {
+  const m = INTRANET_TARGET.exec(target);
+  return m ? { name: m[1] ?? "", path: m[2] ?? "", query: m[3] ?? null } : null;
+}
+
+/** Whether a checked path fits a template: literal segments, `*` one non-empty segment, a last `**` whatever remains; a trailing slash is literal. */
+export function matchTemplate(template: string, path: string): boolean {
+  const want = template.split("/");
+  const got = path.split("/");
+  for (const [i, part] of want.entries()) {
+    if (part === "**" && i === want.length - 1) return true;
+    if (i >= got.length || (part === "*" ? got[i] === "" : part !== got[i])) return false;
+  }
+  return want.length === got.length;
+}
+
+/** The backend URL for an intranet call: the endpoint's configured origin and base path, then the checked path and query. */
+export const intranetUrl = (endpoint: IntranetEndpoint, path: string, query: string | null): URL => {
+  const url = new URL(endpoint.origin);
+  const expected = `${endpoint.base_path}${path}`;
+  url.pathname = expected;
+  url.search = query === null ? "" : `?${query}`;
+  if (url.protocol !== "https:" || url.origin !== endpoint.origin || url.pathname !== expected || !BASE_PATH.test(endpoint.base_path)) throw new Error("invalid-backend");
+  return url;
+};
+
+// ---- The user's token: never verified here (the endpoint does that), only checked to be worth sending ----
+
+/** A JWT's claims: three base64url parts, the middle one a JSON object. Null for anything else. */
+export function jwtClaims(token: string): Json | null {
+  if (!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*$/.test(token)) return null;
+  try {
+    const claims: unknown = JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString("utf8"));
+    return isObject(claims) ? claims : null;
+  } catch {
+    return null;
+  }
+}
+/** `exp` in milliseconds, when it's a number of seconds a Date can hold; else null. */
+export const expiresMs = (claims: Json): number | null => (typeof claims.exp === "number" && claims.exp > 0 && claims.exp < 253_402_300_800 ? claims.exp * 1000 : null);
+/** Whether `aud`, a string or a list, names exactly this audience. */
+export const forAudience = (claims: Json, audience: string): boolean => (Array.isArray(claims.aud) ? claims.aud : [claims.aud]).includes(audience);
+/** A claim fit to log or record: printable ASCII, 1 to 256 characters; else null. */
+export const claimText = (value: unknown): string | null => (typeof value === "string" && /^[\x20-\x7e]{1,256}$/.test(value) ? value : null);
+
+/** Resolve once, check every answer, and hand the numeric address to TLS while
+ * keeping the configured URL hostname for certificate verification and SNI. */
+function checkedLookup(privateAllowed: boolean): NonNullable<https.RequestOptions["lookup"]> {
+  return (hostname, options, callback) => {
+    void lookup(hostname, { all: true, verbatim: true }).then((addresses) => {
+      if (!addresses.length || (!privateAllowed && !addresses.every((a) => isPublic(a.address)))) return callback(new Error("non-public-address"), "", 4);
+      const selected = addresses.find((a) => a.family === 4) ?? addresses[0]!;
+      if (typeof options === "object" && options.all) callback(null, [{ address: selected.address, family: selected.family }]);
+      else callback(null, selected.address, selected.family);
+    }, () => callback(new Error("no-address"), "", 4));
+  };
+}
+
+function grantedJson(value: Json, grant: JsonGrant): boolean {
+  return Object.keys(value).every((k) => grant.fields.includes(k)) && grant.required.every((k) => Object.hasOwn(value, k))
+    && Object.entries(grant.values).every(([k, choices]) => typeof value[k] === "string" && choices.includes(value[k]))
+    && Object.entries(grant.prefixes).every(([k, prefix]) => typeof value[k] === "string" && value[k].startsWith(prefix) && /^[A-Za-z0-9._/-]{1,256}$/.test(value[k]) && !value[k].split("/").some((p) => p === "." || p === ".." || p === ""));
+}
+const exactAudience = (claims: Json, audience: string) => claims.aud === audience || (Array.isArray(claims.aud) && claims.aud.length === 1 && claims.aud[0] === audience);
+const formComponent = (text: string) => new URLSearchParams({ v: text }).toString().slice(2);
+const tlsHost = (url: URL) => url.hostname.replace(/^\[|\]$/g, "");
+function readBoundedSecret(file: string, max: number): string {
+  const stat = statSync(file);
+  if (!stat.isFile() || stat.size > max) throw new Error("credential-unusable");
+  const buffer = readFileSync(file);
+  const text = buffer.toString("utf8").trim();
+  if (buffer.length > max || !/^[\x21-\x7e]+$/.test(text)) throw new Error("credential-unusable");
+  return text;
+}
+// Hex case varies only inside an encoded triplet; the credential's literal
+// letters (including text after an encoded percent sign) remain case-sensitive.
+function percentSpellings(secret: string): RegExp[] {
+  return [encodeURIComponent(secret), formComponent(secret)].map((value) => new RegExp(value
+    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    .replace(/%[0-9A-F]{2}/g, (triplet) => triplet.replace(/[A-F]/g, (hex) => `[${hex}${hex.toLowerCase()}]`))));
+}
+// Streaming model replies keep only a bounded possible-credential suffix.
+// JSON can spell each ASCII byte as six bytes (\u00XX). Normalize escapes
+// across chunks for matching, while forwarding only the original checked bytes.
+function credentialScan(secret: string): Transform {
+  const values = [secret, encodeURIComponent(secret), formComponent(secret), Buffer.from(secret).toString("base64")];
+  const needles = values.map((s) => Buffer.from(s));
+  const percent = percentSpellings(secret);
+  const longest = Math.max(...needles.map((n) => n.length));
+  const keep = longest * 6 + 5;
+  const escapes: Record<string, string> = { '"': '"', "\\": "\\", "/": "/", b: "\b", f: "\f", n: "\n", r: "\r", t: "\t" };
+  let held = Buffer.alloc(0);
+  let escaped = "";
+  let tail = "";
+  const reflected = (text: string, final = false) => {
+    let decoded = "";
+    for (const ch of text) {
+      if (!escaped) {
+        if (ch === "\\") escaped = ch;
+        else decoded += ch;
+      } else if (escaped === "\\") {
+        if (ch === "u") escaped += ch;
+        else { decoded += escapes[ch] ?? `\\${ch}`; escaped = ""; }
+      } else if (/^[0-9a-f]$/i.test(ch)) {
+        escaped += ch;
+        if (escaped.length === 6) { decoded += String.fromCharCode(parseInt(escaped.slice(2), 16)); escaped = ""; }
+      } else {
+        decoded += escaped;
+        escaped = ch === "\\" ? ch : "";
+        if (!escaped) decoded += ch;
+      }
+    }
+    if (final) { decoded += escaped; escaped = ""; }
+    const joined = tail + decoded;
+    if (values.some((v) => joined.includes(v)) || percent.some((pattern) => pattern.test(joined))) return true;
+    tail = joined.slice(Math.max(0, joined.length - longest + 1));
+    return false;
+  };
+  return new Transform({
+    transform(chunk: Buffer, _enc, done) {
+      const joined = Buffer.concat([held, chunk]);
+      const raw = joined.toString("latin1");
+      if (needles.some((n) => joined.includes(n)) || percent.some((pattern) => pattern.test(raw)) || reflected(chunk.toString("latin1"))) return done(new Error("credential-reflected"));
+      const at = Math.max(0, joined.length - keep);
+      held = joined.subarray(at);
+      done(null, joined.subarray(0, at));
+    },
+    flush(done) { if (reflected("", true)) return done(new Error("credential-reflected")); done(null, held); },
+  });
+}
+function reflects(text: string, secrets: string[]): boolean {
+  return secrets.some((s) => [s, JSON.stringify(s).slice(1, -1)].some((v) => text.includes(v)) || percentSpellings(s).some((pattern) => pattern.test(text)));
+}
+
 const sha256 = (text: string) => createHash("sha256").update(text).digest();
 
 /** The run token: x-api-key or Authorization: Bearer on the model listener, Proxy-Authorization: Basic (any user) on CONNECT. */
@@ -327,6 +508,10 @@ export interface ProxyOptions {
   now?: () => number;
   /** Called once the closing marker is written. */
   onSealed?: () => void;
+  /** Service mode uses this synchronous durable sink, never stdout. A throw closes admission. */
+  record?: (line: string) => void;
+  service?: { authority: string; tls: { key: Buffer; cert: Buffer }; context: Record<string, unknown> };
+
 }
 
 export async function startProxy(config: ProxyConfig, options: ProxyOptions = {}) {
@@ -340,23 +525,31 @@ export async function startProxy(config: ProxyConfig, options: ProxyOptions = {}
   // The audit: numbered lines, a byte budget with room kept for the closing
   // marker, and no new work while the output can't keep up.
   const ENTRY_MAX = 600;
+  let auditFailed = false;
   let seq = 0;
   let auditBytes = 0;
   let auditFull = false;
+  let unlogged = 0;
   let waiting = false;
   const write = (entry: Record<string, unknown>) => {
     const line = `${JSON.stringify({ seq: ++seq, t: new Date(now()).toISOString(), run: config.run, ...entry })}\n`;
     auditBytes += Buffer.byteLength(line);
+    if (options.record) {
+      try { options.record(line); } catch { auditFailed = true; queueMicrotask(() => void seal("audit-failed")); }
+      return;
+    }
     if (!out.write(line) && !waiting) {
       waiting = true;
       out.once("drain", () => (waiting = false));
     }
   };
   const log = (entry: Record<string, unknown>) => {
-    if (auditFull) return;
+    if (auditFailed) return;
+    if (auditFull) { unlogged++; return; }
     if (auditBytes + 2 * ENTRY_MAX > limits.audit_bytes) {
       auditFull = true;
       write({ event: "audit-full" });
+      if (options.service) queueMicrotask(() => void seal("audit-full"));
     } else write(entry);
   };
 
@@ -366,7 +559,7 @@ export async function startProxy(config: ProxyConfig, options: ProxyOptions = {}
   const inUse = { connect: 0, model: 0 };
   const active = new Map<number, () => void>();
   /** Why new work is refused right now, or null. */
-  const closedReason = () => (sealing ? "sealed" : now() >= config.expires_at ? "expired" : auditFull ? "audit-full" : waiting ? "audit-backpressure" : null);
+  const closedReason = () => (sealing ? "sealed" : now() >= config.expires_at ? "expired" : auditFailed ? "audit-failed" : auditFull ? "audit-full" : waiting ? "audit-backpressure" : null);
 
   /** One admitted unit of work. `end` logs its one terminal result and frees its slot, however it finishes; `drop` frees a slot never used. */
   function admit(kind: "connect" | "model", id: number) {
@@ -390,6 +583,7 @@ export async function startProxy(config: ProxyConfig, options: ProxyOptions = {}
           if (result !== "ok") cleanup();
         };
         active.set(id, () => end("cancel"));
+        if (auditFailed || auditFull) end("error");
         return end;
       },
     };
@@ -455,7 +649,13 @@ export async function startProxy(config: ProxyConfig, options: ProxyOptions = {}
     client.once("close", () => (socket.destroy(), finish("ok")()));
   });
 
-  const model = http.createServer((req, res) => {
+  const handle: http.RequestListener = (req, res) => {
+    if (options.service && (req.headers.host !== options.service.authority || req.headersDistinct.host?.length !== 1)) {
+      log({ kind: "intranet", op: "unknown", id: ++ids, event: "deny", reason: "bad-host", status: 400 });
+      return void res.writeHead(400, { connection: "close" }).end();
+    }
+    if ((req.url ?? "").startsWith("/intranet/")) return intranet(req, res);
+
     const id = ++ids;
     const matched = matchOperation(req.url ?? "", config.model.routes);
     const op = matched ? OPERATIONS[matched.route.name] : null;
@@ -509,7 +709,8 @@ export async function startProxy(config: ProxyConfig, options: ProxyOptions = {}
       let credential: string;
       try {
         target = backendUrl(matched.route, matched.query);
-        credential = readFileSync(matched.route.secret_file, "utf8").trim();
+        credential = options.service ? readBoundedSecret(matched.route.secret_file, 4096) : readFileSync(matched.route.secret_file, "utf8").trim();
+        if (options.service && isIP(tlsHost(target)) && !matched.route.private && !isPublic(tlsHost(target))) return refuse(403, "non-public-address");
       } catch {
         return refuse(502, "no-backend");
       }
@@ -522,7 +723,11 @@ export async function startProxy(config: ProxyConfig, options: ProxyOptions = {}
       let bytesDown = 0;
       let returned: string | null = null;
       let sniffed = "";
-      const upstream = (target.protocol === "https:" ? https : http).request(target, { method: op.method, headers });
+      let transport: https.RequestOptions = {};
+      try {
+        if (options.service) transport = { lookup: checkedLookup(matched.route.private === true), ...(matched.route.ca_file ? { ca: readFileSync(matched.route.ca_file) } : {}) };
+      } catch { return refuse(502, "no-backend"); }
+      const upstream = (target.protocol === "https:" ? https : http).request(target, { method: op.method, headers, ...transport, agent: false });
       const end = slot.accept({ ...base, model: requested, destination: target.origin }, () => (upstream.destroy(), res.destroy()));
       const finish = (result: Result, status: number | null = null) => {
         clearTimeout(lifetime);
@@ -532,18 +737,31 @@ export async function startProxy(config: ProxyConfig, options: ProxyOptions = {}
       upstream.on("response", (answer) => {
         const back: http.OutgoingHttpHeaders = {};
         for (const name of ["content-type", "request-id", "x-request-id"]) if (answer.headers[name] !== undefined) back[name] = answer.headers[name];
+        if (options.service && (!/^(identity)?$/i.test(String(answer.headers["content-encoding"] ?? "")) || !/^(chunked)?$/i.test(String(answer.headers["transfer-encoding"] ?? "")) || /charset/i.test(String(answer.headers["content-type"] ?? "")) && !/;\s*charset\s*=\s*"?utf-8"?\s*(;|$)/i.test(String(answer.headers["content-type"])))) return finish("error", answer.statusCode ?? null);
+        if (options.service && ((answer.statusCode ?? 502) >= 300 && (answer.statusCode ?? 502) < 400 || reflects(JSON.stringify(back), [credential]))) return finish("error", answer.statusCode ?? null);
         res.writeHead(answer.statusCode ?? 502, back);
         answer.on("data", (chunk: Buffer) => {
           bytesDown += chunk.length;
           if (bytesDown > limits.response_bytes) return finish("limit", answer.statusCode ?? null);
+        });
+        const sample = (chunk: Buffer) => {
           if (sniffed.length < 65_536) {
             sniffed += chunk.subarray(0, 65_536 - sniffed.length).toString("latin1");
             const named = /"model"\s*:\s*"([^"\\]{1,128})"/.exec(sniffed)?.[1];
             if (named && MODEL_ID.test(named)) returned = named;
           }
-        });
-        answer.pipe(res);
-        answer.on("end", () => finish("ok", answer.statusCode ?? null));
+        };
+        if (options.service) {
+          const scan = credentialScan(credential);
+          scan.on("data", sample);
+          scan.on("error", () => finish("error"));
+          answer.pipe(scan).pipe(res);
+          scan.on("end", () => finish("ok", answer.statusCode ?? null));
+        } else {
+          answer.on("data", sample);
+          answer.pipe(res);
+          answer.on("end", () => finish("ok", answer.statusCode ?? null));
+        }
         answer.on("error", () => finish("error", answer.statusCode ?? null));
       });
       upstream.on("error", () => {
@@ -551,9 +769,151 @@ export async function startProxy(config: ProxyConfig, options: ProxyOptions = {}
         finish("error");
       });
       res.once("close", () => finish("cancel")); // after a finished response the end is already logged, so this does nothing
+      if (auditFailed || auditFull) return void upstream.destroy();
       upstream.end(body);
     });
-  });
+  };
+  const model = options.service ? https.createServer({ ...options.service.tls, minVersion: "TLSv1.2", handshakeTimeout: 5000 }, handle) : http.createServer(handle);
+  // Shared terminating route: the configured operation chooses the upstream;
+  // caller headers, credentials and unvalidated bodies never choose authority.
+  function intranet(req: http.IncomingMessage, res: http.ServerResponse) {
+    const id = ++ids;
+    const target = intranetTarget(req.url ?? "");
+    const endpoint = config.intranet?.endpoints.find((e) => e.name === target?.name);
+    const op = target && endpoint?.operations.find((o) => o.method === req.method && matchTemplate(o.path, target.path) && (target.query === null || o.query));
+    const base = { kind: "intranet", op: endpoint && op ? `${endpoint.name}.${op.id}` : "unknown" };
+    const deny = (status: number, reason: string) => {
+      log({ ...base, id, event: "deny", status, reason });
+      if (!res.destroyed) res.writeHead(status, { "content-type": "application/json", connection: "close", "cache-control": "no-store" }).end(JSON.stringify({ error: { type: "blacksand_proxy", message: reason } }));
+    };
+    const closed = closedReason();
+    if (closed) return deny(503, closed);
+    if (!target || !endpoint || !op) return deny(403, "operation-not-allowed");
+    if (!tokenOk(/^Bearer (\S{1,512})$/.exec(req.headers.authorization ?? "")?.[1] ?? null) || req.headersDistinct.authorization?.length !== 1) return deny(401, "bad-run-token");
+    if (inUse.model >= limits.requests_inflight) return deny(503, "too-many-requests");
+    if (requestsTotal >= limits.requests_total) return deny(429, "request-budget-spent");
+    requestsTotal++;
+    const slot = admit("model", id);
+    let upstream: http.ClientRequest | undefined;
+    let stopped = false;
+    const started = now();
+    const end = slot.accept(base, () => { stopped = true; upstream?.destroy(); res.destroy(); req.destroy(); });
+    const timer = setTimeout(() => end("timeout"), limits.request_seconds * 1000);
+    const finish = (result: Result, extra: Record<string, unknown> = {}) => { clearTimeout(timer); stopped = true; end(result, { ms: now() - started, ...extra }); };
+    const refuse = (status: number, reason: string) => {
+      if (stopped) return;
+      // An admitted request has accept/end, never an extra deny for the same id.
+      res.writeHead(status, { "content-type": "application/json", connection: "close", "cache-control": "no-store" }).end(JSON.stringify({ error: { type: "blacksand_proxy", message: reason } }));
+      finish("ok", { status, reason });
+    };
+    res.once("close", () => finish("cancel"));
+    req.once("error", () => finish("error"));
+    if (auditFailed || auditFull) return finish("error");
+    const chunks: Buffer[] = [];
+    let size = 0;
+    req.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > limits.request_bytes) return refuse(413, "request-too-large");
+      if (!stopped) chunks.push(chunk);
+    });
+    req.once("end", () => {
+      if (stopped) return;
+      let body = Buffer.concat(chunks);
+      if (["GET", "HEAD"].includes(op.method)) {
+        if (body.length) return refuse(400, "body-not-allowed");
+      } else {
+        if (!/^application\/json(?:\s*;\s*charset=utf-8)?$/i.test(req.headers["content-type"] ?? "")) return refuse(415, "not-json");
+        let parsed: unknown;
+        try { parsed = JSON.parse(body.toString("utf8")); } catch { return refuse(400, "bad-json"); }
+        if (!isObject(parsed)) return refuse(400, "not-an-object");
+        if (endpoint.auth.kind === "oidc") {
+          if (Object.keys(parsed).some((k) => !["code", "code_verifier"].includes(k)) || typeof parsed.code !== "string" || !/^[\x21-\x7e]{1,4096}$/.test(parsed.code) || typeof parsed.code_verifier !== "string" || !/^[A-Za-z0-9._~-]{43,128}$/.test(parsed.code_verifier)) return refuse(400, "exchange-input");
+        } else if (!op.body || !grantedJson(parsed, op.body)) return refuse(403, "body-not-granted");
+        body = Buffer.from(JSON.stringify(parsed));
+      }
+      let url: URL;
+      let ca: Buffer | undefined;
+      const secrets: string[] = [];
+      const headers: http.OutgoingHttpHeaders = { "accept-encoding": "identity", accept: "application/json" };
+      try {
+        url = intranetUrl(endpoint, target.path, target.query);
+        if (isIP(tlsHost(url)) && !endpoint.private && !isPublic(tlsHost(url))) return refuse(403, "non-public-address");
+        ca = endpoint.ca_file ? readFileSync(endpoint.ca_file) : undefined;
+        if (endpoint.auth.kind === "bearer") {
+          const token = readBoundedSecret(endpoint.auth.token_file, 16384);
+          const claims = jwtClaims(token);
+          const exp = claims && expiresMs(claims);
+          if (!claims || !exp || exp <= now() + 1000 || exp > now() + 3600_000 || claims.iss !== endpoint.auth.issuer || claims.sub !== endpoint.auth.subject || !exactAudience(claims, endpoint.auth.audience) || (claims.nbf !== undefined && (typeof claims.nbf !== "number" || claims.nbf * 1000 > now())) || typeof claims.scope !== "string" || !endpoint.auth.scopes.every((s) => (claims.scope as string).split(" ").includes(s))) return refuse(502, "token-unusable");
+          headers.authorization = `Bearer ${token}`;
+          secrets.push(token);
+        } else if (endpoint.auth.kind === "oidc") {
+          const parsed = JSON.parse(body.toString()) as { code: string; code_verifier: string };
+          const secret = readBoundedSecret(endpoint.auth.client_secret_file, 4096);
+          const basic = Buffer.from(`${formComponent(endpoint.auth.client_id)}:${formComponent(secret)}`).toString("base64");
+          headers.authorization = `Basic ${basic}`;
+          headers["content-type"] = "application/x-www-form-urlencoded";
+          body = Buffer.from(new URLSearchParams({ grant_type: "authorization_code", client_id: endpoint.auth.client_id, redirect_uri: endpoint.auth.redirect_uri, code: parsed.code, code_verifier: parsed.code_verifier }).toString());
+          secrets.push(secret, basic);
+        }
+      } catch { return refuse(502, "no-backend"); }
+      if (endpoint.auth.kind !== "oidc") {
+        // Deliberately narrower than the original intranet header allowlist:
+        // JSON operations need negotiation and conditional writes only.
+        for (const name of ["content-type", "if-match", "if-none-match"]) if (typeof req.headers[name] === "string") headers[name] = req.headers[name];
+      }
+      headers.host = url.host;
+      headers["content-length"] = body.length;
+      try {
+        upstream = https.request(url, { method: op.method, headers, agent: false, lookup: checkedLookup(endpoint.private), ...(ca ? { ca } : {}) });
+      } catch { return refuse(502, "upstream"); }
+      upstream.on("error", () => { if (!stopped) refuse(502, "upstream"); });
+      upstream.once("response", (answer) => {
+        const status = answer.statusCode ?? 502;
+        if (status >= 300 && status < 400) { answer.destroy(); return refuse(502, "upstream-redirect"); }
+        // No compressed/non-ASCII response can bypass reflection checking.
+        const type = String(answer.headers["content-type"] ?? "");
+        if ((op.method !== "HEAD" && !/^application\/json(?:\s*;\s*charset="?utf-8"?)?$/i.test(type)) || !/^(identity)?$/i.test(String(answer.headers["content-encoding"] ?? "")) || !/^(chunked)?$/i.test(String(answer.headers["transfer-encoding"] ?? ""))) { answer.destroy(); return refuse(502, "encoded-response"); }
+        const back: http.OutgoingHttpHeaders = { "content-type": "application/json", "cache-control": "no-store" };
+        for (const name of ["etag", "request-id", "x-request-id"]) if (answer.headers[name] !== undefined) back[name] = answer.headers[name];
+        if (op.method === "HEAD") {
+          if (reflects(JSON.stringify(back), secrets)) { answer.destroy(); return refuse(502, "credential-reflected"); }
+          answer.once("error", () => { if (!stopped) refuse(502, "upstream"); });
+          answer.once("end", () => {
+            if (stopped) return;
+            res.writeHead(status, back).end();
+            finish("ok", { status, bytes_up: body.length, bytes_down: 0 });
+          });
+          answer.resume();
+          return;
+        }
+        const received: Buffer[] = [];
+        let bytes = 0;
+        answer.on("data", (chunk: Buffer) => {
+          bytes += chunk.length;
+          if (bytes > limits.response_bytes) { answer.destroy(); return refuse(502, "response-too-large"); }
+          if (!stopped) received.push(chunk);
+        });
+        answer.once("error", () => { if (!stopped) refuse(502, "upstream"); });
+        answer.once("end", () => {
+          if (stopped) return;
+          const raw = Buffer.concat(received).toString("utf8");
+          let parsed: unknown;
+          try { parsed = JSON.parse(raw); } catch { return refuse(502, "upstream-json"); }
+          if (reflects(raw, secrets) || reflects(JSON.stringify(parsed), secrets) || reflects(JSON.stringify(back), secrets)) return refuse(502, "credential-reflected");
+          if (endpoint.auth.kind === "oidc") {
+            if (status !== 200 || !isObject(parsed) || typeof parsed.id_token !== "string" || parsed.id_token.length > 16384 || !jwtClaims(parsed.id_token)) return refuse(502, "exchange-rejected");
+            parsed = { id_token: parsed.id_token };
+          }
+          // Buffering makes the reflection/body-size decision before ANY response bytes leave.
+          res.writeHead(status, back).end(JSON.stringify(parsed));
+          finish("ok", { status, bytes_up: body.length, bytes_down: bytes });
+        });
+      });
+      if (closedReason()) { upstream.destroy(); return finish("cancel"); }
+      upstream.end(body);
+    });
+  }
+
   model.maxConnections = limits.requests_inflight * 4;
   // Past that, a connection is closed as it arrives; it's still one refusal in the audit.
   model.on("drop", () => log({ kind: "model", op: "unknown", id: ++ids, event: "deny", reason: "too-many-connections", status: 0 }));
@@ -565,14 +925,19 @@ export async function startProxy(config: ProxyConfig, options: ProxyOptions = {}
       else socket.destroy();
     });
   }
-  model.requestTimeout = 120_000;
+  model.requestTimeout = options.service ? limits.request_seconds * 1000 : 120_000;
+  if (options.service) {
+    model.headersTimeout = Math.min(5000, limits.request_seconds * 1000);
+    model.on("connection", (socket) => { const timer = setTimeout(() => socket.destroy(), limits.request_seconds * 1000); socket.once("close", () => clearTimeout(timer)); });
+    model.on("connect", (_req, socket) => socket.destroy());
+  }
 
   /** Refuses new work, ends what's open (each logs its end), then writes the closing marker. */
   function seal(reason: string): Promise<void> {
     sealing ??= (async () => {
       for (const cancel of [...active.values()]) cancel();
       for (let i = 0; (inUse.connect || inUse.model) && i < 100; i++) await new Promise((r) => setTimeout(r, 20));
-      write({ event: "sealed", reason, entries: seq + 1, audit_full: auditFull, unfinished: inUse.connect + inUse.model });
+      write({ event: "sealed", reason, entries: seq + 1, audit_full: auditFull, ...(options.service ? { unlogged, audit_failed: auditFailed } : {}), unfinished: inUse.connect + inUse.model });
       for (const socket of sockets) socket.destroy(); // CONNECT sockets included, which closeAllConnections doesn't reach
       await Promise.all([tunnel, model].map((s) => new Promise<void>((resolve) => s.close(() => resolve()))));
       clearTimeout(expiry);
@@ -590,9 +955,10 @@ export async function startProxy(config: ProxyConfig, options: ProxyOptions = {}
       server.once("error", reject);
       server.listen(port, host, () => resolve((server.address() as AddressInfo).port));
     });
-  const ports = { connect: await listen(tunnel, config.connect.port), model: await listen(model, config.model.port) };
+  const ports = { connect: options.service ? 0 : await listen(tunnel, config.connect.port), model: 0 };
+  try { ports.model = await listen(model, config.model.port); } catch (error) { tunnel.close(); throw error; }
   const expiry = setTimeout(() => void seal("expired"), Math.min(2 ** 31 - 1, Math.max(0, config.expires_at - now())));
-  write({ event: "start", ports, expires_at: new Date(config.expires_at).toISOString(), limits });
+  write({ event: "start", ...(options.service?.context ?? {}), ports, expires_at: new Date(config.expires_at).toISOString(), limits });
   return { ports, seal };
 }
 

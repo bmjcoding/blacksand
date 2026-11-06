@@ -75,6 +75,8 @@ export function readAudit(log: string, run: string): Audit {
         audit.problems.push("the proxy's audit budget ran out");
         break;
       case "sealed":
+        if (e.audit_failed === true) audit.problems.push("the audit sink failed");
+        if (typeof e.unlogged === "number" && e.unlogged > 0) audit.problems.push("audit entries were not retained");
         if (i !== lines.length - 1) audit.problems.push("entries follow the closing marker");
         else if (e.entries !== e.seq) audit.problems.push("the closing marker's count doesn't match");
         else if (e.unfinished !== 0) audit.problems.push("work was still open when the proxy sealed");

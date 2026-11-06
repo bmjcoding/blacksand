@@ -349,3 +349,7 @@ Deep:
 
 `src/longlived.ts` is the interface for an always-on agent: create, attach, and stop,
 on a persistent volume. It isn't implemented yet.
+
+Admin-owned service principals use the same proxy with finite HTTPS epochs,
+file-backed credentials and persisted audit segments. See [Service proxy](SERVICE-PROXY.md)
+for its configuration, capability delivery and Kubernetes packaging contract.
