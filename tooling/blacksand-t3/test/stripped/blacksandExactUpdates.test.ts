@@ -19,6 +19,7 @@ import {
   resolveProviderMaintenanceCapabilitiesEffect,
   type ProviderMaintenanceCapabilities,
 } from "@t3tools/provider-core/server/maintenanceResolver";
+import { onlyExactUpdates } from "@t3tools/provider-core/server/blacksandReleaseAge";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -171,6 +172,24 @@ describe("blacksand: Update all installs exactly a version 3 days old, with ever
     }),
   );
 
+  it.effect("Codex and OpenCode take npm's dated version, never one a lookup of their own names", () =>
+    Effect.gen(function* () {
+      // A lookup upstream might add, naming 1.0.9, a day old on npm.
+      const own = { latestVersion: "1.0.9", lookupLatestVersion: Effect.succeed("1.0.9") };
+      for (const maintenance of [
+        capabilities("codex", "@openai/codex", "/home/me/.codex/packages/standalone/current/bin/codex", ["update"], "codex-native", { env: { CODEX_HOME: "/home/me/.codex" }, ...own }),
+        capabilities("opencode", "opencode-ai", "/home/me/.opencode/bin/opencode", ["upgrade"], "opencode-native", own),
+      ]) {
+        const filtered = onlyExactUpdates(maintenance);
+        const { spawned } = yield* run(filtered);
+        const pinned = spawned.map((call) => call.env?.CODEX_RELEASE ?? call.args.at(-1));
+        assert.deepStrictEqual(pinned, ["1.0.8"], maintenance.update?.lockKey);
+        // npm failing: nothing, not the lookup's version.
+        assert.deepStrictEqual((yield* run(filtered, null)).spawned, [], maintenance.update?.lockKey);
+      }
+    }),
+  );
+
   it.effect("OpenCode and native Claude Code each install exactly that version", () =>
     Effect.gen(function* () {
       for (const [maintenance, args] of [
@@ -211,9 +230,9 @@ describe("blacksand: Update all installs exactly a version 3 days old, with ever
   );
 
   // Muse's launcher takes no version: it installs whatever its channel names when it
-  // runs. Native Grok's `grok update --version` is real, but nothing ties the native
-  // build it downloads to npm's publish times. Both are left to the user, and even
-  // handed a settled version, the runner spawns neither.
+  // runs. A Grok install of no known kind (lock key `grok`) could be any of Grok's
+  // installers; native Grok is grok-native (blacksandGrokUpdates.test.ts). Both are left
+  // to the user, and even handed a settled version, the runner spawns neither.
   const muse = (latestVersion: string | null) =>
     capabilities("muse", null, "/home/me/.local/bin/muse", ["--version"], "muse:/home/me/.local/bin/muse", {
       env: { MUSE_NO_AUTO_UPDATE: "0", MUSE_SYNC_UPDATE: "1", MUSE_UPDATE_INTERVAL_SECONDS: "0" },
@@ -223,7 +242,7 @@ describe("blacksand: Update all installs exactly a version 3 days old, with ever
     env: { npm_config_allow_scripts: "@xai-official/grok" },
   });
 
-  it.effect("never runs Muse's launcher or native Grok's updater, even with a settled version", () =>
+  it.effect("never runs Muse's launcher, or Grok's updater on an install of no known kind, even with a settled version", () =>
     Effect.gen(function* () {
       for (const maintenance of [muse(null), muse("1.2.0-R4"), grok]) {
         const { spawned, last } = yield* run(maintenance);
@@ -236,7 +255,7 @@ describe("blacksand: Update all installs exactly a version 3 days old, with ever
     }),
   );
 
-  it.effect("leaves Muse and native Grok to the user, showing the command and why", () =>
+  it.effect("leaves Muse and a Grok install of no known kind to the user, showing the command and why", () =>
     Effect.gen(function* () {
       for (const maintenance of [muse("1.2.0-R4"), grok]) {
         const left = yield* resolveProviderMaintenanceCapabilitiesEffect({ resolve: () => Effect.succeed(maintenance) }).pipe(
@@ -245,9 +264,11 @@ describe("blacksand: Update all installs exactly a version 3 days old, with ever
         const command = maintenance.update!.command;
         assert.strictEqual(left.update, null);
         assert.strictEqual(left.manualCommand, command);
+        // Grok is on npm, so it's told how to update in one click; Muse isn't.
         assert.strictEqual(
           left.manualReason,
-          `T3 Code (blacksand) doesn't run \`${command}\`: it can't install a specific version, so it can't keep to releases at least 3 days old. Run it yourself when you choose to update.`,
+          `T3 Code (blacksand) doesn't run \`${command}\`: it can't install a specific version, so it can't keep to releases at least 3 days old. Run it yourself when you choose to update.` +
+            (maintenance.packageName ? " To update it in one click, install it with npm or pnpm instead." : ""),
         );
         const { spawned, exit } = yield* run(left);
         assert.deepStrictEqual(spawned, []);
@@ -433,7 +454,7 @@ it.layer(NodeServices.layer)("blacksand: installs left to the user", (it) => {
           canUpdate: false,
           updateCommand: "brew upgrade --cask codex",
           message:
-            "Version 1.0.8 is out. T3 Code (blacksand) doesn't run `brew upgrade --cask codex`: it can't install a specific version, so it can't keep to releases at least 3 days old. Run it yourself when you choose to update.",
+            "Version 1.0.8 is out. T3 Code (blacksand) doesn't run `brew upgrade --cask codex`: it can't install a specific version, so it can't keep to releases at least 3 days old. Run it yourself when you choose to update. To update it in one click, install it with npm or pnpm instead.",
         },
       );
     }).pipe(Effect.scoped),
@@ -447,7 +468,10 @@ it.layer(NodeServices.layer)("blacksand: installs left to the user", (it) => {
     assert.include(read("Drivers/ClaudeMaintenance.ts"), 'nativeUpdate: {\n    args: ["update"],');
     const opencode = read("../../../../packages/provider-opencode/src/server/driver.ts");
     assert.include(opencode, 'nativeUpdate: {\n      args: ["upgrade"],\n      isCommandPath: isOpenCodeNativeCommandPath,');
-    assert.include(read("../../../../packages/provider-grok/src/server/driver.ts"), 'updateArgs: ["update"],\n      updateLockKey: "grok",');
+    assert.include(
+      read("../../../../packages/provider-grok/src/server/driver.ts"),
+      'updateArgs: ["update"],\n      updateLockKey: isGrokDownload(context.realCommandPath) ? "grok-native" : "grok",',
+    );
     assert.include(read("../../../../packages/provider-pi/src/server/driver.ts"), 'nativeUpdate: { args: ["update", "--self"] },');
     assert.include(read("../../../../packages/provider-muse/src/server/maintenance.ts"), 'updateLockKey: `muse:${context.realCommandPath}`,');
   });

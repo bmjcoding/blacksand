@@ -16,10 +16,26 @@
 // releases share version numbers. Muse's channel publishes no release dates, so
 // Muse's check asks nothing (rule provider/muse-version-check-off).
 //
+// A native Grok install asks Grok's own release channel (x.ai/cli/stable), which
+// names one version and no date. Its age counts from when this server first saw
+// that version there (firstSeenChannelVersion): a version this server saw 3 days
+// ago is at least 3 days old. That holds only because Grok's updater installs
+// the exact version it's given; it's never paired with an updater that takes
+// whatever the channel names when it runs.
+//
 // Every one-click update installs exactly the version the check offered
 // (exactUpdateAction, and maintenanceResolver.ts for npm and pnpm), or nothing;
 // an updater that can't is left to the user, with its command and why
 // (onlyExactUpdates).
+
+import * as Clock from "effect/Clock";
+import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
+import * as Semaphore from "effect/Semaphore";
+import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClientResponse from "effect/http/HttpClientResponse";
 
 import type { ProviderMaintenanceCapabilities, ProviderMaintenanceCommandAction } from "./maintenance.ts";
 
@@ -320,24 +336,121 @@ export function newestSettledVersion(
 }
 
 // ---------------------------------------------------------------------------
+// First seen on a vendor's channel, for a channel that names one version and no
+// date. Kept in the server's state directory, so a wait outlasts restarts.
+
+const DAY_MS = 86_400_000;
+
+/** When this server first saw each version on each channel: { [channel]: { [version]: epoch ms } }. */
+const FirstSeenFile = Schema.fromJsonString(Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.Finite)));
+const decodeFirstSeen = Schema.decodeUnknownEffect(FirstSeenFile);
+const encodeFirstSeen = Schema.encodeEffect(FirstSeenFile);
+
+/**
+ * The newest version this server first saw on `channel` at least
+ * MIN_RELEASE_AGE_DAYS ago, and no newer than `version`, the one the channel
+ * names now; null when none is. `version` must be plain x.y.z. It's recorded
+ * the first time it's seen. A channel that has moved back has pulled whatever
+ * was above it: nothing above is offered, and a pulled version named again
+ * waits from then. One check at a time in this server reads and writes the
+ * record; it's written whole to a file of its own, then renamed over the record,
+ * so a reader never sees half of it. A record it can't
+ * read starts every wait over, an entry dated ahead of the clock that version's
+ * wait, and a record it can't write keeps every new version back.
+ */
+const firstSeenLock = Semaphore.makeUnsafe(1);
+let firstSeenWrites = 0;
+
+export const settledSinceFirstSeen = Effect.fn("settledSinceFirstSeen")(function* (input: {
+  readonly file: string;
+  readonly channel: string;
+  readonly version: string;
+}) {
+  const current = /^\d+\.\d+\.\d+$/.test(input.version) ? parseVersion(input.version) : null;
+  if (!current) return null;
+  const fs = yield* FileSystem.FileSystem;
+  const now = yield* Clock.currentTimeMillis;
+  const record = yield* fs.readFileString(input.file).pipe(
+    Effect.flatMap(decodeFirstSeen),
+    Effect.orElseSucceed((): typeof FirstSeenFile.Type => ({})),
+  );
+  const seen = { ...record[input.channel] };
+  const added = !(seen[input.version]! <= now);
+  if (added) seen[input.version] = now;
+  const settled = (version: string) => now - seen[version]! >= MIN_RELEASE_AGE_DAYS * DAY_MS;
+  const newest =
+    Object.keys(seen)
+      .flatMap((version) => {
+        const parsed = parseVersion(version);
+        return parsed && settled(version) && compareVersions(parsed, current) <= 0 ? [{ version, parsed }] : [];
+      })
+      .sort((a, b) => compareVersions(b.parsed, a.parsed))[0]?.version ?? null;
+  // Keep what may still settle, and the version offered; drop the rest, and anything
+  // above the version named now: the channel has pulled it, so it waits again if named again.
+  const kept = Object.fromEntries(
+    Object.entries(seen).filter(([version]) => {
+      const parsed = parseVersion(version);
+      return parsed !== null && compareVersions(parsed, current) <= 0 && (!settled(version) || version === newest);
+    }),
+  );
+  if (added || Object.keys(kept).length < Object.keys(seen).length) {
+    const temp = `${input.file}.${process.pid}.${++firstSeenWrites}.tmp`;
+    yield* encodeFirstSeen({ ...record, [input.channel]: kept }).pipe(
+      Effect.flatMap((text) => fs.writeFileString(temp, text)),
+      Effect.andThen(fs.rename(temp, input.file)),
+      Effect.ignore,
+    );
+  }
+  return newest;
+}, (effect) => firstSeenLock.withPermit(effect));
+
+/**
+ * The version a channel pointer at `url` (a plain-text x.y.z, such as Grok's
+ * https://x.ai/cli/stable) names, once this server has seen it there for
+ * MIN_RELEASE_AGE_DAYS (settledSinceFirstSeen, recorded in `file`). Null when
+ * the channel can't be read in 4 seconds, or names anything else.
+ */
+export const firstSeenChannelVersion = Effect.fn("firstSeenChannelVersion")(function* (url: string, file: string) {
+  const client = yield* HttpClient.HttpClient;
+  const named = yield* client.get(url).pipe(
+    Effect.flatMap(HttpClientResponse.filterStatusOk),
+    Effect.flatMap((response) => response.text),
+    Effect.timeoutOption("4 seconds"),
+    Effect.map((text) => Option.getOrNull(text)?.trim() ?? null),
+    Effect.orElseSucceed(() => null),
+  );
+  return named === null ? null : yield* settledSinceFirstSeen({ file, channel: url, version: named });
+});
+
+// ---------------------------------------------------------------------------
 // One-click updates (Update all). npm and pnpm install exactly the version the
 // check reported, as an exact package spec, and hold the whole install to the
 // minimum age as well (--before, minimum-release-age; maintenanceResolver.ts).
 // Each native updater in EXACT_UPDATES installs an exact version too: the one
-// the check reported, an npm release whose own publish time shows it
-// MIN_RELEASE_AGE_DAYS old (newestSettledVersion). That's an age only where the
-// vendor builds its native and npm releases from the same release, under the
-// same version number, which each entry's source shows. Any other updater is
-// left to the user (onlyExactUpdates): one that takes no version, such as
-// Homebrew's `brew upgrade`, Pi's `pi update --self` or Muse's launcher, whose
-// channel publishes no release dates; native Grok's, whose `--version` is real
-// though nothing yet ties the build it downloads to npm's publish times; and
-// any upstream adds.
+// the check reported. For Claude Code, Codex and OpenCode that's an npm release
+// whose own publish time shows it MIN_RELEASE_AGE_DAYS old
+// (newestSettledVersion), an age only because the vendor builds its native and
+// npm releases from the same release, under the same version number, which each
+// entry's source shows. For native Grok it's the version first seen on Grok's
+// own channel MIN_RELEASE_AGE_DAYS ago (firstSeenChannelVersion), and its
+// updater downloads that build from the same host. Any other updater is left to
+// the user (onlyExactUpdates): one that takes no version, such as Homebrew's
+// `brew upgrade`, Pi's `pi update --self` or Muse's launcher, and any upstream
+// adds.
 
 type UpdateAction = ProviderMaintenanceCommandAction;
 
-/** By lock key: upstream's arguments for each native updater, and its command for one exact version. */
-const EXACT_UPDATES = new Map<string, { readonly args: string; readonly pin: (update: UpdateAction, version: string) => UpdateAction }>([
+type ExactUpdate = {
+  /** Upstream's arguments for the updater. */
+  readonly args: string;
+  /** Its command for exactly one version. */
+  readonly pin: (update: UpdateAction, version: string) => UpdateAction;
+  /** The version is the one first seen on the vendor's channel, which the driver checks; never npm's. */
+  readonly firstSeen?: true;
+};
+
+/** By lock key: each native updater blacksand can make install an exact version. */
+const EXACT_UPDATES = new Map<string, ExactUpdate>([
   // `claude install <version>`, never `claude update` (the newest build, however young).
   ["claudeAgent-native", { args: "update", pin: (update, version) => ({ ...update, args: ["install", version], command: `${update.command.slice(0, -"update".length)}install ${version}` }) }],
   // `codex update` reruns Codex's installer (install.sh, install.ps1), which installs CODEX_RELEASE when it's set.
@@ -345,6 +458,12 @@ const EXACT_UPDATES = new Map<string, { readonly args: string; readonly pin: (up
   // `opencode upgrade <version>`, in both generations, with its background updater off
   // like every other OpenCode process T3 starts (provider/opencode-autoupdate-off).
   ["opencode-native", { args: "upgrade", pin: (update, version) => ({ ...update, args: ["upgrade", version], env: { ...update.env, OPENCODE_DISABLE_AUTOUPDATE: "1" }, command: `${update.command} ${version}` }) }],
+  // `grok update --version <version>` hands the version straight to Grok's installer
+  // (xai-grok-update auto_update.rs, run_update). GROK_INSTALLER=internal makes that the
+  // installer that downloads Grok's own build grok-<version>-<platform> (from x.ai/cli, or
+  // the same name from Grok's storage mirror), whatever installer Grok's config names (rule
+  // provider/grok-native-updates). Its own updater stays off meanwhile.
+  ["grok-native", { args: "update", firstSeen: true, pin: (update, version) => ({ ...update, args: ["update", "--version", version], env: { ...update.env, GROK_INSTALLER: "internal", GROK_DISABLE_AUTOUPDATER: "1" }, command: `GROK_INSTALLER=internal ${update.command} --version ${version}` }) }],
 ]);
 
 const keepsMinimumAge = (lockKey: string) => /^(?:npm-global:|pnpm-global$)/.test(lockKey) || EXACT_UPDATES.has(lockKey);
@@ -366,10 +485,22 @@ export function exactUpdateAction(update: UpdateAction, version: string | null):
  * `capabilities`, unless its updater can't install an exact version: then no
  * update, its command shown for the user to run, and why. Its version check is
  * dropped with it, so what it reports comes from npm, at least
- * MIN_RELEASE_AGE_DAYS old.
+ * MIN_RELEASE_AGE_DAYS old. An updater whose version is first seen on its
+ * vendor's channel has no version until the driver adds that check: never npm's
+ * or upstream's.
  */
 export function onlyExactUpdates(capabilities: ProviderMaintenanceCapabilities): ProviderMaintenanceCapabilities {
   const update = capabilities.update;
+  if (update !== null && EXACT_UPDATES.get(update.lockKey)?.firstSeen) {
+    const { lookupLatestVersion: _lookup, latestVersionCacheKey: _key, ...rest } = capabilities;
+    return { ...rest, latestVersion: null };
+  }
+  // Codex's and OpenCode's versions come from npm, dated, never from a lookup of their
+  // own; native Claude Code's channel stays, as the ceiling (provider/claude-native-updates-minimum-age).
+  if (update !== null && EXACT_UPDATES.has(update.lockKey) && update.lockKey !== "claudeAgent-native") {
+    const { lookupLatestVersion: _lookup, latestVersionCacheKey: _key, latestVersion: _version, ...rest } = capabilities;
+    return rest;
+  }
   if (update === null || keepsMinimumAge(update.lockKey)) return capabilities;
   return {
     provider: capabilities.provider,
@@ -377,6 +508,8 @@ export function onlyExactUpdates(capabilities: ProviderMaintenanceCapabilities):
     update: null,
     ...(capabilities.compareVersions ? { compareVersions: capabilities.compareVersions } : {}),
     manualCommand: update.command,
-    manualReason: `T3 Code (blacksand) doesn't run \`${update.command}\`: it can't install a specific version, so it can't keep to releases at least ${MIN_RELEASE_AGE_DAYS} days old. Run it yourself when you choose to update.`,
+    manualReason:
+      `T3 Code (blacksand) doesn't run \`${update.command}\`: it can't install a specific version, so it can't keep to releases at least ${MIN_RELEASE_AGE_DAYS} days old. Run it yourself when you choose to update.` +
+      (capabilities.packageName ? " To update it in one click, install it with npm or pnpm instead." : ""),
   };
 }

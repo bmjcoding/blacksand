@@ -158,8 +158,11 @@ These are out of scope by design. Nothing in the code tries to cover them.
 - **Vendor self-updaters.** `claude update`, `codex update` and the CLIs'
   auto-updates install the vendors' newest builds, without the 3-day wait. The app's
   Update never runs them that way, and the Claude Code, Grok, OpenCode and Muse processes
-  blacksand-t3 starts run with their background updaters off
-  ([provider updates](../updates/provider-updates.md)). You can still run an updater
+  blacksand-t3 starts run with their background updaters off. Kiro's is a setting you
+  turn off yourself ([provider updates](../updates/provider-updates.md)). For native
+  Grok, the 3 days count from when the server first saw a version on Grok's channel,
+  by the server's clock and its record in the account's state directory. Anyone who
+  can change either can already run code as that account. You can still run an updater
   yourself, and a CLI you start outside blacksand-t3 updates as its own settings say.
   This is an accepted risk.
 - **Hand-made configuration.** This covers unusual things the owner configures by

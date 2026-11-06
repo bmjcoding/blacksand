@@ -43,7 +43,8 @@ What still connects out:
 
 - the agent CLIs, to their own providers
 - automatic provider CLI version checks, which go to the npm registry (a natively
-  installed Claude Code also asks Anthropic's release channel).
+  installed Claude Code also asks Anthropic's release channel, and a natively installed
+  Grok asks Grok's instead of npm).
   They're on by default; turn them off in **Settings → Maintenance → Provider update
   checks**.
 - the server, when it fetches GitHub images for a chat

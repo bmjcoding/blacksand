@@ -106,3 +106,4 @@ www.idpf.org # EPUB OPF XML namespace, compared as a string in the document prev
 www.jsonrpc.org
 www.nayuki.io
 www.w3.org
+x.ai # native Grok's stable channel (https://x.ai/cli/stable), which Grok's updater reads; asked by a blacksand rule, not upstream: Update all pins a version first seen there 3 days ago (rule provider/grok-native-updates)

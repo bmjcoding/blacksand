@@ -853,11 +853,11 @@ export const makeRules = ({ updater, build }) => [
     // Every one-click updater installs exactly the version the check showed 3 days old,
     // or nothing. npm and pnpm take it as an exact package spec, never upstream's
     // `@latest` fallback (their --before and minimum-release-age stay, as defense in
-    // depth); Codex's and OpenCode's native updaters and native Claude Code take it too
-    // (blacksandReleaseAge.ts: exactUpdateAction). One that can't (Homebrew's
-    // `brew upgrade`, Pi's `pi update --self`, Muse's launcher, native Grok, any
-    // upstream adds) is left to the user, saying why (onlyExactUpdates), at the one
-    // place every provider's capabilities are resolved.
+    // depth); Codex's, OpenCode's and Grok's native updaters and native Claude Code take
+    // it too (blacksandReleaseAge.ts: exactUpdateAction). One that can't (Homebrew's
+    // `brew upgrade`, Pi's `pi update --self`, Muse's launcher, a Grok install of no
+    // known kind, any upstream adds) is left to the user, saying why (onlyExactUpdates),
+    // at the one place every provider's capabilities are resolved.
     id: "provider/updates-exact-version",
     why: "Update all installs exactly the version the check showed at least 3 days old, with every installer, or nothing; one that can't install a specific version is left to the user, saying why",
     file: "packages/provider-core/src/server/maintenanceResolver.ts",
@@ -953,6 +953,90 @@ export const makeRules = ({ updater, build }) => [
           "                          ? `T3 Code (blacksand) found no release at least ${MIN_RELEASE_AGE_DAYS} days old to install. Try again later.`\n" +
           "                          : `T3 Code (blacksand) can't make \\`${fresh.update.command}\\` install exactly ${candidateVersion}, so it ran nothing. Run it yourself when you choose to update.`\n" +
           '                        : "The latest provider version is incompatible with this T3 Code release. Review provider settings.",\n',
+      },
+    ],
+  },
+  {
+    // At this pin every Grok install that isn't a Homebrew cask updates with `grok update`,
+    // which on an npm install runs npm itself with no minimum age. An npm or pnpm global
+    // install takes npm's or pnpm's own update instead (provider/updates-minimum-age), as
+    // every other provider's does: exactly the newest @xai-official/grok release npm
+    // shows is 3 days old. Upstream's own resolver finds it, so its tests cover the layouts.
+    id: "provider/grok-npm-updates",
+    why: "A Grok installed with npm or pnpm updates through npm or pnpm, which install exactly a release at least 3 days old; `grok update` there runs npm with no minimum age",
+    file: "packages/provider-grok/src/server/driver.ts",
+    edits: [
+      {
+        find: "  resolveHomebrewProviderMaintenance,\n  resolveProviderMaintenanceCapabilitiesEffect,\n} from \"@t3tools/provider-core/server/maintenanceResolver\";\n",
+        replace:
+          "  resolveHomebrewProviderMaintenance,\n  resolvePackageManagedProviderMaintenance,\n  resolveProviderMaintenanceCapabilitiesEffect,\n" +
+          "} from \"@t3tools/provider-core/server/maintenanceResolver\";\n",
+      },
+      {
+        find:
+          "    return makeProviderMaintenanceCapabilities({\n      provider: DRIVER_KIND,\n      packageName: GROK_NPM_PACKAGE,\n" +
+          "      updateExecutable: context.resolvedCommandPath,\n",
+        replace:
+          "    // blacksand: an npm or pnpm global install updates through npm or pnpm (provider/grok-npm-updates).\n" +
+          "    const packaged = yield* resolvePackageManagedProviderMaintenance(\n" +
+          "      { provider: DRIVER_KIND, npmPackageName: GROK_NPM_PACKAGE, nativeUpdate: null },\n      context,\n    );\n" +
+          '    if (/^(?:npm-global:|pnpm-global$)/.test(packaged.update?.lockKey ?? "")) return packaged;\n' +
+          "    return makeProviderMaintenanceCapabilities({\n      provider: DRIVER_KIND,\n      packageName: GROK_NPM_PACKAGE,\n" +
+          "      updateExecutable: context.resolvedCommandPath,\n",
+      },
+    ],
+  },
+  {
+    // Grok's own installer keeps each build at <GROK_HOME>/downloads/grok-<version>-<platform>
+    // and links ~/.grok/bin/grok to it. Only such an install gets lock key grok-native,
+    // which Update all pins: `GROK_INSTALLER=internal grok update --version <version>`
+    // (blacksandReleaseAge.ts, EXACT_UPDATES). Any other stays `grok`, left to the user.
+    // Its version is the newest one this server first saw at least 3 days ago on the
+    // channel that installer reads, https://x.ai/cli/stable (xai-grok-update version.rs,
+    // fetch_gcs_version), and no newer than the version it names now; never npm's.
+    // Nothing when the channel can't be read, or no version has been seen there that long.
+    id: "provider/grok-native-updates",
+    why: "Update all installs exactly a native Grok build first seen on Grok's own channel at least 3 days ago, or nothing; a Grok install of any other kind isn't run",
+    file: "packages/provider-grok/src/server/driver.ts",
+    edits: [
+      {
+        find: 'import { mergeProviderInstanceEnvironment } from "@t3tools/provider-core/server/instanceEnvironment";\n',
+        replace:
+          'import { mergeProviderInstanceEnvironment } from "@t3tools/provider-core/server/instanceEnvironment";\n' +
+          'import { firstSeenChannelVersion } from "@t3tools/provider-core/server/blacksandReleaseAge";\n',
+      },
+      {
+        find: 'const GROK_NPM_PACKAGE = "@xai-official/grok";\n',
+        replace:
+          'const GROK_NPM_PACKAGE = "@xai-official/grok";\n' +
+          "// blacksand: the stable channel Grok's own installer reads, and a build that installer downloaded\n" +
+          "// (provider/grok-native-updates).\n" +
+          'const GROK_CHANNEL = "https://x.ai/cli/stable";\n' +
+          "const isGrokDownload = (realCommandPath: string) =>\n" +
+          "  /\\/downloads\\/grok-\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.]+)?-(?:macos|linux)-(?:x86_64|aarch64)$/.test(realCommandPath);\n",
+      },
+      {
+        find: '      updateArgs: ["update"],\n      updateLockKey: "grok",\n',
+        replace: '      updateArgs: ["update"],\n      updateLockKey: isGrokDownload(context.realCommandPath) ? "grok-native" : "grok",\n',
+      },
+      {
+        find:
+          "      resolveProviderMaintenanceCapabilitiesEffect(UPDATE, {\n        binaryPath: effectiveConfig.binaryPath,\n        env: processEnv,\n      }).pipe(\n",
+        replace:
+          "      resolveProviderMaintenanceCapabilitiesEffect(UPDATE, {\n        binaryPath: effectiveConfig.binaryPath,\n        env: processEnv,\n      }).pipe(\n" +
+          "        // blacksand: native Grok's version is first seen on Grok's own channel (provider/grok-native-updates).\n" +
+          "        Effect.map((capabilities) =>\n" +
+          '          capabilities.update?.lockKey === "grok-native"\n' +
+          "            ? {\n" +
+          "                ...capabilities,\n" +
+          "                latestVersionCacheKey: GROK_CHANNEL,\n" +
+          '                lookupLatestVersion: firstSeenChannelVersion(GROK_CHANNEL, path.join(host.paths.stateDir, "blacksand-first-seen.json")).pipe(\n' +
+          "                  Effect.provideService(HttpClient.HttpClient, httpClient),\n" +
+          "                  Effect.provideService(FileSystem.FileSystem, fileSystem),\n" +
+          "                ),\n" +
+          "              }\n" +
+          "            : capabilities,\n" +
+          "        ),\n",
       },
     ],
   },

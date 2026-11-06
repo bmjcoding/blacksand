@@ -159,7 +159,9 @@ class FixedDate extends Date {
 
 const releaseAge = (() => {
   const source = fs.readFileSync(new URL("../lib/files/blacksandReleaseAge.ts", import.meta.url), "utf8");
-  const context = { Effect, Date: FixedDate };
+  // The first-seen record's schema, which nothing here reaches.
+  const unused = new Proxy(function () {}, { get: () => unused, apply: () => unused });
+  const context = { Effect, Schema: unused, Semaphore: unused, Date: FixedDate };
   vm.runInNewContext(`${script(source)}\nthis.exports = { newestSettledVersion, exactUpdateAction, onlyExactUpdates };`, context);
   return context.exports;
 })();
