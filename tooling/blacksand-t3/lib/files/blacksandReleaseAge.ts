@@ -11,7 +11,11 @@
 // and npm then installs exactly that version (maintenanceResolver.ts), so the
 // app never offers a release an install would refuse. Muse's channel publishes
 // no release dates, so its age counts from when this server first saw it there
-// (settledSinceFirstSeen).
+// (settledSinceFirstSeen). A native Claude Code install also asks its own
+// release channel (downloads.claude.ai). Its version is only a ceiling: the
+// install is offered the newest npm release at or below it that npm's own
+// publish time shows is MIN_RELEASE_AGE_DAYS old (newestSettledVersion's
+// ceiling). Native and npm releases share version numbers.
 
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
@@ -261,13 +265,20 @@ const sameRelease = (a: SemVer, b: SemVer) => a.main.every((part, i) => part ===
  * `engines`: the Node and npm versions npm checks engines against. The server's
  * Node stands in for the one the provider's npm runs under; npm's own version is
  * unknown here, so engines.npm isn't checked. Unlike npm, a version with no
- * publish time is never taken (npm treats it as old enough), and a version key
- * that isn't strict SemVer is skipped (the registry only publishes strict ones).
+ * valid publish time is never taken (npm treats a missing one as old enough),
+ * and a version key that isn't strict SemVer is skipped (the registry only
+ * publishes strict ones).
+ *
+ * `ceiling`: an exact x.y.z version to stay at or below, such as a native
+ * install's update channel. Below the latest tag it takes the tag's place, so it
+ * too must be a release npm lists with a valid publish time. Null when it isn't
+ * an exact x.y.z version.
  */
 export function newestSettledVersion(
   document: unknown,
   now: number = Date.now(),
   engines: Engines = { node: typeof process === "undefined" ? null : process.version, npm: null },
+  ceiling: string | null = null,
 ): string | null {
   if (!isRecord(document)) return null;
   const { "dist-tags": tags, versions, time } = document;
@@ -275,19 +286,24 @@ export function newestSettledVersion(
   const latest = tags.latest;
   const tagged = parseVersion(latest);
   if (typeof latest !== "string" || !tagged) return null;
+  const capped = ceiling === null ? null : /^\d+\.\d+\.\d+$/.test(ceiling) ? parseVersion(ceiling) : null;
+  if (ceiling !== null && !capped) return null;
+  // The version to stay at or below: the latest tag, or a lower ceiling in its place.
+  const [top, bound] = ceiling !== null && capped && compareVersions(capped, tagged) < 0 ? [ceiling, capped] : [latest, tagged];
   const cutoff = Date.parse(releaseAgeCutoff(now));
   const settled = (version: string) => {
     const published = time[version];
     return typeof published === "string" && Date.parse(published) <= cutoff;
   };
-  // npm reads a tag with no publish time as old enough; this never offers one.
-  if (typeof time[latest] !== "string") return null;
-  if (settled(latest)) return isRecord(versions[latest]) ? latest : null;
+  // npm reads a tag with no publish time as old enough. This offers nothing then, or when the time can't be read.
+  const published = time[top];
+  if (typeof published !== "string" || Number.isNaN(Date.parse(published))) return null;
+  if (settled(top)) return isRecord(versions[top]) ? top : null;
   const candidates = Object.keys(versions).flatMap((version) => {
     const manifest = versions[version];
     const parsed = parseVersion(version);
-    if (!isRecord(manifest) || !parsed || !settled(version) || compareVersions(parsed, tagged) > 0) return [];
-    if (parsed.prerelease.length > 0 && !(tagged.prerelease.length > 0 && sameRelease(parsed, tagged))) return [];
+    if (!isRecord(manifest) || !parsed || !settled(version) || compareVersions(parsed, bound) > 0) return [];
+    if (parsed.prerelease.length > 0 && !(bound.prerelease.length > 0 && sameRelease(parsed, bound))) return [];
     return [{ version, parsed, live: !manifest.deprecated, fits: engineOk(manifest, engines) }];
   });
   // A stable sort, like npm's: equal precedence (build metadata) keeps the document's order.

@@ -5,6 +5,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { ProviderDriverKind } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientResponse from "effect/http/HttpClientResponse";
 
@@ -75,10 +76,11 @@ describe("blacksand release age", () => {
     expect(satisfiesEngine("v20.11.1", "not a range")).toBe(false);
     expect(satisfiesEngine("v20.11.1", 20)).toBe(false);
   });
-  it("reports nothing when nothing qualifies, the tag has no publish time, or the document is malformed", () => {
+  it("reports nothing when nothing qualifies, the tag has no valid publish time, or the document is malformed", () => {
     expect(pick("1.0.0", { "1.0.0": 1 })).toBeNull();
     const undated = doc("1.1.0", { "1.0.0": 30 });
     expect(newestSettledVersion({ ...undated, versions: { ...undated.versions, "1.1.0": {} } }, NOW, NODE)).toBeNull();
+    expect(newestSettledVersion({ ...undated, versions: { ...undated.versions, "1.1.0": {} }, time: { ...undated.time, "1.1.0": "soon" } }, NOW, NODE)).toBeNull();
     expect(newestSettledVersion({ version: "1.0.0" }, NOW)).toBeNull();
     expect(newestSettledVersion(null, NOW)).toBeNull();
   });
@@ -111,6 +113,81 @@ describe("blacksand release age", () => {
       );
       expect(requested).toEqual(["https://registry.npmjs.org/%40openai%2Fcodex"]);
       expect(version).toBe("0.1.0");
+    }),
+  );
+  // Rule provider/claude-native-updates-minimum-age.
+  const nativeDocument = () => {
+    const now = Date.now();
+    return {
+      "dist-tags": { latest: "2.1.318" },
+      versions: { "2.1.309": {}, "2.1.311": {}, "2.1.316": {}, "2.1.318": {} },
+      time: Object.fromEntries(
+        [["2.1.309", 12], ["2.1.311", 1], ["2.1.316", 4], ["2.1.318", 1]].map(([v, days]) => [v, new Date(now - Number(days) * 86_400_000).toISOString()]),
+      ),
+    };
+  };
+  const nativeClaude = (lookupLatestVersion: Effect.Effect<string | null>) =>
+    makeProviderMaintenanceCapabilities({
+      provider: ProviderDriverKind.make("claudeAgent"),
+      packageName: "@anthropic-ai/claude-code",
+      updateExecutable: "/Users/me/.local/bin/claude",
+      updateArgs: ["update"],
+      updateLockKey: "claudeAgent-native",
+      latestVersion: null,
+      lookupLatestVersion,
+    });
+  it.effect("offers a native Claude Code install the newest npm release 3 days old by its own publish time, at most its channel's version", () =>
+    Effect.gen(function* () {
+      const offered = (channel: string | null, status = 200) => {
+        const client = HttpClient.make((request) =>
+          Effect.succeed(HttpClientResponse.fromWeb(request, new Response(JSON.stringify(nativeDocument()), { status }))),
+        );
+        const native = nativeClaude(Effect.succeed(channel));
+        return resolveLatestProviderVersion(native).pipe(
+          Effect.map((version) => ({ version, action: resolveLatestProviderUpdateAction(native, version) })),
+          Effect.provideService(HttpClient.HttpClient, client),
+          Effect.provide(ProviderLatestVersions.layer),
+        );
+      };
+      const capped = yield* offered("2.1.318");
+      expect(capped.version).toBe("2.1.316");
+      expect(capped.action?.args).toEqual(["install", "2.1.316"]);
+      expect(capped.action?.command).toBe("/Users/me/.local/bin/claude install 2.1.316");
+      // 2.1.311 is a day old: the newest release under it that is 3 days old.
+      expect((yield* offered("2.1.311")).version).toBe("2.1.309");
+      expect(yield* offered("2.1.312")).toEqual({ version: null, action: null });
+      expect(yield* offered(null)).toEqual({ version: null, action: null });
+      expect(yield* offered("2.1.318", 500)).toEqual({ version: null, action: null });
+    }),
+  );
+  it.effect("asks a native install's channel with no trace, cookie or authorization headers", () =>
+    Effect.gen(function* () {
+      const sent: Array<Request> = [];
+      const fetch: typeof globalThis.fetch = async (input, init) => {
+        const request = new Request(input, init);
+        sent.push(request);
+        const body = request.url.startsWith("https://downloads.claude.ai/") ? "2.1.318\n" : JSON.stringify(nativeDocument());
+        return new Response(body, { status: 200 });
+      };
+      const version = yield* Effect.gen(function* () {
+        // ClaudeMaintenance.ts's lookup: the server's client, asked for the channel's version.
+        const client = yield* HttpClient.HttpClient;
+        const lookup = client.get("https://downloads.claude.ai/claude-code-releases/stable").pipe(
+          Effect.flatMap((response) => response.text),
+          Effect.map((text) => text.trim()),
+          Effect.orElseSucceed(() => null),
+        );
+        return yield* resolveLatestProviderVersion(nativeClaude(lookup));
+      }).pipe(
+        Effect.withSpan("parent"),
+        Effect.provide(ProviderLatestVersions.layer),
+        Effect.provide(FetchHttpClient.layer),
+        Effect.provideService(FetchHttpClient.Fetch, fetch),
+      );
+      expect(version).toBe("2.1.316");
+      const channel = sent.find((request) => request.url.startsWith("https://downloads.claude.ai/"));
+      expect(channel && new URL(channel.url).pathname).toMatch(/\/(?:latest|stable)$/);
+      for (const header of ["b3", "traceparent", "tracestate", "cookie", "authorization"]) expect(channel?.headers.has(header)).toBe(false);
     }),
   );
 });

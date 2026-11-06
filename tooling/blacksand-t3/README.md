@@ -43,8 +43,9 @@ What still connects out:
 
 - the agent CLIs, to their own providers
 - automatic provider CLI version checks, which go to the npm registry (Muse uses
-  Meta's release channel). They're on by default; turn them off in **Settings →
-  Maintenance → Provider update checks**.
+  Meta's release channel, and a natively installed Claude Code also asks Anthropic's).
+  They're on by default; turn them off in **Settings → Maintenance → Provider update
+  checks**.
 - the server, when it fetches GitHub images for a chat
 - updates: GitHub, the npm registry, Electron's prebuilt runtime, and the advisory
   and release-list services the checks read

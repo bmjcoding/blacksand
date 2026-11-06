@@ -776,6 +776,86 @@ export const makeRules = ({ updater, build }) => [
     ],
   },
   {
+    // A native install (~/.local/bin/claude, lock key claudeAgent-native) updates with
+    // `claude update`, which takes the newest native build however young. Since
+    // 0.1.7-nightly.20261103.4106 its version check asks downloads.claude.ai for the
+    // user's channel (ClaudeMaintenance.ts, the installer's own lookup here); before
+    // that it had none, and the npm check stands alone. Native and npm releases share
+    // version numbers, so the offered version is an npm release whose own publish
+    // time proves its age; the channel's version is only a ceiling.
+    id: "provider/claude-native-updates-minimum-age",
+    why: "Update all on a native Claude Code install runs `claude install <version>`, never `claude update`. The version is the newest npm release at least 3 days old by its own publish time and no higher than the channel's version; nothing when either lookup fails. The channel request sends no trace headers",
+    file: "packages/provider-core/src/server/maintenanceResolver.ts",
+    edits: [
+      {
+        find:
+          "export function resolveLatestProviderUpdateAction(\n" +
+          "  capabilities: ProviderMaintenanceCapabilities,\n" +
+          "  latestVersion: string | null,\n" +
+          "): ProviderMaintenanceCommandAction | null {\n",
+        replace:
+          "/** blacksand: `claude install <version>`, exactly the version the check offered; none without one. */\n" +
+          "function blacksandNativeClaudeInstall(\n" +
+          "  update: ProviderMaintenanceCommandAction,\n" +
+          "  version: string | null,\n" +
+          "): ProviderMaintenanceCommandAction | null {\n" +
+          '  if (version === null || !/^\\d+\\.\\d+\\.\\d+$/.test(version)) return null;\n' +
+          '  if (update.args.join(" ") !== "update" || !update.command.endsWith(" update")) return null;\n' +
+          '  return { ...update, args: ["install", version], command: `${update.command.slice(0, -"update".length)}install ${version}` };\n' +
+          "}\n\n" +
+          "export function resolveLatestProviderUpdateAction(\n" +
+          "  capabilities: ProviderMaintenanceCapabilities,\n" +
+          "  latestVersion: string | null,\n" +
+          "): ProviderMaintenanceCommandAction | null {\n" +
+          '  if (capabilities.update?.lockKey === "claudeAgent-native") {\n' +
+          "    return blacksandNativeClaudeInstall(capabilities.update, latestVersion);\n" +
+          "  }\n",
+      },
+      {
+        // The npm check (provider/updates-minimum-age), optionally at or below a ceiling.
+        find: 'const fetchNpmLatestVersion = Effect.fn("fetchNpmLatestVersion")(function* (packageName: string) {\n',
+        replace:
+          'const fetchNpmLatestVersion = Effect.fn("fetchNpmLatestVersion")(function* (\n' +
+          "  packageName: string,\n" +
+          "  ceiling: string | null = null,\n" +
+          ") {\n",
+      },
+      {
+        find: "  return Option.isSome(payload) ? newestSettledVersion(payload.value) : null;\n",
+        replace: "  return Option.isSome(payload) ? newestSettledVersion(payload.value, undefined, undefined, ceiling) : null;\n",
+      },
+      {
+        find:
+          "  const latestVersions = yield* ProviderLatestVersions.ProviderLatestVersions;\n" +
+          "  const installerKey = installerLatestVersionKey(maintenanceCapabilities);\n",
+        replace:
+          "  const latestVersions = yield* ProviderLatestVersions.ProviderLatestVersions;\n" +
+          "  const installerKey = installerLatestVersionKey(maintenanceCapabilities);\n" +
+          "  // blacksand: a native Claude Code install is offered the newest npm release at least\n" +
+          "  // 3 days old by its own publish time, no higher than its channel's version; nothing\n" +
+          "  // when either lookup fails. Cached under the channel's key, which a refresh clears.\n" +
+          '  if (maintenanceCapabilities.update?.lockKey === "claudeAgent-native") {\n' +
+          "    const npmPackage = maintenanceCapabilities.packageName;\n" +
+          "    if (!npmPackage) return null;\n" +
+          "    const lookup = maintenanceCapabilities.lookupLatestVersion;\n" +
+          "    if (!installerKey || !lookup) {\n" +
+          "      return yield* latestVersions.cached(npmPackage, fetchNpmLatestVersion(npmPackage));\n" +
+          "    }\n" +
+          "    // The channel request names only the channel: no b3 or traceparent header.\n" +
+          "    const channel = lookup.pipe(Effect.provideService(HttpClient.TracerPropagationEnabled, false));\n" +
+          "    return yield* latestVersions.cached(\n" +
+          "      installerKey,\n" +
+          "      Effect.flatMap(channel, (version) =>\n" +
+          "        version !== null && /^\\d+\\.\\d+\\.\\d+$/.test(version)\n" +
+          "          ? fetchNpmLatestVersion(npmPackage, version)\n" +
+          "          : Effect.succeed(null),\n" +
+          "      ),\n" +
+          "    );\n" +
+          "  }\n",
+      },
+    ],
+  },
+  {
     id: "provider/updates-manual-reason",
     why: "Carries why an install is left to the user (provider/updates-minimum-age), so the settings and the update say so",
     file: "packages/provider-core/src/server/maintenance.ts",

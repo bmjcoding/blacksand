@@ -53,6 +53,7 @@ dev.azure.com
 developers.openai.com
 dl.google.com
 docs.github.com
+downloads.claude.ai # native Claude Code channel version lookup; only a ceiling: the offered version is an npm release whose own publish time shows it 3 days old (rule provider/claude-native-updates-minimum-age)
 duckduckgo.com
 example.com # placeholder search URL in Settings -> Integrations
 example.invalid
@@ -83,6 +84,7 @@ play.google.com
 raw.githubusercontent.com
 registry.npmjs.org
 relay.invalid
+schemas.microsoft.com # XML namespace in the generated Windows Group Policy (ADMX) template; never fetched
 schemas.openxmlformats.org # XML namespace URIs the Word preview compares strings against; never fetched
 search.brave.com
 spell.sh
