@@ -533,14 +533,18 @@ test("every shaped edit is text in, text out, and none writes stock T3 guidance"
   }
 });
 
-test("each ungated installer is manual with or without its provider environment, and changed commands stop", () => {
+test("each ungated installer gets Update to latest only, with or without its provider environment, and changed commands stop", () => {
   const id = "provider/updates-minimum-age";
   for (const environment of ["", "      env: context.env,\n"]) {
     const common = RESOLVER_COMMON.replace(/(      updateLockKey: "(?:vite-plus-global|bun-global|yarn-global|volta)",\n)/g, `$1${environment}`);
     const source = RESOLVER_HEAD + common + FETCH_3956 + NPM_VIEW_3956;
     const out = applies(id, source);
-    for (const label of ["Vite+", "bun", "yarn", "Volta"]) assert.ok(out.includes(`return blacksandUngatedInstall(manual, "${label}");`));
-    assert.doesNotMatch(out, /updateExecutable: "(?:vp|bun|yarn|volta)"/);
+    for (const label of ["Vite+", "bun", "yarn", "Volta"]) {
+      assert.ok(out.includes(`return blacksandUngatedInstall(manual, "${label}", makeProviderMaintenanceCapabilities({\n`), label);
+    }
+    // Upstream's install is never returned as it is: only through the wrapper.
+    assert.doesNotMatch(out, /    return makeProviderMaintenanceCapabilities\(\{\n      provider: definition\.provider,\n      packageName,\n      updateExecutable: "(?:vp|bun|yarn|volta)"/);
+    assert.equal(out.match(/updateExecutable: "(?:vp|bun|yarn|volta)"/g).length, 4);
     for (const executable of ["vp", "bun", "yarn", "volta"]) {
       drifts(id, source.replace(`updateExecutable: "${executable}"`, 'updateExecutable: "unknown"'));
     }

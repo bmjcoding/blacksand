@@ -47,6 +47,9 @@ What still connects out:
   Grok asks Grok's instead of npm).
   They're on by default; turn them off in **Settings → Maintenance → Provider update
   checks**.
+- provider CLI updates: blacksand-t3 installs each provider's newest version at least
+  3 days old by itself (turn this off in **Settings → Maintenance → Automatic provider
+  updates**), and runs the vendor's own update when you press **Update to latest**
 - the server, when it fetches GitHub images for a chat
 - updates: GitHub, the npm registry, Electron's prebuilt runtime, and the advisory
   and release-list services the checks read

@@ -91,7 +91,7 @@ test("provider and ACP Registry installs keep to the release age", () => {
   assert.match(acp, /"--exclude-newer", releaseAgeCutoff\(\)/);
 });
 
-test("installers that can't keep to the release age are manual, and ACP agents never run prebuilt binaries", () => {
+test("installers that can't keep to the release age get Update to latest only, and ACP agents never run prebuilt binaries", () => {
   const provider = byId.get("provider/updates-minimum-age").edits;
   const ungated = provider.filter((edit) => edit.alternatives?.every((shape) => shape.replace.includes("return blacksandUngatedInstall(")));
   assert.equal(ungated.length, 4, "each installer has one strict edit");
@@ -99,11 +99,20 @@ test("installers that can't keep to the release age are manual, and ACP agents n
     assert.equal(edit.alternatives.length, 2, "with and without the provider environment");
     for (const shape of edit.alternatives) {
       assert.equal(shape.find.replace(new RegExp(edit.find.source, "g"), edit.replace), shape.replace);
-      assert.doesNotMatch(shape.replace, /makeProviderMaintenanceCapabilities|env:|updateExecutable/);
+      // Upstream's own install, unchanged, handed to the wrapper, which keeps it for Update to latest only.
+      const label = /^    return blacksandUngatedInstall\(manual, "(Vite\+|bun|yarn|Volta)", makeProviderMaintenanceCapabilities\(\{\n/.exec(shape.replace)?.[1];
+      assert.ok(label, shape.replace);
+      const wrapped = shape.find
+        .replace("    return makeProviderMaintenanceCapabilities({\n", `    return blacksandUngatedInstall(manual, "${label}", makeProviderMaintenanceCapabilities({\n`)
+        .replace(/    \}\);\n$/, "    }));\n");
+      assert.equal(shape.replace, wrapped);
     }
   }
   const text = provider.map((edit) => (typeof edit.replace === "string" ? edit.replace : "")).join("\n");
-  assert.match(text, /Update this provider with npm or pnpm, or its own updater\./);
+  // No gated update: the manual capabilities, with upstream's update only as latestUpdate.
+  assert.match(text, /  return \{\n    \.\.\.manual,\n/);
+  assert.match(text, /\.\.\.\(upstream\.update \? \{ latestUpdate: upstream\.update \} : \{\}\)/);
+  assert.match(text, /Use Update to latest to update it now, or install it with npm or pnpm to have it updated automatically\./);
   assert.match(text, /!\/\^\(\?:npm-global:\|pnpm-global\$\)\/\.test\(/, "only npm and pnpm take a targeted install");
   assert.doesNotMatch(text, /bun-global|yarn-global|vite-plus-global/);
   const acp = byId.get("acp-registry/no-prebuilt-binaries").edits.map((edit) => edit.replace).join("\n");

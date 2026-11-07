@@ -1,7 +1,9 @@
-// node --test: every one-click provider update installs exactly the version its check
-// showed at least 3 days old, or is left to the user (lib/files/blacksandReleaseAge.ts:
-// exactUpdateAction, onlyExactUpdates; rules provider/updates-exact-version and
-// provider/grok-native-updates). The module runs in a vm, with no upstream package.
+// node --test: every gated provider update (automatic, Update now, Update all) installs
+// exactly the version its check showed at least 3 days old, or nothing (native Grok's
+// pin aside, which a minimum Grok's own config requires can override), and every updater
+// keeps Update to latest (lib/files/blacksandReleaseAge.ts: exactUpdateAction,
+// onlyExactUpdates, latestUpdate; rules provider/updates-exact-version,
+// provider/grok-native-updates, provider/update-to-latest). The module runs in a vm, with no upstream package.
 // test/stripped/blacksandExactUpdates.test.ts and blacksandGrokUpdates.test.ts run the
 // same code in upstream's checkout, through its update runner.
 import { test } from "node:test";
@@ -20,10 +22,10 @@ const source = fs.readFileSync(new URL("../lib/files/blacksandReleaseAge.ts", im
 const unused = new Proxy(function () {}, { get: () => unused, apply: () => unused });
 const context = { Effect: { fn: () => (body) => body }, Schema: unused, Semaphore: unused };
 vm.runInNewContext(
-  `${stripTypeScriptTypes(source.replace(/^import[^;]*;\n/gm, "").replace(/^export /gm, ""))}\nthis.exports = { exactUpdateAction, onlyExactUpdates, MIN_RELEASE_AGE_DAYS };`,
+  `${stripTypeScriptTypes(source.replace(/^import[^;]*;\n/gm, "").replace(/^export /gm, ""))}\nthis.exports = { exactUpdateAction, onlyExactUpdates, latestUpdate, MIN_RELEASE_AGE_DAYS };`,
   context,
 );
-const { exactUpdateAction, onlyExactUpdates, MIN_RELEASE_AGE_DAYS } = context.exports;
+const { exactUpdateAction, onlyExactUpdates, latestUpdate, MIN_RELEASE_AGE_DAYS } = context.exports;
 // Plain objects, so deepEqual doesn't trip over the vm's own Array and Object.
 const plain = (value) => JSON.parse(JSON.stringify(value));
 
@@ -69,10 +71,24 @@ test("each native updater installs exactly the version offered", () => {
   });
   assert.deepEqual(at("grokNative"), {
     ...UPDATES.grokNative,
-    args: ["update", "--version", "1.4.2"],
-    env: { npm_config_allow_scripts: "@xai-official/grok", GROK_INSTALLER: "internal", GROK_DISABLE_AUTOUPDATER: "1" },
-    command: "GROK_INSTALLER=internal /Users/me/.grok/bin/grok update --version 1.4.2",
+    env: {
+      npm_config_allow_scripts: "@xai-official/grok",
+      GROK_INSTALLER: "internal",
+      GROK_MINIMUM_VERSION: "1.4.2",
+      GROK_MAXIMUM_VERSION: "1.4.2",
+      GROK_DISABLE_AUTOUPDATER: "1",
+    },
+    command: "GROK_INSTALLER=internal GROK_MINIMUM_VERSION=1.4.2 GROK_MAXIMUM_VERSION=1.4.2 /Users/me/.grok/bin/grok update",
   });
+});
+
+test("native Grok's pinned update never takes `--version`, the branch that turns off Grok's own auto-update", () => {
+  // xai-grok-update auto_update.rs, run_update: only the `--version` branch writes
+  // cli.auto_update=false. Plain `grok update` with its range narrowed to one version installs that or nothing, unless Grok requires a newer minimum.
+  const pinned = plain(exactUpdateAction(UPDATES.grokNative, "1.4.2"));
+  assert.deepEqual(pinned.args, ["update"]);
+  assert.doesNotMatch(pinned.command, /--version/);
+  assert.equal(pinned.env.GROK_MINIMUM_VERSION, pinned.env.GROK_MAXIMUM_VERSION);
 });
 
 test("native Grok downloads Grok's own build of that version, with its background updater off, whatever env it was given", () => {
@@ -81,11 +97,13 @@ test("native Grok downloads Grok's own build of that version, with its backgroun
     { KEEP: "yes", GROK_INSTALLER: "npm" },
     { KEEP: "yes", GROK_INSTALLER: "gh-release" },
     { KEEP: "yes", GROK_DISABLE_AUTOUPDATER: "0" },
+    // A range the instance set can't widen it: these are set after its env.
+    { KEEP: "yes", GROK_MINIMUM_VERSION: "0.0.1", GROK_MAXIMUM_VERSION: "99.0.0" },
   ]) {
     const given = Object.freeze({ ...env });
     const pinned = plain(exactUpdateAction({ ...UPDATES.grokNative, env: given }, "1.4.2"));
-    assert.deepEqual(pinned.env, { KEEP: "yes", GROK_INSTALLER: "internal", GROK_DISABLE_AUTOUPDATER: "1" });
-    assert.deepEqual(pinned.args, ["update", "--version", "1.4.2"]);
+    assert.deepEqual(pinned.env, { KEEP: "yes", GROK_INSTALLER: "internal", GROK_MINIMUM_VERSION: "1.4.2", GROK_MAXIMUM_VERSION: "1.4.2", GROK_DISABLE_AUTOUPDATER: "1" });
+    assert.deepEqual(pinned.args, ["update"]);
     assert.deepEqual(given, env);
   }
 });
@@ -138,7 +156,7 @@ test("an updater whose arguments upstream changed installs nothing", () => {
   }
 });
 
-test("an install whose updater can't take a version is left to the user, saying why", () => {
+test("an install whose updater can't take a version gets no gated update, saying why, and keeps Update to latest", () => {
   for (const update of [UPDATES.homebrew, UPDATES.pi, UPDATES.muse, UPDATES.grok, { ...UPDATES.claude, lockKey: "nativeCli-native" }]) {
     const compareVersions = () => 0;
     const left = onlyExactUpdates({
@@ -155,17 +173,20 @@ test("an install whose updater can't take a version is left to the user, saying 
     assert.equal(left.manualCommand, update.command);
     assert.equal(
       left.manualReason,
-      `T3 Code (blacksand) doesn't run \`${update.command}\`: it can't install a specific version, so it can't keep to releases at least 3 days old. Run it yourself when you choose to update. To update it in one click, install it with npm or pnpm instead.`,
+      `T3 Code (blacksand) doesn't run \`${update.command}\` by itself: it can't install a specific version, so it can't keep to releases at least 3 days old. Use Update to latest to run it now. To have it updated automatically, 3 days after each release, install it with npm or pnpm instead.`,
     );
+    // Update to latest runs the vendor's own command, unchanged.
+    assert.equal(left.latestUpdate, update);
     // Its own version check goes with it: what's reported comes from npm, 3 days old.
-    assert.deepEqual(Object.keys(left).sort(), ["compareVersions", "manualCommand", "manualReason", "packageName", "provider", "update"]);
+    assert.deepEqual(Object.keys(left).sort(), ["compareVersions", "latestUpdate", "manualCommand", "manualReason", "packageName", "provider", "update"]);
   }
   // A provider with no npm package (Muse) isn't told to install it with npm.
   const muse = onlyExactUpdates({ provider: "muse", packageName: null, update: UPDATES.muse });
   assert.equal(
     muse.manualReason,
-    `T3 Code (blacksand) doesn't run \`${UPDATES.muse.command}\`: it can't install a specific version, so it can't keep to releases at least 3 days old. Run it yourself when you choose to update.`,
+    `T3 Code (blacksand) doesn't run \`${UPDATES.muse.command}\` by itself: it can't install a specific version, so it can't keep to releases at least 3 days old. Use Update to latest to run it now.`,
   );
+  assert.equal(muse.latestUpdate, UPDATES.muse);
   assert.equal(MIN_RELEASE_AGE_DAYS, 3);
 });
 
@@ -181,8 +202,10 @@ test("native Grok keeps its update, with no version until its driver adds the ch
     compareVersions,
   });
   // Never npm's version, nor any upstream adds: latestVersion null stops the npm fallback.
-  assert.deepEqual(Object.keys(kept).sort(), ["compareVersions", "latestVersion", "packageName", "provider", "update"]);
+  assert.deepEqual(Object.keys(kept).sort(), ["compareVersions", "latestUpdate", "latestVersion", "packageName", "provider", "update"]);
   assert.equal(kept.update, UPDATES.grokNative);
+  // Update to latest is plain `grok update`, the branch that leaves Grok's auto-update setting alone.
+  assert.equal(kept.latestUpdate, UPDATES.grokNative);
   assert.equal(kept.latestVersion, null);
   assert.equal(kept.compareVersions, compareVersions);
 });
@@ -191,14 +214,18 @@ test("an install whose updater installs an exact version, or holds the whole ins
   // npm and pnpm, and native Claude Code, whose channel is only the ceiling for npm's version.
   for (const name of ["claude", "npm", "pnpm"]) {
     const capabilities = { provider: name, packageName: null, update: UPDATES[name], lookupLatestVersion: {} };
-    assert.equal(onlyExactUpdates(capabilities), capabilities, name);
+    const kept = onlyExactUpdates(capabilities);
+    assert.equal(kept.update, UPDATES[name], name);
+    assert.equal(kept.lookupLatestVersion, capabilities.lookupLatestVersion, name);
+    assert.deepEqual(Object.keys(kept).sort(), ["latestUpdate", "lookupLatestVersion", "packageName", "provider", "update"], name);
   }
   // Codex's and OpenCode's versions come from npm, dated: never a lookup or version of their own.
   for (const name of ["codex", "opencode"]) {
     const capabilities = { provider: name, packageName: "pkg", update: UPDATES[name], lookupLatestVersion: {}, latestVersionCacheKey: "k", latestVersion: "9.0.0" };
     const kept = onlyExactUpdates(capabilities);
-    assert.deepEqual(Object.keys(kept).sort(), ["packageName", "provider", "update"], name);
+    assert.deepEqual(Object.keys(kept).sort(), ["latestUpdate", "packageName", "provider", "update"], name);
     assert.equal(kept.update, UPDATES[name]);
+    assert.equal(kept.latestUpdate, UPDATES[name]);
   }
   const manual = { provider: "cursor", packageName: null, update: null };
   assert.equal(onlyExactUpdates(manual), manual);
@@ -215,6 +242,19 @@ test("the rules are strict", () => {
     "provider/opencode-autoupdate-off",
     "provider/claude-autoupdater-off",
     "provider/muse-autoupdate-off",
+    "provider/update-to-latest",
+    "provider/update-to-latest-input",
+    "provider/update-to-latest-advisory",
+    "provider/automatic-updates-file",
+    "provider/automatic-updates",
+    "provider/automatic-updates-idle",
+    "provider/automatic-updates-last-check",
+    "provider/one-update-runner",
+    "provider/automatic-updates-setting",
+    "web/automatic-provider-updates-setting",
+    "web/automatic-provider-updates-search",
+    "web/provider-update-to-latest",
+    "web/provider-update-to-latest-request",
   ]) {
     assert.equal(rules.filter((rule) => rule.id === id).length, 1, id);
     assert.equal(featureIndex(rules).get(id), undefined, `${id} stays strict`);
@@ -226,4 +266,62 @@ test("Grok's channel host is listed, saying why", () => {
   assert.equal(isKnownHost(hostsIn("https://x.ai/cli/stable")[0].host), true);
   assert.match(listed, /^x\.ai # .*first seen .*3 days .*\(rule provider\/grok-native-updates\)$/m);
   assert.equal(isKnownHost("cli.x.ai"), false);
+});
+
+test("Update to latest runs the vendor's own update: upstream's command, without the age flags for npm and pnpm", () => {
+  const cutoff = "--before=2026-11-03T20:00:00Z";
+  const npm = Object.freeze({
+    ...UPDATES.npm,
+    args: Object.freeze(["install", "-g", "--prefix", "/usr/local", "--allow-scripts=@openai/codex", cutoff, "@openai/codex@latest"]),
+    command: `npm install -g --prefix /usr/local --allow-scripts=@openai/codex ${cutoff} @openai/codex@latest`,
+    env: Object.freeze({ PATH: "/usr/bin" }),
+  });
+  assert.deepEqual(plain(latestUpdate(npm)), {
+    ...plain(npm),
+    args: ["install", "-g", "--prefix", "/usr/local", "--allow-scripts=@openai/codex", "@openai/codex@latest"],
+    command: "npm install -g --prefix /usr/local --allow-scripts=@openai/codex @openai/codex@latest",
+  });
+  const pnpm = Object.freeze({
+    ...UPDATES.pnpm,
+    args: Object.freeze(["add", "-g", "--config.minimum-release-age=4320", "--config.minimum-release-age-strict=true", "@openai/codex@latest"]),
+    command: "pnpm add -g --config.minimum-release-age=4320 --config.minimum-release-age-strict=true @openai/codex@latest",
+  });
+  assert.deepEqual(plain(latestUpdate(pnpm)), { ...plain(pnpm), args: ["add", "-g", "@openai/codex@latest"], command: "pnpm add -g @openai/codex@latest" });
+  // The caller's action and env are left as they were.
+  assert.equal(npm.args.length, 7);
+  assert.deepEqual(npm.env, { PATH: "/usr/bin" });
+  // Native updaters run as upstream builds them: `claude update`, `codex update`, `opencode upgrade`, `grok update`.
+  for (const name of ["claude", "codex", "opencode", "grokNative", "grok", "muse", "homebrew", "pi"]) {
+    assert.equal(latestUpdate(UPDATES[name]), UPDATES[name], name);
+  }
+  // Only an npm or pnpm install loses an age flag: elsewhere the words are the vendor's own.
+  const odd = { ...UPDATES.claude, args: ["update", cutoff], command: `${UPDATES.claude.command} ${cutoff}` };
+  assert.equal(latestUpdate(odd), odd);
+});
+
+test("Update to latest is the only ungated command, and only the user runs it", () => {
+  const rules = makeRules({ updater: { node: "/usr/bin/node", launcher: "/opt/blacksand/bin/t3", path: "/usr/bin" }, build: null });
+  const auto = rules.find((rule) => rule.id === "provider/automatic-updates-file").content;
+  // The automatic path asks the runner for the gated update, never latest or a target version.
+  assert.match(auto, /runner\.updateProvider\(\{ provider: driver, instanceId, beforeRun \}\)/);
+  assert.doesNotMatch(auto, /latest: true|targetVersion/);
+  const ui = rules.find((rule) => rule.id === "web/provider-update-to-latest-request").edits.map((edit) => edit.replace).join("");
+  assert.match(ui, /\.\.\.\(latest \? \{ latest: true \} : \{\}\)/);
+  const label = rules.find((rule) => rule.id === "web/provider-update-to-latest").edits.map((edit) => edit.replace).join("");
+  assert.match(label, /without waiting the 3 days/);
+});
+
+test("automatic updates and every socket share the server's one update runner", () => {
+  const rules = makeRules({ updater: { node: "/usr/bin/node", launcher: "/opt/blacksand/bin/t3", path: "/usr/bin" }, build: null });
+  const edits = (id) => rules.find((rule) => rule.id === id).edits.map((edit) => edit.replace).join("");
+  // server.ts builds it once, for the server's lifetime, beside the automatic updates.
+  assert.match(edits("provider/automatic-updates"), /Layer\.provideMerge\(ProviderMaintenanceRunner\.layer\)/);
+  // ws.ts hands each socket that runner instead of building one per socket.
+  const ws = edits("provider/one-update-runner");
+  assert.match(ws, /Layer\.succeed\(ProviderMaintenanceRunner\.ProviderMaintenanceRunner, providerMaintenanceRunner\)/);
+  assert.doesNotMatch(ws, /ProviderMaintenanceRunner\.layer/);
+  // The automatic updates take that runner, never one of their own.
+  const auto = rules.find((rule) => rule.id === "provider/automatic-updates-file").content;
+  assert.match(auto, /yield\* ProviderMaintenanceRunner\.ProviderMaintenanceRunner;/);
+  assert.doesNotMatch(auto, /ProviderMaintenanceRunner\.make\(/);
 });

@@ -19,14 +19,17 @@
 // A native Grok install asks Grok's own release channel (x.ai/cli/stable), which
 // names one version and no date. Its age counts from when this server first saw
 // that version there (firstSeenChannelVersion): a version this server saw 3 days
-// ago is at least 3 days old. That holds only because Grok's updater installs
-// the exact version it's given; it's never paired with an updater that takes
-// whatever the channel names when it runs.
+// ago is at least 3 days old. That holds only because the gated Grok update
+// installs exactly that version or nothing, short of a minimum Grok's own config
+// requires (EXACT_UPDATES); it's never paired with an updater that takes whatever
+// the channel names when it runs.
 //
-// Every one-click update installs exactly the version the check offered
-// (exactUpdateAction, and maintenanceResolver.ts for npm and pnpm), or nothing;
-// an updater that can't is left to the user, with its command and why
-// (onlyExactUpdates).
+// Every update T3 runs by itself, or with Update now, installs exactly the
+// version the check offered (exactUpdateAction, and maintenanceResolver.ts for
+// npm and pnpm), or nothing; an updater that can't isn't run that way, and Settings
+// says why (onlyExactUpdates). The one exception is native Grok's minimum above,
+// which is why T3 never runs that update by itself (docs/updates/provider-updates.md). Update to latest is the user's exception: it runs
+// the vendor's own update to its newest release, with no age gate (latestUpdate).
 
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
@@ -423,20 +426,22 @@ export const firstSeenChannelVersion = Effect.fn("firstSeenChannelVersion")(func
 });
 
 // ---------------------------------------------------------------------------
-// One-click updates (Update all). npm and pnpm install exactly the version the
-// check reported, as an exact package spec, and hold the whole install to the
-// minimum age as well (--before, minimum-release-age; maintenanceResolver.ts).
-// Each native updater in EXACT_UPDATES installs an exact version too: the one
-// the check reported. For Claude Code, Codex and OpenCode that's an npm release
-// whose own publish time shows it MIN_RELEASE_AGE_DAYS old
-// (newestSettledVersion), an age only because the vendor builds its native and
-// npm releases from the same release, under the same version number, which each
-// entry's source shows. For native Grok it's the version first seen on Grok's
-// own channel MIN_RELEASE_AGE_DAYS ago (firstSeenChannelVersion), and its
-// updater downloads that build from the same host. Any other updater is left to
-// the user (onlyExactUpdates): one that takes no version, such as Homebrew's
-// `brew upgrade`, Pi's `pi update --self` or Muse's launcher, and any upstream
-// adds.
+// Gated updates: the ones T3 runs by itself, and Update now / Update all. npm and
+// pnpm install exactly the version the check reported, as an exact package spec,
+// and hold the whole install to the minimum age as well (--before,
+// minimum-release-age; maintenanceResolver.ts). Each native updater in
+// EXACT_UPDATES installs an exact version too: the one the check reported. For
+// Claude Code, Codex and OpenCode that's an npm release whose own publish time
+// shows it MIN_RELEASE_AGE_DAYS old (newestSettledVersion), an age only because
+// the vendor builds its native and npm releases from the same release, under the
+// same version number, which each entry's source shows. For native Grok it's the
+// version first seen on Grok's own channel MIN_RELEASE_AGE_DAYS ago
+// (firstSeenChannelVersion), and its updater downloads that build from the same
+// host. Any other updater gets no gated update (onlyExactUpdates): one that takes
+// no version, such as Homebrew's `brew upgrade`, Pi's `pi update --self` or
+// Muse's launcher, and any upstream adds. Every updater, gated or not, keeps
+// Update to latest (latestUpdate). None of these commands writes the vendor's own
+// auto-update setting (docs/updates/provider-updates.md says what each one leaves).
 
 type UpdateAction = ProviderMaintenanceCommandAction;
 
@@ -458,15 +463,33 @@ const EXACT_UPDATES = new Map<string, ExactUpdate>([
   // `opencode upgrade <version>`, in both generations, with its background updater off
   // like every other OpenCode process T3 starts (provider/opencode-autoupdate-off).
   ["opencode-native", { args: "upgrade", pin: (update, version) => ({ ...update, args: ["upgrade", version], env: { ...update.env, OPENCODE_DISABLE_AUTOUPDATE: "1" }, command: `${update.command} ${version}` }) }],
-  // `grok update --version <version>` hands the version straight to Grok's installer
-  // (xai-grok-update auto_update.rs, run_update). GROK_INSTALLER=internal makes that the
-  // installer that downloads Grok's own build grok-<version>-<platform> (from x.ai/cli, or
-  // the same name from Grok's storage mirror), whatever installer Grok's config names (rule
-  // provider/grok-native-updates). Its own updater stays off meanwhile.
-  ["grok-native", { args: "update", firstSeen: true, pin: (update, version) => ({ ...update, args: ["update", "--version", version], env: { ...update.env, GROK_INSTALLER: "internal", GROK_DISABLE_AUTOUPDATER: "1" }, command: `GROK_INSTALLER=internal ${update.command} --version ${version}` }) }],
+  // `grok update` with Grok's own version range set to exactly <version>
+  // (GROK_MINIMUM_VERSION, GROK_MAXIMUM_VERSION; xai-grok-shell config/resolve/version.rs,
+  // where the environment can only narrow it). Grok clamps the channel's version to that
+  // range: it installs <version>, or nothing when the channel is now below it (xai-grok-update
+  // auto_update.rs, run_update and plan_for), unless Grok's config or environment requires a
+  // higher minimum, which wins (clamp_version). So T3 never runs it by itself, only when the
+  // user presses Update now (blacksandProviderAutoUpdates.ts, runsByItself). Never `--version <version>`: that branch also
+  // writes cli.auto_update=false to the user's Grok config. GROK_INSTALLER=internal makes the
+  // installer the one that downloads Grok's own build grok-<version>-<platform> (from x.ai/cli,
+  // or the same name from Grok's storage mirror), whatever installer Grok's config names (rule
+  // provider/grok-native-updates). Its own background updater stays off meanwhile.
+  ["grok-native", { args: "update", firstSeen: true, pin: (update, version) => ({ ...update, env: { ...update.env, GROK_INSTALLER: "internal", GROK_MINIMUM_VERSION: version, GROK_MAXIMUM_VERSION: version, GROK_DISABLE_AUTOUPDATER: "1" }, command: `GROK_INSTALLER=internal GROK_MINIMUM_VERSION=${version} GROK_MAXIMUM_VERSION=${version} ${update.command}` }) }],
 ]);
 
-const keepsMinimumAge = (lockKey: string) => /^(?:npm-global:|pnpm-global$)/.test(lockKey) || EXACT_UPDATES.has(lockKey);
+const isPackageManager = (lockKey: string) => /^(?:npm-global:|pnpm-global$)/.test(lockKey);
+const keepsMinimumAge = (lockKey: string) => isPackageManager(lockKey) || EXACT_UPDATES.has(lockKey);
+
+/**
+ * Update to latest: the vendor's own update to its newest release, skipping the
+ * MIN_RELEASE_AGE_DAYS wait. That's upstream's command, and for npm and pnpm the
+ * same install without the age flags this file adds (`<package>@latest`).
+ */
+export function latestUpdate(update: UpdateAction): UpdateAction {
+  const aged = (word: string) => word.startsWith("--before=") || word.startsWith("--config.minimum-release-age");
+  if (!isPackageManager(update.lockKey) || !update.args.some(aged)) return update;
+  return { ...update, args: update.args.filter((arg) => !aged(arg)), command: update.command.split(" ").filter((word) => !aged(word)).join(" ") };
+}
 
 /**
  * A native updater's command for exactly `version`, the version the check
@@ -483,25 +506,27 @@ export function exactUpdateAction(update: UpdateAction, version: string | null):
 
 /**
  * `capabilities`, unless its updater can't install an exact version: then no
- * update, its command shown for the user to run, and why. Its version check is
- * dropped with it, so what it reports comes from npm, at least
- * MIN_RELEASE_AGE_DAYS old. An updater whose version is first seen on its
- * vendor's channel has no version until the driver adds that check: never npm's
- * or upstream's.
+ * gated update, its command shown, and why. Its version check is dropped with it,
+ * so what it reports comes from npm, at least MIN_RELEASE_AGE_DAYS old. An updater
+ * whose version is first seen on its vendor's channel has no version until the
+ * driver adds that check: never npm's or upstream's. Every updater keeps Update to
+ * latest (latestUpdate).
  */
 export function onlyExactUpdates(capabilities: ProviderMaintenanceCapabilities): ProviderMaintenanceCapabilities {
   const update = capabilities.update;
-  if (update !== null && EXACT_UPDATES.get(update.lockKey)?.firstSeen) {
+  if (update === null) return capabilities;
+  const latest = { latestUpdate: latestUpdate(update) };
+  if (EXACT_UPDATES.get(update.lockKey)?.firstSeen) {
     const { lookupLatestVersion: _lookup, latestVersionCacheKey: _key, ...rest } = capabilities;
-    return { ...rest, latestVersion: null };
+    return { ...rest, latestVersion: null, ...latest };
   }
   // Codex's and OpenCode's versions come from npm, dated, never from a lookup of their
   // own; native Claude Code's channel stays, as the ceiling (provider/claude-native-updates-minimum-age).
-  if (update !== null && EXACT_UPDATES.has(update.lockKey) && update.lockKey !== "claudeAgent-native") {
+  if (EXACT_UPDATES.has(update.lockKey) && update.lockKey !== "claudeAgent-native") {
     const { lookupLatestVersion: _lookup, latestVersionCacheKey: _key, latestVersion: _version, ...rest } = capabilities;
-    return rest;
+    return { ...rest, ...latest };
   }
-  if (update === null || keepsMinimumAge(update.lockKey)) return capabilities;
+  if (keepsMinimumAge(update.lockKey)) return { ...capabilities, ...latest };
   return {
     provider: capabilities.provider,
     packageName: capabilities.packageName,
@@ -509,7 +534,8 @@ export function onlyExactUpdates(capabilities: ProviderMaintenanceCapabilities):
     ...(capabilities.compareVersions ? { compareVersions: capabilities.compareVersions } : {}),
     manualCommand: update.command,
     manualReason:
-      `T3 Code (blacksand) doesn't run \`${update.command}\`: it can't install a specific version, so it can't keep to releases at least ${MIN_RELEASE_AGE_DAYS} days old. Run it yourself when you choose to update.` +
-      (capabilities.packageName ? " To update it in one click, install it with npm or pnpm instead." : ""),
+      `T3 Code (blacksand) doesn't run \`${update.command}\` by itself: it can't install a specific version, so it can't keep to releases at least ${MIN_RELEASE_AGE_DAYS} days old. Use Update to latest to run it now.` +
+      (capabilities.packageName ? ` To have it updated automatically, ${MIN_RELEASE_AGE_DAYS} days after each release, install it with npm or pnpm instead.` : ""),
+    ...latest,
   };
 }

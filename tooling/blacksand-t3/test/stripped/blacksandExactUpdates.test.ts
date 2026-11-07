@@ -154,7 +154,7 @@ const run = (maintenance: ProviderMaintenanceCapabilities, document: unknown = n
   );
 };
 
-describe("blacksand: Update all installs exactly a version 3 days old, with every installer", () => {
+describe("blacksand: Update all installs exactly a version 3 days old, with every installer (native Grok's minimum aside)", () => {
   const codex = capabilities("codex", "@openai/codex", "/home/me/.codex/packages/standalone/current/bin/codex", ["update"], "codex-native", {
     env: { CODEX_HOME: "/home/me/.codex" },
   });
@@ -264,11 +264,11 @@ describe("blacksand: Update all installs exactly a version 3 days old, with ever
         const command = maintenance.update!.command;
         assert.strictEqual(left.update, null);
         assert.strictEqual(left.manualCommand, command);
-        // Grok is on npm, so it's told how to update in one click; Muse isn't.
+        // Grok is on npm, so it's told how to have it updated automatically; Muse isn't.
         assert.strictEqual(
           left.manualReason,
-          `T3 Code (blacksand) doesn't run \`${command}\`: it can't install a specific version, so it can't keep to releases at least 3 days old. Run it yourself when you choose to update.` +
-            (maintenance.packageName ? " To update it in one click, install it with npm or pnpm instead." : ""),
+          `T3 Code (blacksand) doesn't run \`${command}\` by itself: it can't install a specific version, so it can't keep to releases at least 3 days old. Use Update to latest to run it now.` +
+            (maintenance.packageName ? " To have it updated automatically, 3 days after each release, install it with npm or pnpm instead." : ""),
         );
         const { spawned, exit } = yield* run(left);
         assert.deepStrictEqual(spawned, []);
@@ -278,7 +278,7 @@ describe("blacksand: Update all installs exactly a version 3 days old, with ever
     }),
   );
 
-  it.effect("refuses an install left to the user with its reason, running nothing", () =>
+  it.effect("refuses a gated update for an install with none, with its reason, running nothing", () =>
     Effect.gen(function* () {
       const pi = capabilities("pi", "@earendil-works/pi-coding-agent", "/home/me/.pi/bin/pi", ["update", "--self"], "pi-native");
       const left = yield* resolveProviderMaintenanceCapabilitiesEffect({ resolve: () => Effect.succeed(pi) }).pipe(
@@ -287,12 +287,12 @@ describe("blacksand: Update all installs exactly a version 3 days old, with ever
       const { spawned, exit } = yield* run(left);
       assert.deepStrictEqual(spawned, []);
       assert.ok(Exit.isFailure(exit));
-      assert.include(String(exit.cause), "doesn't run `/home/me/.pi/bin/pi update --self`: it can't install a specific version");
+      assert.include(String(exit.cause), "doesn't run `/home/me/.pi/bin/pi update --self` by itself: it can't install a specific version");
     }),
   );
 });
 
-it.layer(NodeServices.layer)("blacksand: installs left to the user", (it) => {
+it.layer(NodeServices.layer)("blacksand: installs with no gated update", (it) => {
   /** A file at `relative` under a fresh real directory, and that directory. */
   const install = (relative: string, content = "") =>
     Effect.gen(function* () {
@@ -391,7 +391,7 @@ it.layer(NodeServices.layer)("blacksand: installs left to the user", (it) => {
         assert.deepStrictEqual(unpinned.spawned, [], update.lockKey);
         assert.strictEqual(
           unpinned.last?.message,
-          `T3 Code (blacksand) can't make \`${other.update.command}\` install exactly 1.0.8, so it ran nothing. Run it yourself when you choose to update.`,
+          `T3 Code (blacksand) can't make \`${other.update.command}\` install exactly 1.0.8, so it ran nothing. Use Update to latest to run it now.`,
         );
       }
     }).pipe(Effect.scoped),
@@ -449,12 +449,14 @@ it.layer(NodeServices.layer)("blacksand: installs left to the user", (it) => {
         maintenanceCapabilities: brewLeft,
       });
       assert.deepStrictEqual(
-        { canUpdate: advisory.canUpdate, updateCommand: advisory.updateCommand, message: advisory.message },
+        { canUpdate: advisory.canUpdate, canUpdateToLatest: advisory.canUpdateToLatest, updateCommand: advisory.updateCommand, message: advisory.message },
         {
           canUpdate: false,
+          // Update to latest runs `brew upgrade` when the user asks.
+          canUpdateToLatest: true,
           updateCommand: "brew upgrade --cask codex",
           message:
-            "Version 1.0.8 is out. T3 Code (blacksand) doesn't run `brew upgrade --cask codex`: it can't install a specific version, so it can't keep to releases at least 3 days old. Run it yourself when you choose to update. To update it in one click, install it with npm or pnpm instead.",
+            "Version 1.0.8 is out. T3 Code (blacksand) doesn't run `brew upgrade --cask codex` by itself: it can't install a specific version, so it can't keep to releases at least 3 days old. Use Update to latest to run it now. To have it updated automatically, 3 days after each release, install it with npm or pnpm instead.",
         },
       );
     }).pipe(Effect.scoped),

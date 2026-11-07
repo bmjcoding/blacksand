@@ -171,18 +171,18 @@ it.layer(NodeServices.layer)("blacksand installers without a minimum age", (it) 
   const at = (resolved: string, real = resolved) =>
     resolvePackageManagedProviderMaintenance(definition, { binaryPath: "codex", resolvedCommandPath: resolved, realCommandPath: real, env: {}, platform: "darwin" });
 
-  it.effect("leaves bun, yarn, Vite+ and Volta installs to the user, saying why", () =>
+  it.effect("gives bun, yarn, Vite+ and Volta installs no gated update, saying why, and keeps their own for Update to latest", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const volta = yield* fs.makeTempDirectoryScoped({ prefix: "t3b-volta-" });
       yield* fs.makeDirectory(`${volta}/tools/image/packages/@openai/codex`, { recursive: true });
       const installs = [
-        ["bun", yield* at("/Users/me/.bun/bin/codex")],
-        ["yarn", yield* at("/Users/me/.config/yarn/global/node_modules/@openai/codex/bin/codex.js")],
-        ["Vite+", yield* at("/Users/me/.vite-plus/bin/codex")],
-        ["Volta", yield* at(`${volta}/bin/codex`, `${volta}/bin/volta-shim`)],
+        ["bun", yield* at("/Users/me/.bun/bin/codex"), "bun i -g @openai/codex@latest"],
+        ["yarn", yield* at("/Users/me/.config/yarn/global/node_modules/@openai/codex/bin/codex.js"), "yarn global add @openai/codex@latest"],
+        ["Vite+", yield* at("/Users/me/.vite-plus/bin/codex"), "vp i -g @openai/codex"],
+        ["Volta", yield* at(`${volta}/bin/codex`, `${volta}/bin/volta-shim`), "volta install @openai/codex@latest"],
       ] as const;
-      for (const [installer, capabilities] of installs) {
+      for (const [installer, capabilities, latest] of installs) {
         expect(capabilities.update).toBeNull();
         expect(capabilities.manualReason).toContain(`installed with ${installer}`);
         const advisory = createProviderVersionAdvisory({
@@ -191,9 +191,11 @@ it.layer(NodeServices.layer)("blacksand installers without a minimum age", (it) 
           latestVersion: "1.2.0",
           maintenanceCapabilities: capabilities,
         });
-        expect(advisory).toMatchObject({ status: "behind_latest", canUpdate: false, canInstallVersion: false, updateCommand: null });
+        expect(advisory).toMatchObject({ status: "behind_latest", canUpdate: false, canInstallVersion: false, canUpdateToLatest: true, updateCommand: null });
         expect(advisory.message).toBe(`Version 1.2.0 is out. ${capabilities.manualReason}`);
-        expect(advisory.message).toContain("Update this provider with npm or pnpm, or its own updater.");
+        expect(advisory.message).toContain("Use Update to latest to update it now, or install it with npm or pnpm to have it updated automatically.");
+        // Upstream's own install, run only by Update to latest.
+        expect(capabilities.latestUpdate?.command).toBe(latest);
       }
     }).pipe(Effect.scoped),
   );

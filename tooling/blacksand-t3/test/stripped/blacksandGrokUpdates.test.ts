@@ -2,8 +2,9 @@
 // (rules provider/grok-native-updates, provider/grok-npm-updates,
 // provider/updates-exact-version, provider/release-age-file): what Update all runs for each
 // kind of Grok install, through upstream's Grok driver and update runner. A build Grok's own
-// installer downloaded gets exactly the version first seen on Grok's channel 3 days ago; an
-// npm or pnpm global install goes through npm or pnpm; any other is left to the user.
+// installer downloaded gets its range pinned to the version first seen on Grok's channel 3 days
+// ago (a minimum Grok's own config requires still wins, so it never updates by itself); an
+// npm or pnpm global install goes through npm or pnpm; any other gets Update to latest only.
 // Install fixtures are real files, and npm's publish times real dates:
 // @effect-diagnostics nodeBuiltinImport:off
 // @effect-diagnostics globalDate:off
@@ -205,7 +206,7 @@ it.layer(layer)("blacksand: Update all for each kind of Grok install", (it) => {
     return now;
   });
 
-  it.effect("a build Grok's installer downloaded installs exactly the version first seen on Grok's channel 3 days ago", () =>
+  it.effect("a build Grok's installer downloaded is pinned to the version first seen on Grok's channel 3 days ago", () =>
     Effect.gen(function* () {
       const now = yield* reset;
       const { binaryPath, maintenance, record } = yield* native;
@@ -215,7 +216,11 @@ it.layer(layer)("blacksand: Update all for each kind of Grok install", (it) => {
       const { spawned, asked, last } = yield* run(maintenance);
       assert.strictEqual(spawned.length, 1);
       assert.strictEqual(spawned[0]!.command, binaryPath);
-      assert.deepStrictEqual(spawned[0]!.args, ["update", "--version", "1.0.8"]);
+      // Plain `grok update` with Grok's own range narrowed to 1.0.8: that build, or nothing,
+      // unless Grok requires a newer minimum. Never `--version`, which also writes cli.auto_update=false to Grok's config.
+      assert.deepStrictEqual(spawned[0]!.args, ["update"]);
+      assert.strictEqual(spawned[0]!.env?.GROK_MINIMUM_VERSION, "1.0.8");
+      assert.strictEqual(spawned[0]!.env?.GROK_MAXIMUM_VERSION, "1.0.8");
       // Grok's own build of that version; npm 12 still lets Grok's npm postinstall run.
       assert.strictEqual(spawned[0]!.env?.GROK_INSTALLER, "internal");
       // Grok's own updater stays off while it installs (provider/grok-autoupdater-off).
@@ -232,7 +237,7 @@ it.layer(layer)("blacksand: Update all for each kind of Grok install", (it) => {
     }).pipe(Effect.scoped),
   );
 
-  it.effect("runs nothing while the version was first seen under 3 days ago, then exactly that one", () =>
+  it.effect("runs nothing while the version was first seen under 3 days ago, then pins that one", () =>
     Effect.gen(function* () {
       yield* reset;
       const { maintenance } = yield* native;
@@ -244,7 +249,7 @@ it.layer(layer)("blacksand: Update all for each kind of Grok install", (it) => {
       }
       yield* TestClock.adjust(1);
       const { spawned } = yield* run(maintenance);
-      assert.deepStrictEqual(spawned.map((call) => call.args), [["update", "--version", "1.0.9"]]);
+      assert.deepStrictEqual(spawned.map((call) => [call.args, call.env?.GROK_MINIMUM_VERSION, call.env?.GROK_MAXIMUM_VERSION]), [[["update"], "1.0.9", "1.0.9"]]);
     }).pipe(Effect.scoped),
   );
 
@@ -296,7 +301,7 @@ it.layer(layer)("blacksand: Update all for each kind of Grok install", (it) => {
     }).pipe(Effect.scoped),
   );
 
-  it.effect("any other Grok install is left to the user, showing `grok update` and why", () =>
+  it.effect("any other Grok install gets no gated update, showing `grok update` and why", () =>
     Effect.gen(function* () {
       yield* reset;
       for (const relative of ["tools/grok", ".grok/downloads/grok-latest", "Downloads/grok-1.0.0-macos-aarch64"]) {
@@ -305,7 +310,7 @@ it.layer(layer)("blacksand: Update all for each kind of Grok install", (it) => {
         assert.strictEqual(maintenance.manualCommand, `${binaryPath} update`);
         assert.strictEqual(
           maintenance.manualReason,
-          `T3 Code (blacksand) doesn't run \`${binaryPath} update\`: it can't install a specific version, so it can't keep to releases at least 3 days old. Run it yourself when you choose to update. To update it in one click, install it with npm or pnpm instead.`,
+          `T3 Code (blacksand) doesn't run \`${binaryPath} update\` by itself: it can't install a specific version, so it can't keep to releases at least 3 days old. Use Update to latest to run it now. To have it updated automatically, 3 days after each release, install it with npm or pnpm instead.`,
         );
         const { spawned } = yield* run(maintenance);
         assert.deepStrictEqual(spawned, [], relative);

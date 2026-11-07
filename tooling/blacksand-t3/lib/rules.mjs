@@ -668,7 +668,7 @@ export const makeRules = ({ updater, build }) => [
     // outbound calls (the owner updates providers with Update all). They report
     // only releases 3 days old, the one npm would pick (blacksandReleaseAge.ts).
     id: "provider/updates-minimum-age",
-    why: "Settings -> Providers -> Update all installs @latest; hold back versions under 3 days old, as the build pipeline does, install exactly the version the check reported, and leave installers that can't age-gate a provider's dependencies (bun, yarn, Volta, Vite+) to the user",
+    why: "Settings -> Providers -> Update all installs @latest; hold back versions under 3 days old, as the build pipeline does, install exactly the version the check reported (short of a minimum native Grok requires), and leave installers that can't age-gate a provider's dependencies (bun, yarn, Volta, Vite+) to the user",
     file: "packages/provider-core/src/server/maintenanceResolver.ts",
     edits: [
       {
@@ -712,26 +712,31 @@ export const makeRules = ({ updater, build }) => [
         ["yarn", "[\"global\", \"add\", `${packageName}@latest`]", "yarn-global", "yarn"],
         ["volta", "[\"install\", `${packageName}@latest`]", "volta", "Volta"],
       ].map(([executable, args, lockKey, label]) =>
-        shapes(...["", "      env: context.env,\n"].map((environment) => ({
-          find:
-            "    return makeProviderMaintenanceCapabilities({\n" +
+        shapes(...["", "      env: context.env,\n"].map((environment) => {
+          const options =
             "      provider: definition.provider,\n      packageName,\n" +
             `      updateExecutable: "${executable}",\n      updateArgs: ${args},\n      updateLockKey: "${lockKey}",\n` +
-            environment + "    });\n",
-          replace: `    return blacksandUngatedInstall(manual, "${label}");\n`,
-        }))),
+            environment;
+          return {
+            find: `    return makeProviderMaintenanceCapabilities({\n${options}    });\n`,
+            // Upstream's own install stays, for Update to latest only.
+            replace: `    return blacksandUngatedInstall(manual, "${label}", makeProviderMaintenanceCapabilities({\n${options}    }));\n`,
+          };
+        })),
       ),
       {
         find: "function manualUpdateMessage(latestVersion: string, installPath: string | undefined): string {\n",
         replace:
-          "/** blacksand: an install whose installer can't keep its dependencies to the minimum age. */\n" +
+          "/** blacksand: an install whose installer can't keep its dependencies to the minimum age: Update to latest only. */\n" +
           "function blacksandUngatedInstall(\n" +
           "  manual: ProviderMaintenanceCapabilities,\n" +
           "  installer: string,\n" +
+          "  upstream: ProviderMaintenanceCapabilities,\n" +
           "): ProviderMaintenanceCapabilities {\n" +
           "  return {\n" +
           "    ...manual,\n" +
-          "    manualReason: `T3 Code (blacksand) doesn't update a provider installed with ${installer}, which can't hold its dependencies to the ${MIN_RELEASE_AGE_DAYS}-day minimum release age. Update this provider with npm or pnpm, or its own updater.`,\n" +
+          "    manualReason: `T3 Code (blacksand) doesn't update a provider installed with ${installer} by itself: ${installer} can't hold its dependencies to the ${MIN_RELEASE_AGE_DAYS}-day minimum release age. Use Update to latest to update it now, or install it with npm or pnpm to have it updated automatically.`,\n" +
+          "    ...(upstream.update ? { latestUpdate: upstream.update } : {}),\n" +
           "  };\n" +
           "}\n\n" +
           "function manualUpdateMessage(latestVersion: string, installPath: string | undefined): string {\n",
@@ -850,16 +855,17 @@ export const makeRules = ({ updater, build }) => [
     ],
   },
   {
-    // Every one-click updater installs exactly the version the check showed 3 days old,
-    // or nothing. npm and pnpm take it as an exact package spec, never upstream's
-    // `@latest` fallback (their --before and minimum-release-age stay, as defense in
-    // depth); Codex's, OpenCode's and Grok's native updaters and native Claude Code take
-    // it too (blacksandReleaseAge.ts: exactUpdateAction). One that can't (Homebrew's
-    // `brew upgrade`, Pi's `pi update --self`, Muse's launcher, a Grok install of no
-    // known kind, any upstream adds) is left to the user, saying why (onlyExactUpdates),
-    // at the one place every provider's capabilities are resolved.
+    // Every gated update (automatic, Update now, Update all) installs exactly the version the
+    // check showed 3 days old, or nothing, short of a minimum native Grok's own config requires
+    // (docs/updates/provider-updates.md), which is why native Grok never updates by itself. npm and pnpm take it as an exact package spec,
+    // never upstream's `@latest` fallback (their --before and minimum-release-age stay, as
+    // defense in depth); Codex's, OpenCode's and Grok's native updaters and native Claude
+    // Code take it too (blacksandReleaseAge.ts: exactUpdateAction). One that can't (Homebrew's
+    // `brew upgrade`, Pi's `pi update --self`, Muse's launcher, a Grok install of no known
+    // kind, any upstream adds) gets no gated update, saying why, and keeps Update to latest
+    // (onlyExactUpdates), at the one place every provider's capabilities are resolved.
     id: "provider/updates-exact-version",
-    why: "Update all installs exactly the version the check showed at least 3 days old, with every installer, or nothing; one that can't install a specific version is left to the user, saying why",
+    why: "Every gated update installs exactly the version the check showed at least 3 days old, with every installer, or nothing, short of a minimum native Grok requires; one that can't install a specific version gets Update to latest only, saying why",
     file: "packages/provider-core/src/server/maintenanceResolver.ts",
     edits: [
       {
@@ -907,7 +913,7 @@ export const makeRules = ({ updater, build }) => [
           "    readonly env?: NodeJS.ProcessEnv;\n" +
           "  },\n" +
           ") {\n" +
-          "  // blacksand: an updater that can't install an exact version is left to the user.\n" +
+          "  // blacksand: an updater that can't install an exact version gets Update to latest only.\n" +
           "  const resolver: ProviderMaintenanceCapabilitiesResolver = {\n" +
           "    resolve: (context) => Effect.map(providerResolver.resolve(context), onlyExactUpdates),\n" +
           "  };\n",
@@ -916,7 +922,7 @@ export const makeRules = ({ updater, build }) => [
   },
   {
     id: "provider/updates-manual-reason",
-    why: "Carries why an install is left to the user (provider/updates-minimum-age), so the settings and the update say so",
+    why: "Carries why an install gets no gated update (provider/updates-minimum-age), so the settings and the update say so, and the vendor's own update for Update to latest",
     file: "packages/provider-core/src/server/maintenance.ts",
     edits: [
       shapes(...[
@@ -924,7 +930,12 @@ export const makeRules = ({ updater, build }) => [
         "  readonly installPath?: string;\n  /** Displayed for manual updates; never executed by T3 Code. */\n  readonly manualCommand?: string;\n}\n",
       ].map((find) => ({
         find,
-        replace: find.replace("\n}\n", "\n  /** blacksand: why blacksand-t3 leaves this install to the user, in place of the generic advice. */\n  readonly manualReason?: string;\n}\n"),
+        replace: find.replace(
+          "\n}\n",
+          "\n  /** blacksand: why blacksand-t3 leaves this install to the user, in place of the generic advice. */\n  readonly manualReason?: string;\n" +
+            "  /** blacksand: the vendor's own update to its newest release, run only by Update to latest (no age gate). */\n" +
+            "  readonly latestUpdate?: ProviderMaintenanceCommandAction;\n}\n",
+        ),
       }))),
     ],
   },
@@ -951,8 +962,522 @@ export const makeRules = ({ updater, build }) => [
           "                      : !rejected\n" +
           "                        ? candidateVersion === null\n" +
           "                          ? `T3 Code (blacksand) found no release at least ${MIN_RELEASE_AGE_DAYS} days old to install. Try again later.`\n" +
-          "                          : `T3 Code (blacksand) can't make \\`${fresh.update.command}\\` install exactly ${candidateVersion}, so it ran nothing. Run it yourself when you choose to update.`\n" +
+          "                          : `T3 Code (blacksand) can't make \\`${update.command}\\` install exactly ${candidateVersion}, so it ran nothing. Use Update to latest to run it now.`\n" +
           '                        : "The latest provider version is incompatible with this T3 Code release. Review provider settings.",\n',
+      },
+    ],
+  },
+  {
+    // The owner's exception to the 3-day gate: Update to latest, an explicit action per
+    // provider, runs the vendor's own update to its newest release (capabilities.latestUpdate,
+    // blacksandReleaseAge.ts: latestUpdate): upstream's command, and for npm and pnpm the same
+    // install without the age flags. Every updater gets it, including those with no gated
+    // update (Homebrew's `brew upgrade`, Pi's `pi update --self`, Muse's launcher). It never
+    // runs on its own, and it skips upstream's "already current" check, which compares against
+    // the settled version.
+    id: "provider/update-to-latest",
+    why: "Update to latest installs the newest release on demand, skipping the 3-day wait; nothing runs it but the user",
+    file: "apps/server/src/provider/providerMaintenanceRunner.ts",
+    edits: [
+      {
+        find: "          readonly targetVersion?: string | undefined;\n        },\n  ) => Effect.Effect<ServerProviderUpdatedPayload, ServerProviderUpdateError>;\n",
+        replace:
+          "          readonly targetVersion?: string | undefined;\n" +
+          "          /** blacksand: the vendor's own update to its newest release, with no age gate. */\n" +
+          "          readonly latest?: boolean | undefined;\n" +
+          "        },\n  ) => Effect.Effect<ServerProviderUpdatedPayload, ServerProviderUpdateError>;\n",
+      },
+      {
+        find:
+          '    const targetVersion = typeof target === "string" ? undefined : target.targetVersion;\n',
+        replace:
+          '    const targetVersion = typeof target === "string" ? undefined : target.targetVersion;\n' +
+          "    // blacksand: Update to latest (provider/update-to-latest).\n" +
+          '    const latest = typeof target !== "string" && target.latest === true && targetVersion === undefined;\n',
+      },
+      {
+        find:
+          "    const update = capabilities.update;\n    if (!update) {\n      return yield* new ServerProviderUpdateError({\n        provider,\n" +
+          '        reason: capabilities.manualReason ?? "This provider does not support one-click updates.",\n',
+        replace:
+          "    const update = latest ? (capabilities.latestUpdate ?? null) : capabilities.update;\n    if (!update) {\n      return yield* new ServerProviderUpdateError({\n        provider,\n" +
+          "        reason: latest\n" +
+          '          ? "This provider has no updater T3 Code (blacksand) can run."\n' +
+          '          : (capabilities.manualReason ?? "This provider does not support one-click updates."),\n',
+      },
+      {
+        find: "            if (!fresh.update || fresh.update.lockKey !== update.lockKey) {\n",
+        replace:
+          "            const freshUpdate = latest ? (fresh.latestUpdate ?? null) : fresh.update;\n" +
+          "            if (!freshUpdate || freshUpdate.lockKey !== update.lockKey) {\n",
+      },
+      {
+        find: "            const candidateVersion =\n              targetVersion ??\n",
+        replace: "            const candidateVersion = latest\n              ? null\n              : targetVersion ??\n",
+      },
+      {
+        find: "            const command =\n              targetVersion !== undefined\n",
+        replace: "            const command = latest\n              ? freshUpdate\n              : targetVersion !== undefined\n",
+      },
+      {
+        // Upstream's "already up to date" compares against the settled version, not the newest.
+        find: "            if (targetVersion === undefined) {\n              const prior =",
+        replace: "            if (targetVersion === undefined && !latest) {\n              const prior =",
+      },
+    ],
+  },
+  {
+    id: "provider/update-to-latest-input",
+    why: "The update request can ask for Update to latest (provider/update-to-latest)",
+    file: "packages/contracts/src/server.ts",
+    edits: [
+      {
+        find: "  targetVersion: Schema.optionalKey(TrimmedNonEmptyString),\n  instanceId: Schema.optionalKey(ProviderInstanceId),\n});\n",
+        replace:
+          "  targetVersion: Schema.optionalKey(TrimmedNonEmptyString),\n  instanceId: Schema.optionalKey(ProviderInstanceId),\n" +
+          "  // blacksand: the vendor's own update to its newest release, skipping the 3-day wait.\n" +
+          "  latest: Schema.optionalKey(Schema.Boolean),\n});\n",
+      },
+      {
+        find: "  canInstallVersion: Schema.optionalKey(Schema.Boolean),\n  checkedAt: Schema.NullOr(IsoDateTime),\n",
+        replace:
+          "  canInstallVersion: Schema.optionalKey(Schema.Boolean),\n" +
+          "  // blacksand: Update to latest can run for this install (provider/update-to-latest).\n" +
+          "  canUpdateToLatest: Schema.optionalKey(Schema.Boolean),\n" +
+          "  checkedAt: Schema.NullOr(IsoDateTime),\n",
+      },
+    ],
+  },
+  {
+    id: "provider/update-to-latest-advisory",
+    why: "Settings offers Update to latest only for an install that has an updater to run",
+    file: "packages/provider-core/src/server/maintenanceResolver.ts",
+    edits: [
+      {
+        find: '    canInstallVersion: makeTargetedProviderUpdateAction(capabilities, "0.0.0") !== null,\n',
+        replace:
+          '    canInstallVersion: makeTargetedProviderUpdateAction(capabilities, "0.0.0") !== null,\n' +
+          "    ...(capabilities.latestUpdate ? { canUpdateToLatest: true } : {}),\n",
+      },
+    ],
+  },
+  {
+    // T3 updates each provider by itself, through the server's one update runner and the same
+    // gated, exact-version path as Update now: only to a version the check shows at least 3 days
+    // old, only where an exact pin exists, and only while no session of that driver is opening,
+    // open or closing (blacksandProviderAutoUpdates.ts). It acts on upstream's version checks and
+    // the snapshots its health refresh republishes; it adds no schedule of its own.
+    id: "provider/automatic-updates-file",
+    why: "Updates each provider by itself to the newest release at least 3 days old, while it's idle",
+    kind: "write",
+    file: "apps/server/src/provider/blacksandProviderAutoUpdates.ts",
+    content: readFile("blacksandProviderAutoUpdates.ts"),
+  },
+  {
+    // One update runner for the server's lifetime, so automatic updates and the ones Settings
+    // asks for share upstream's command coordinator: an install waits for any other into the
+    // same place (provider/one-update-runner).
+    id: "provider/automatic-updates",
+    why: "Runs the automatic provider updates for the server's lifetime, with the server's one update runner (provider/automatic-updates-file)",
+    file: "apps/server/src/server.ts",
+    edits: [
+      {
+        find: 'import * as ProviderUsageLimitsIngestion from "./provider/ProviderUsageLimitsIngestion.ts";\n',
+        replace:
+          'import * as ProviderUsageLimitsIngestion from "./provider/ProviderUsageLimitsIngestion.ts";\n' +
+          'import * as BlacksandProviderAutoUpdates from "./provider/blacksandProviderAutoUpdates.ts";\n' +
+          'import * as ProviderMaintenanceRunner from "./provider/providerMaintenanceRunner.ts";\n',
+      },
+      {
+        find: "  layerProviderInstallationRefresh,\n  ReplayMarkers.layer,\n",
+        replace: "  layerProviderInstallationRefresh,\n  BlacksandProviderAutoUpdates.layer,\n  ReplayMarkers.layer,\n",
+      },
+      {
+        find: "  Layer.effectDiscard(ProjectSettingsOverrideSweep.sweep),\n).pipe(\n  Layer.provideMerge(layerOrchestrationApplication),\n",
+        replace:
+          "  Layer.effectDiscard(ProjectSettingsOverrideSweep.sweep),\n).pipe(\n" +
+          "  // blacksand: the server's one update runner (provider/automatic-updates).\n" +
+          "  Layer.provideMerge(ProviderMaintenanceRunner.layer),\n" +
+          "  Layer.provideMerge(layerOrchestrationApplication),\n",
+      },
+    ],
+  },
+  {
+    id: "provider/one-update-runner",
+    why: "Every socket's provider updates use the server's one update runner, so they queue behind automatic ones into the same place (provider/automatic-updates)",
+    file: "apps/server/src/ws.ts",
+    edits: [
+      {
+        find: "    const npmRelease = yield* NpmRelease.NpmRelease;\n    const pullRequests = yield* PullRequestService.PullRequestService;\n    const reviewGuides =",
+        replace:
+          "    const npmRelease = yield* NpmRelease.NpmRelease;\n" +
+          "    // blacksand: the server's one update runner (provider/one-update-runner).\n" +
+          "    const providerMaintenanceRunner = yield* ProviderMaintenanceRunner.ProviderMaintenanceRunner;\n" +
+          "    const pullRequests = yield* PullRequestService.PullRequestService;\n    const reviewGuides =",
+      },
+      {
+        find: "              Layer.provide(ProviderMaintenanceRunner.layer),\n",
+        replace:
+          "              Layer.provide(\n" +
+          "                Layer.succeed(ProviderMaintenanceRunner.ProviderMaintenanceRunner, providerMaintenanceRunner),\n" +
+          "              ),\n",
+      },
+    ],
+  },
+  {
+    // An automatic update's last check, made by the automatic updates themselves: after any wait
+    // for another update into the same place, with the exact command resolved, just before it
+    // runs. A withdrawn request runs nothing and leaves no state. Update now, Update all and
+    // Update to latest pass none, and run as upstream's do.
+    id: "provider/automatic-updates-last-check",
+    why: "An automatic update checks its settings, its provider and its command again just before it runs, and runs nothing if they've changed",
+    file: "apps/server/src/provider/providerMaintenanceRunner.ts",
+    edits: [
+      {
+        find: "          readonly latest?: boolean | undefined;\n        },\n  ) => Effect.Effect<ServerProviderUpdatedPayload, ServerProviderUpdateError>;\n",
+        replace:
+          "          readonly latest?: boolean | undefined;\n" +
+          "          /** blacksand: an automatic update's last check, just before its command runs; false runs nothing. */\n" +
+          "          readonly beforeRun?:\n" +
+          "            | ((command: ProviderMaintenanceCommandAction, version: string | null) => Effect.Effect<boolean>)\n" +
+          "            | undefined;\n" +
+          "        },\n  ) => Effect.Effect<ServerProviderUpdatedPayload, ServerProviderUpdateError>;\n",
+      },
+      {
+        find: '    const latest = typeof target !== "string" && target.latest === true && targetVersion === undefined;\n',
+        replace:
+          '    const latest = typeof target !== "string" && target.latest === true && targetVersion === undefined;\n' +
+          '    const beforeRun = typeof target === "string" ? undefined : target.beforeRun;\n',
+      },
+      {
+        find: "            yield* setRunningMessage(`Running ${describeCommand(command)}`);\n",
+        replace:
+          "            // blacksand: provider/automatic-updates-last-check.\n" +
+          "            if (beforeRun && !(yield* beforeRun(command, candidateVersion))) {\n" +
+          "              return { providers: yield* setUpdateState(null) };\n" +
+          "            }\n" +
+          "            yield* setRunningMessage(`Running ${describeCommand(command)}`);\n",
+      },
+    ],
+  },
+  {
+    // A session runs its CLI from the adapter's openSession until its scope has closed, idle or
+    // mid-turn; any instance of the driver may share the executable an update replaces. Each
+    // driver has a count of sessions opening, open or closing, and a lock. An automatic update
+    // holds the lock for its whole install, and runs only while the count is 0. A session takes
+    // the lock to count itself in, so it waits while an automatic update runs. It counts itself
+    // out in its scope's first finalizer, which runs last, once the adapter's own have stopped
+    // the CLI (Scope.close runs them in reverse). From before the count until the session is
+    // published, upstream's own failed-open cleanup closes that scope: only that setup is
+    // interruptible, so a failure or interruption anywhere in it counts the session out, and the
+    // publication follows it without a gap. Optional, so a stand-in without it reads as busy.
+    id: "provider/automatic-updates-idle",
+    why: "An automatic provider update runs only while no session of that driver is opening, open or closing, and new sessions wait for it",
+    file: "apps/server/src/orchestration-v2/ProviderSessionManager.ts",
+    edits: [
+      {
+        find: "  readonly closeInstance: (\n    instanceId: ProviderInstanceId,\n  ) => Effect.Effect<void, ProviderSessionManagerV2Error>;\n",
+        replace:
+          "  readonly closeInstance: (\n    instanceId: ProviderInstanceId,\n  ) => Effect.Effect<void, ProviderSessionManagerV2Error>;\n" +
+          "  /**\n" +
+          "   * blacksand: runs `effect` only while no session of this driver is opening, open or\n" +
+          "   * closing, and holds new ones back until it ends; otherwise nothing (provider/automatic-updates-idle).\n" +
+          "   */\n" +
+          "  readonly whenDriverIdle?: <A, E, R>(driver: string, effect: Effect.Effect<A, E, R>) => Effect.Effect<void, E, R>;\n",
+      },
+      {
+        find: "      const sessionOpen = yield* KeyedLock.make<ProviderSessionId>();\n",
+        replace:
+          "      const sessionOpen = yield* KeyedLock.make<ProviderSessionId>();\n" +
+          "      // blacksand: each driver's sessions opening, open or closing, and the lock an automatic update holds (provider/automatic-updates-idle).\n" +
+          "      const driverSessions = new Map<string, number>();\n" +
+          "      const driverIdle = yield* KeyedLock.make<string>();\n" +
+          "      const countDriverSession = (driver: string, by: number) =>\n" +
+          "        Effect.sync(() => driverSessions.set(driver, (driverSessions.get(driver) ?? 0) + by));\n",
+      },
+      {
+        find: "              const sessionScope = yield* Scope.fork(sessionScopes);\n              yield* agentScope.clear(input.threadId);\n",
+        replace:
+          "              const sessionScope = yield* Scope.fork(sessionScopes);\n" +
+          "              // blacksand: counted until this scope's last finalizer, after the CLI has stopped. Until the\n" +
+          "              // entry is published, a failure or interruption closes the scope (provider/automatic-updates-idle).\n" +
+          "              const { runtime, exposedRuntime, entry } = yield* Effect.uninterruptibleMask((restore) =>\n" +
+          "                restore(\n" +
+          "                  Effect.gen(function* () {\n" +
+          "              yield* driverIdle.withLock(\n" +
+          "                adapter.driver,\n" +
+          "                Effect.uninterruptible(\n" +
+          "                  countDriverSession(adapter.driver, 1).pipe(\n" +
+          "                    Effect.andThen(Scope.addFinalizer(sessionScope, countDriverSession(adapter.driver, -1))),\n" +
+          "                  ),\n" +
+          "                ),\n" +
+          "              );\n" +
+          "              yield* agentScope.clear(input.threadId);\n",
+      },
+      {
+        find:
+          "                  Effect.provideService(Scope.Scope, sessionScope),\n" +
+          "                  // Bound scope close after cleanup; a wedged finalizer must not hold the open lock or interrupter.\n" +
+          "                  Effect.onError(() =>\n" +
+          "                    dropReservation.pipe(\n" +
+          "                      Effect.andThen(\n" +
+          "                        prepared.issued\n" +
+          "                          ? clearMcpSession(input.threadId, mcpCredentialId)\n" +
+          "                          : Effect.void,\n" +
+          "                      ),\n" +
+          "                      Effect.ensuring(\n" +
+          "                        closeScopeWithin(sessionScope, {\n" +
+          "                          providerSessionId: input.providerSessionId,\n" +
+          "                          reason: \"open_failed\",\n" +
+          "                        }),\n" +
+          "                      ),\n" +
+          "                    ),\n" +
+          "                  ),\n" +
+          "                  Effect.mapError(\n",
+        replace: "                  Effect.provideService(Scope.Scope, sessionScope),\n                  Effect.mapError(\n",
+      },
+      {
+        find:
+          "                idleThreadUnloads: new Map(),\n" +
+          "              };\n" +
+          "              yield* Ref.update(sessions, (current) => {\n" +
+          "                const updated = new Map(current);\n" +
+          "                updated.set(key, entry);\n" +
+          "                return updated;\n" +
+          "              });\n",
+        replace:
+          "                idleThreadUnloads: new Map(),\n" +
+          "              };\n" +
+          "              return { runtime, exposedRuntime, entry };\n" +
+          "                  }),\n" +
+          "                ).pipe(\n" +
+          "                  // Bound scope close after cleanup; a wedged finalizer must not hold the open lock or interrupter.\n" +
+          "                  Effect.onError(() =>\n" +
+          "                    dropReservation.pipe(\n" +
+          "                      Effect.andThen(\n" +
+          "                        prepared.issued\n" +
+          "                          ? clearMcpSession(input.threadId, mcpCredentialId)\n" +
+          "                          : Effect.void,\n" +
+          "                      ),\n" +
+          "                      Effect.ensuring(\n" +
+          "                        closeScopeWithin(sessionScope, {\n" +
+          "                          providerSessionId: input.providerSessionId,\n" +
+          "                          reason: \"open_failed\",\n" +
+          "                        }),\n" +
+          "                      ),\n" +
+          "                    ),\n" +
+          "                  ),\n" +
+          "                  // Published as the setup ends, with no interruption between: from here the entry owns the scope.\n" +
+          "                  Effect.tap(({ entry }) =>\n" +
+          "                    Ref.update(sessions, (current) => {\n" +
+          "                      const updated = new Map(current);\n" +
+          "                      updated.set(key, entry);\n" +
+          "                      return updated;\n" +
+          "                    }),\n" +
+          "                  ),\n" +
+          "                ),\n" +
+          "              );\n",
+      },
+      {
+        find: '        closeInstance: Effect.fn("ProviderSessionManager.closeInstance")(\n',
+        replace:
+          "        whenDriverIdle: (driver, effect) =>\n" +
+          "          driverIdle.withLock(\n" +
+          "            driver,\n" +
+          "            Effect.suspend(() => ((driverSessions.get(driver) ?? 0) > 0 ? Effect.void : Effect.asVoid(effect))),\n" +
+          "          ),\n" +
+          '        closeInstance: Effect.fn("ProviderSessionManager.closeInstance")(\n',
+      },
+    ],
+  },
+  {
+    id: "provider/automatic-updates-setting",
+    why: "One setting turns automatic provider updates off; they're on by default",
+    file: "packages/contracts/src/settings.ts",
+    edits: [
+      {
+        find: "  enableProviderUpdateChecks: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),\n",
+        replace:
+          "  enableProviderUpdateChecks: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),\n" +
+          "  // blacksand: T3 updates providers by itself, 3 days after each release (provider/automatic-updates).\n" +
+          "  enableAutomaticProviderUpdates: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),\n",
+      },
+      {
+        find: "  enableProviderUpdateChecks: Schema.optionalKey(Schema.Boolean),\n",
+        replace:
+          "  enableProviderUpdateChecks: Schema.optionalKey(Schema.Boolean),\n" +
+          "  enableAutomaticProviderUpdates: Schema.optionalKey(Schema.Boolean),\n",
+      },
+    ],
+  },
+  {
+    id: "web/automatic-provider-updates-setting",
+    why: "Settings -> Maintenance turns automatic provider updates off (provider/automatic-updates-setting)",
+    file: "apps/web/src/components/settings/SettingsPanels.tsx",
+    edits: [
+      {
+        find:
+          "        <SettingsRow\n" +
+          '          {...searchableSetting("continue-threads-after-server-update")}\n',
+        replace:
+          "        <SettingsRow\n" +
+          "          serverScoped\n" +
+          '          settingKeys={["enableAutomaticProviderUpdates"]}\n' +
+          '          {...searchableSetting("automatic-provider-updates")}\n' +
+          '          description="Update each provider CLI by itself to the newest release at least 3 days old, once none of its sessions is open. It uses the provider update checks above."\n' +
+          "          resetAction={\n" +
+          "            settings.enableAutomaticProviderUpdates !==\n" +
+          "            DEFAULT_UNIFIED_SETTINGS.enableAutomaticProviderUpdates ? (\n" +
+          "              <SettingResetButton\n" +
+          '                label="automatic provider updates"\n' +
+          "                onClick={() =>\n" +
+          "                  updateSettings({\n" +
+          "                    enableAutomaticProviderUpdates: DEFAULT_UNIFIED_SETTINGS.enableAutomaticProviderUpdates,\n" +
+          "                  })\n" +
+          "                }\n" +
+          "              />\n" +
+          "            ) : null\n" +
+          "          }\n" +
+          "          control={\n" +
+          "            <ScopedSwitch\n" +
+          '              settingKeys={["enableAutomaticProviderUpdates"]}\n' +
+          "              checked={settings.enableAutomaticProviderUpdates}\n" +
+          "              onCheckedChange={(checked) =>\n" +
+          "                updateSettings({ enableAutomaticProviderUpdates: Boolean(checked) })\n" +
+          "              }\n" +
+          '              aria-label="Update providers automatically"\n' +
+          "            />\n" +
+          "          }\n" +
+          "        />\n" +
+          "        <SettingsRow\n" +
+          '          {...searchableSetting("continue-threads-after-server-update")}\n',
+      },
+      {
+        // Listed among changed settings, and reset by Restore defaults, like the checks.
+        find:
+          "    ...(settings.enableProviderUpdateChecks !== DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks\n" +
+          '      ? ["Provider update checks"]\n' +
+          "      : []),\n",
+        replace:
+          "    ...(settings.enableProviderUpdateChecks !== DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks\n" +
+          '      ? ["Provider update checks"]\n' +
+          "      : []),\n" +
+          "    ...(settings.enableAutomaticProviderUpdates !==\n" +
+          "    DEFAULT_UNIFIED_SETTINGS.enableAutomaticProviderUpdates\n" +
+          '      ? ["Automatic provider updates"]\n' +
+          "      : []),\n",
+      },
+      {
+        find: "      enableProviderUpdateChecks: DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks,\n      continueThreadsAfterServerUpdate:",
+        replace:
+          "      enableProviderUpdateChecks: DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks,\n" +
+          "      enableAutomaticProviderUpdates: DEFAULT_UNIFIED_SETTINGS.enableAutomaticProviderUpdates,\n" +
+          "      continueThreadsAfterServerUpdate:",
+      },
+    ],
+  },
+  {
+    id: "web/automatic-provider-updates-search",
+    why: "Settings search finds the automatic provider updates switch (web/automatic-provider-updates-setting)",
+    file: "apps/web/src/components/settings/settingsSearch.ts",
+    edits: [
+      {
+        find: '  {\n    id: "continue-threads-after-server-update",\n',
+        replace:
+          "  {\n" +
+          '    id: "automatic-provider-updates",\n' +
+          '    title: "Automatic provider updates",\n' +
+          '    to: "/settings/maintenance",\n' +
+          '    searchTerms: ["update provider cli automatically auto-update 3 days release age claude codex grok opencode"],\n' +
+          '    scope: "environment-defaults",\n' +
+          "  },\n" +
+          '  {\n    id: "continue-threads-after-server-update",\n',
+      },
+    ],
+  },
+  {
+    // Each provider's settings offer Update to latest when its install has an updater
+    // (provider/update-to-latest-advisory), in upstream's row and button style. The label says
+    // it skips the 3-day wait. It's never run but by this button.
+    id: "web/provider-update-to-latest",
+    why: "Settings -> Providers offers Update to latest for each provider, saying it skips the 3-day wait",
+    file: "apps/web/src/components/settings/ProviderInstanceCard.tsx",
+    edits: [
+      {
+        find: "  readonly onInstallRecommended?: (() => void) | undefined;\n  readonly isUpdating?: boolean | undefined;\n",
+        replace:
+          "  readonly onInstallRecommended?: (() => void) | undefined;\n" +
+          "  /** blacksand: the vendor's own update to its newest release, skipping the 3-day wait. */\n" +
+          "  readonly onUpdateToLatest?: (() => void) | undefined;\n" +
+          "  readonly isUpdating?: boolean | undefined;\n",
+      },
+      {
+        find: "  onRunUpdate,\n  onInstallRecommended,\n  isUpdating = false,\n",
+        replace: "  onRunUpdate,\n  onInstallRecommended,\n  onUpdateToLatest,\n  isUpdating = false,\n",
+      },
+      {
+        find: '        <SettingsRow title="Status" status={statusContent} />\n',
+        replace:
+          '        <SettingsRow title="Status" status={statusContent} />\n' +
+          "        {onUpdateToLatest ? (\n" +
+          "          <SettingsRow\n" +
+          '            title="Update to latest"\n' +
+          '            description="Install the newest release now, without waiting the 3 days automatic updates wait."\n' +
+          "            control={\n" +
+          "              <Button\n" +
+          '                type="button"\n' +
+          '                size="xs"\n' +
+          '                variant="outline"\n' +
+          "                disabled={isUpdating}\n" +
+          "                onClick={onUpdateToLatest}\n" +
+          "              >\n" +
+          "                {isUpdating ? <Spinner /> : <DownloadIcon />}\n" +
+          '                {isUpdating ? "Updating" : "Update to latest"}\n' +
+          "              </Button>\n" +
+          "            }\n" +
+          "          />\n" +
+          "        ) : null}\n",
+      },
+    ],
+  },
+  {
+    id: "web/provider-update-to-latest-request",
+    why: "Update to latest sends the update request with latest set (provider/update-to-latest-input)",
+    file: "apps/web/src/components/settings/ProviderSettingsPanel.tsx",
+    edits: [
+      {
+        find:
+          '      candidate: Pick<ProviderSettingsUpdateCandidate, "driver" | "instanceId">,\n' +
+          "      targetVersion?: string,\n    ) => {\n",
+        replace:
+          '      candidate: Pick<ProviderSettingsUpdateCandidate, "driver" | "instanceId">,\n' +
+          "      targetVersion?: string,\n      latest?: boolean,\n    ) => {\n",
+      },
+      {
+        find: "          ...(targetVersion ? { targetVersion } : {}),\n        },\n      });\n",
+        replace:
+          "          ...(targetVersion ? { targetVersion } : {}),\n" +
+          "          ...(latest ? { latest: true } : {}),\n        },\n      });\n",
+      },
+      {
+        find:
+          '    candidate: Pick<ProviderSettingsUpdateCandidate, "driver" | "instanceId">,\n' +
+          "    targetVersion?: string,\n  ) => Promise<void>;\n",
+        replace:
+          '    candidate: Pick<ProviderSettingsUpdateCandidate, "driver" | "instanceId">,\n' +
+          "    targetVersion?: string,\n    latest?: boolean,\n  ) => Promise<void>;\n",
+      },
+      {
+        find: "      isUpdating={isInstanceUpdateRunning}\n    />\n",
+        replace:
+          "      onUpdateToLatest={\n" +
+          "        !readOnly && liveProvider?.versionAdvisory?.canUpdateToLatest === true\n" +
+          "          ? () => {\n" +
+          "              if (!isInstanceUpdateRunning) void actions.runProviderUpdate(liveProvider, undefined, true);\n" +
+          "            }\n" +
+          "          : undefined\n" +
+          "      }\n" +
+          "      isUpdating={isInstanceUpdateRunning}\n    />\n",
       },
     ],
   },
@@ -989,14 +1514,16 @@ export const makeRules = ({ updater, build }) => [
   {
     // Grok's own installer keeps each build at <GROK_HOME>/downloads/grok-<version>-<platform>
     // and links ~/.grok/bin/grok to it. Only such an install gets lock key grok-native,
-    // which Update all pins: `GROK_INSTALLER=internal grok update --version <version>`
-    // (blacksandReleaseAge.ts, EXACT_UPDATES). Any other stays `grok`, left to the user.
+    // whose gated update pins it: `GROK_INSTALLER=internal GROK_MINIMUM_VERSION=<version>
+    // GROK_MAXIMUM_VERSION=<version> grok update`, never `--version`, which also turns off
+    // Grok's own auto-update (blacksandReleaseAge.ts, EXACT_UPDATES). Any other stays `grok`,
+    // with Update to latest only.
     // Its version is the newest one this server first saw at least 3 days ago on the
     // channel that installer reads, https://x.ai/cli/stable (xai-grok-update version.rs,
     // fetch_gcs_version), and no newer than the version it names now; never npm's.
     // Nothing when the channel can't be read, or no version has been seen there that long.
     id: "provider/grok-native-updates",
-    why: "Update all installs exactly a native Grok build first seen on Grok's own channel at least 3 days ago, or nothing; a Grok install of any other kind isn't run",
+    why: "A gated update installs exactly a native Grok build first seen on Grok's own channel at least 3 days ago, or nothing, unless Grok's own config requires a newer minimum; a Grok install of any other kind gets Update to latest only",
     file: "packages/provider-grok/src/server/driver.ts",
     edits: [
       {
@@ -1059,13 +1586,15 @@ export const makeRules = ({ updater, build }) => [
   // An agent CLI that updates itself in the background installs its channel's newest
   // release, however young, with no Update pressed. Each switch below is set after the
   // environment the child is given, so neither the host's nor an instance's env turns
-  // it back on. Codex's and Pi's servers only notify.
+  // it back on. They're process-only: they change nothing in the vendor's own settings,
+  // and a CLI run outside T3 updates as those say. None of them stops an explicit update
+  // (Update to latest). Codex's and Pi's servers only notify.
   {
     // Muse's launcher updates itself and its runtime on any launch, `serve` included,
     // unless MUSE_NO_AUTO_UPDATE=1. Upstream's makeMuseEnvironment sets it, but the
     // instance's env is merged over it, so an instance value of 0 turned it back on.
     id: "provider/muse-autoupdate-off",
-    why: "Every Muse process T3 starts runs with MUSE_NO_AUTO_UPDATE=1, so a Muse session never updates Muse behind Update all's 3-day gate",
+    why: "Every Muse process T3 starts runs with MUSE_NO_AUTO_UPDATE=1, so a Muse session never updates Muse behind the 3-day gate",
     file: "packages/provider-muse/src/server/driver.ts",
     edits: [
       {
@@ -1086,7 +1615,7 @@ export const makeRules = ({ updater, build }) => [
     // GROK_DISABLE_AUTOUPDATER is set. Upstream sets it for status and skills probes
     // only; this is the one spawn builder for sessions, text generation and probes alike.
     id: "provider/grok-autoupdater-off",
-    why: "Every `grok agent stdio` T3 starts runs with GROK_DISABLE_AUTOUPDATER=1, so a Grok session never updates Grok behind Update all's 3-day gate",
+    why: "Every `grok agent stdio` T3 starts runs with GROK_DISABLE_AUTOUPDATER=1, so a Grok session never updates Grok behind the 3-day gate",
     file: "packages/provider-grok/src/server/acpSupport.ts",
     edits: [
       {
@@ -1102,7 +1631,7 @@ export const makeRules = ({ updater, build }) => [
     // OpenCode's updater honours OPENCODE_DISABLE_AUTOUPDATE. Its automatic install is in
     // the interactive handler, not `serve`, so this guards against a future change.
     id: "provider/opencode-autoupdate-off",
-    why: "Every OpenCode process T3 starts runs with OPENCODE_DISABLE_AUTOUPDATE=1, so it never updates OpenCode behind Update all's 3-day gate",
+    why: "Every OpenCode process T3 starts runs with OPENCODE_DISABLE_AUTOUPDATE=1, so it never updates OpenCode behind the 3-day gate",
     file: "packages/provider-opencode/src/server/OpenCodeRuntime.ts",
     edits: [
       {
@@ -1129,7 +1658,7 @@ export const makeRules = ({ updater, build }) => [
     // to 0. Every Claude process (sessions, probes, text generation, `claude install`)
     // takes its env from mergeClaudeProcessEnvironment, after the instance's.
     id: "provider/claude-autoupdater-off",
-    why: "Every Claude Code process T3 starts runs with DISABLE_AUTOUPDATER=1, whatever an instance's env says, so it never updates Claude Code behind Update all's 3-day gate",
+    why: "Every Claude Code process T3 starts runs with DISABLE_AUTOUPDATER=1, whatever an instance's env says, so it never updates Claude Code behind the 3-day gate",
     file: "apps/server/src/provider/Drivers/ClaudeHome.ts",
     edits: [
       {

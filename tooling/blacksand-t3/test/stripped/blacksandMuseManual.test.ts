@@ -1,6 +1,6 @@
 // Copied to packages/provider-muse/src/server/ in a stripped upstream checkout and run there
 // (rules provider/updates-exact-version, provider/muse-version-check-off): Muse's launcher
-// can't install a specific version, so a Muse install is left to the user, with its command
+// can't install a specific version, so a Muse install gets no gated update, with its command
 // and why; and since its channel publishes no release dates, its version check asks nothing.
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
@@ -18,8 +18,8 @@ import { latestMuseVersion, museMaintenance } from "./maintenance.ts";
 /** Fails the test on any request: nothing here may reach Muse's channel. */
 const noRequests = HttpClient.make((request) => Effect.die(`asked ${request.url}`));
 
-it.layer(NodeServices.layer)("blacksand: Muse updates are left to the user", (it) => {
-  it.effect("an official launcher is left to the user, showing its command and why", () =>
+it.layer(NodeServices.layer)("blacksand: Muse gets no gated update", (it) => {
+  it.effect("an official launcher gets no gated update, showing its command and why", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const dir = yield* fs.realPath(yield* fs.makeTempDirectoryScoped({ prefix: "t3b-muse-" }));
@@ -36,7 +36,7 @@ it.layer(NodeServices.layer)("blacksand: Muse updates are left to the user", (it
       assert.strictEqual(left.manualCommand, command);
       assert.strictEqual(
         left.manualReason,
-        `T3 Code (blacksand) doesn't run \`${command}\`: it can't install a specific version, so it can't keep to releases at least 3 days old. Run it yourself when you choose to update.`,
+        `T3 Code (blacksand) doesn't run \`${command}\` by itself: it can't install a specific version, so it can't keep to releases at least 3 days old. Use Update to latest to run it now.`,
       );
       // Its own version comparison stays, for the settings.
       assert.strictEqual(typeof left.compareVersions, "function");

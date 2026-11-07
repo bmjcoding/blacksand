@@ -155,16 +155,24 @@ These are out of scope by design. Nothing in the code tries to cover them.
   tell ([playbook](keys-and-incidents.md#the-owner-key-leaked)).
 - **Agents within one account.** Everything running as one agent account can read
   that account's tokens and files.
-- **Vendor self-updaters.** `claude update`, `codex update` and the CLIs'
-  auto-updates install the vendors' newest builds, without the 3-day wait. The app's
-  Update never runs them that way, and the Claude Code, Grok, OpenCode and Muse processes
-  blacksand-t3 starts run with their background updaters off. Kiro's is a setting you
+- **Vendor self-updaters, and Update to latest.** `claude update`, `codex update` and
+  the CLIs' auto-updates install the vendors' newest builds, without the 3-day wait.
+  blacksand-t3 runs one of those only when you press **Update to latest** on a
+  provider. That button is a deliberate exception to the 3-day rule, so you can take a
+  release the day it ships when you choose to. A release pulled within its first days
+  can reach you that way. blacksand-t3's automatic updates, Update now and Update all
+  wait 3 days. They install exactly a version at least 3 days old, with one exception:
+  for native Grok, a minimum version Grok's own config or environment requires wins, so
+  Update now and Update all install that minimum, which may be younger. That's why native
+  Grok never updates by itself ([provider updates](../updates/provider-updates.md#update-now-and-update-all)). The automatic
+  updates run only while no session of that provider is starting, open or closing. The Claude Code, Grok,
+  OpenCode and Muse processes blacksand-t3 starts run with their background updaters
+  off. That switch is set on the process only: no vendor setting changes, and a CLI you
+  start outside blacksand-t3 updates as its own settings say. Kiro's is a setting you
   turn off yourself ([provider updates](../updates/provider-updates.md)). For native
   Grok, the 3 days count from when the server first saw a version on Grok's channel,
   by the server's clock and its record in the account's state directory. Anyone who
-  can change either can already run code as that account. You can still run an updater
-  yourself, and a CLI you start outside blacksand-t3 updates as its own settings say.
-  This is an accepted risk.
+  can change either can already run code as that account. This is an accepted risk.
 - **Hand-made configuration.** This covers unusual things the owner configures by
   hand, such as Serve mappings or foreground sessions on the scripts' ports, and edited
   plists or state files.
